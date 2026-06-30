@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, Loader2, MessageCircle, Sparkles } from 'lucide-react';
+import { Copy, Loader2, MessageCircle, Sparkles, UserPlus } from 'lucide-react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -36,9 +36,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/use-auth';
 
 type InviteRole = 'admin' | 'agent' | 'viewer';
+
+// 'existing' — the classic flow: generate a link, the recipient
+//   already has (or will self-create) a login.
+// 'new' — there's no public signup anymore, so this mode also
+//   provisions the Supabase Auth user server-side before issuing
+//   the invite. See /api/account/members/create-and-invite.
+type DialogMode = 'existing' | 'new';
 
 interface InviteMemberDialogProps {
   open: boolean;
@@ -55,8 +63,7 @@ const EXPIRY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const ROLE_DESCRIPTIONS: Record<InviteRole, string> = {
-  admin:
-    'Can invite teammates, manage settings, send messages, and edit data.',
+  admin: 'Can invite teammates, manage settings, send messages, and edit data.',
   agent:
     'Can use the inbox, contacts, broadcasts, automations, and flows. No settings or member access.',
   viewer: 'Read-only access across every page. Cannot send or edit anything.',
@@ -74,6 +81,9 @@ interface CreatedInvite {
   /** Snapshotted at creation time so a later account rename can't
    *  retroactively change the wa.me message text on the result step. */
   accountName: string;
+  /** Only set in 'new' mode — the login credentials for the
+   *  account we just provisioned, shown exactly once. */
+  newAccount?: { username: string; tempPassword: string };
 }
 
 export function InviteMemberDialog({
@@ -82,16 +92,22 @@ export function InviteMemberDialog({
   onCreated,
 }: InviteMemberDialogProps) {
   const { account } = useAuth();
+  const [mode, setMode] = useState<DialogMode>('existing');
   const [role, setRole] = useState<InviteRole>('agent');
   const [expiry, setExpiry] = useState<string>('7');
   const [label, setLabel] = useState('');
+  const [username, setUsername] = useState('');
+  const [fullName, setFullName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CreatedInvite | null>(null);
 
   function reset() {
+    setMode('existing');
     setRole('agent');
     setExpiry('7');
     setLabel('');
+    setUsername('');
+    setFullName('');
     setResult(null);
     setSubmitting(false);
   }
@@ -108,27 +124,56 @@ export function InviteMemberDialog({
       toast.error(`Label must be ${MAX_LABEL_LEN} characters or fewer`);
       return;
     }
+
+    const trimmedUsername = username.trim();
+    if (mode === 'new' && !trimmedUsername) {
+      toast.error('Username is required to create an account');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await fetch('/api/account/invitations', {
+      const endpoint =
+        mode === 'new'
+          ? '/api/account/members/create-and-invite'
+          : '/api/account/invitations';
+      const payload =
+        mode === 'new'
+          ? {
+              username: trimmedUsername,
+              fullName: fullName.trim() || undefined,
+              role,
+              expiresInDays: Number(expiry),
+              label: trimmedLabel || undefined,
+            }
+          : {
+              role,
+              expiresInDays: Number(expiry),
+              label: trimmedLabel || undefined,
+            };
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role,
-          expiresInDays: Number(expiry),
-          label: trimmedLabel || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        toast.error(payload.error || 'Failed to create invitation');
+        const responseBody = await res.json().catch(() => ({}));
+        toast.error(
+          responseBody.error ||
+            (mode === 'new'
+              ? 'Failed to create account and invitation'
+              : 'Failed to create invitation')
+        );
         return;
       }
 
       const data = (await res.json()) as {
         url: string;
         expiresInDays: number;
+        user?: { email: string };
+        tempPassword?: string;
       };
 
       setResult({
@@ -141,6 +186,10 @@ export function InviteMemberDialog({
         // — the dialog requires admin+ which requires a loaded
         // profile — but stay safe).
         accountName: account?.name ?? 'our wacrm account',
+        newAccount:
+          data.user && data.tempPassword
+            ? { username: data.user.email!.split('@')[0], tempPassword: data.tempPassword }
+            : undefined,
       });
       onCreated();
     } catch (err) {
@@ -189,23 +238,87 @@ export function InviteMemberDialog({
         {result ? (
           <>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-popover-foreground">
-                <Sparkles className="size-4 text-primary" />
-                Invite created
+              <DialogTitle className="text-popover-foreground flex items-center gap-2">
+                <Sparkles className="text-primary size-4" />
+                {result.newAccount ? 'Account created' : 'Invite created'}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Share this link with your new teammate. They&apos;ll be able
-                to sign up (or sign in) and join the account as{' '}
-                <span className="font-medium text-muted-foreground">{result.role}</span>
+                {result.newAccount ? (
+                  <>
+                    Share the login below and the invite link with your new
+                    teammate. They&apos;ll sign in, then accept the invite to
+                    join as{' '}
+                  </>
+                ) : (
+                  <>
+                    Share this link with your new teammate. They&apos;ll be able
+                    to sign in and join the account as{' '}
+                  </>
+                )}
+                <span className="text-muted-foreground font-medium">
+                  {result.role}
+                </span>
                 . The link is valid for{' '}
-                <span className="font-medium text-muted-foreground">
-                  {result.expiresInDays} day{result.expiresInDays === 1 ? '' : 's'}
+                <span className="text-muted-foreground font-medium">
+                  {result.expiresInDays} day
+                  {result.expiresInDays === 1 ? '' : 's'}
                 </span>
                 .
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3 py-2">
+              {result.newAccount && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Login username</Label>
+                    <Input
+                      readOnly
+                      value={result.newAccount.username}
+                      className="bg-muted border-border text-foreground font-mono text-xs"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      Temporary password
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={result.newAccount.tempPassword}
+                        className="bg-muted border-border text-foreground font-mono text-xs"
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(
+                              result.newAccount!.tempPassword
+                            );
+                            toast.success('Password copied');
+                          } catch {
+                            toast.error('Clipboard blocked — copy it manually');
+                          }
+                        }}
+                        className="border-border text-muted-foreground hover:bg-muted shrink-0"
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2 text-xs text-amber-200">
+                    <strong className="font-semibold text-amber-100">
+                      Save this password now.
+                    </strong>{' '}
+                    It&apos;s shown once and not recoverable afterward. They can
+                    change it from Settings once signed in.
+                  </div>
+                </>
+              )}
+
               <Label className="text-muted-foreground">Invite link</Label>
               <div className="flex gap-2">
                 <Input
@@ -233,9 +346,9 @@ export function InviteMemberDialog({
                 <strong className="font-semibold text-amber-100">
                   Save this link now.
                 </strong>{' '}
-                We never store the plaintext — once you close this dialog
-                the URL is gone. To re-share, revoke this invite and create
-                a new one.
+                We never store the plaintext — once you close this dialog the
+                URL is gone. To re-share, revoke this invite and create a new
+                one.
               </div>
 
               {/* Anchor styled with `buttonVariants` rather than wrapping
@@ -250,7 +363,7 @@ export function InviteMemberDialog({
                 className={buttonVariants({
                   variant: 'outline',
                   className:
-                    'w-full border-border text-muted-foreground hover:bg-muted',
+                    'border-border text-muted-foreground hover:bg-muted w-full',
                 })}
               >
                 <MessageCircle className="size-4" />
@@ -270,71 +383,125 @@ export function InviteMemberDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle className="text-popover-foreground">Invite a teammate</DialogTitle>
+              <DialogTitle className="text-popover-foreground">
+                {mode === 'new'
+                  ? 'Create account & invite'
+                  : 'Invite a teammate'}
+              </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Generate a one-time invite link. Share it via WhatsApp,
-                Slack, or any channel you like — no email service required.
+                {mode === 'new'
+                  ? "Provision a login for someone who doesn't have one yet, then invite them to join."
+                  : 'Generate a one-time invite link for someone who already has a login.'}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Role</Label>
-                <Select
-                  value={role}
-                  onValueChange={(v) => v && setRole(v as InviteRole)}
-                >
-                  <SelectTrigger className="w-full bg-muted border-border text-foreground">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="agent">Agent</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {ROLE_DESCRIPTIONS[role]}
-                </p>
-              </div>
+            <Tabs
+              value={mode}
+              onValueChange={(v) => v && setMode(v as DialogMode)}
+              className="px-0"
+            >
+              <TabsList className="w-full">
+                <TabsTrigger value="existing" className="flex-1">
+                  Existing user
+                </TabsTrigger>
+                <TabsTrigger value="new" className="flex-1">
+                  <UserPlus className="size-3.5" />
+                  New account
+                </TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Link valid for</Label>
-                <Select
-                  value={expiry}
-                  onValueChange={(v) => v && setExpiry(v)}
-                >
-                  <SelectTrigger className="w-full bg-muted border-border text-foreground">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EXPIRY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <TabsContent value={mode} className="space-y-4 py-2">
+                {mode === 'new' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">Username</Label>
+                      <Input
+                        type="text"
+                        placeholder="janedoe"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground">
+                        Full name{' '}
+                        <span className="text-muted-foreground text-xs">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        placeholder="Jane Doe"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </>
+                )}
 
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  Label{' '}
-                  <span className="text-xs text-muted-foreground">(optional)</span>
-                </Label>
-                <Input
-                  placeholder="e.g. Sara — support team"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  maxLength={MAX_LABEL_LEN}
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Helps you remember who you sent the link to in the pending
-                  list below.
-                </p>
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Role</Label>
+                  <Select
+                    value={role}
+                    onValueChange={(v) => v && setRole(v as InviteRole)}
+                  >
+                    <SelectTrigger className="bg-muted border-border text-foreground w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="agent">Agent</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">
+                    {ROLE_DESCRIPTIONS[role]}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">
+                    Link valid for
+                  </Label>
+                  <Select
+                    value={expiry}
+                    onValueChange={(v) => v && setExpiry(v)}
+                  >
+                    <SelectTrigger className="bg-muted border-border text-foreground w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXPIRY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">
+                    Label{' '}
+                    <span className="text-muted-foreground text-xs">
+                      (optional)
+                    </span>
+                  </Label>
+                  <Input
+                    placeholder="e.g. Sara — support team"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    maxLength={MAX_LABEL_LEN}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Helps you remember who you sent the link to in the pending
+                    list below.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <DialogFooter className="bg-popover border-border">
               <Button
@@ -354,6 +521,8 @@ export function InviteMemberDialog({
                     <Loader2 className="size-4 animate-spin" />
                     Creating...
                   </>
+                ) : mode === 'new' ? (
+                  'Create & invite'
                 ) : (
                   'Generate link'
                 )}
