@@ -77,7 +77,7 @@ npm run dev
 ```
 
 Open <http://localhost:3001>. You'll be redirected to `/login` (or
-`/dashboard` if already signed in).
+`/inbox` if already signed in).
 
 ## 🚀 Deploy on Hostinger (recommended)
 

@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
   // send the already-signed-in user to /join/<token> instead so
   // they can accept the invitation in one click. Without this,
   // a forwarded invite link to someone who's already signed in
-  // would silently drop them on /dashboard.
+  // would silently drop them on /inbox.
   if (user && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone()
     const inviteToken = request.nextUrl.searchParams.get('invite')
@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
       url.pathname = `/join/${encodeURIComponent(inviteToken)}`
       url.search = ''
     } else {
-      url.pathname = '/dashboard'
+      url.pathname = '/inbox'
       url.search = ''
     }
     return withRefreshedCookies(NextResponse.redirect(url))
