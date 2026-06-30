@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import packageJson from "../../../package.json";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,6 @@ import {
   Crown,
   GitBranch,
   LayoutDashboard,
-  LogOut,
   MessageSquare,
   Radio,
   Settings,
@@ -63,18 +63,6 @@ const ROLE_CHIP: Record<
       "border-border bg-card text-muted-foreground",
   },
 };
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   href: string;
@@ -100,6 +88,11 @@ const bottomNavItems = [
   { href: "/flows", label: "Flows", icon: Workflow, beta: true },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+// TODO: replace with the real support link and a version sourced from
+// package.json (or an env var injected at build time) once confirmed.
+const SUPPORT_WA = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || 'https://wa.me/';
+const APP_VERSION = `v${packageJson.version}`;
 
 interface SidebarProps {
   /** Controlled on mobile by the Header's hamburger button. Ignored on lg+. */
@@ -196,7 +189,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </div>
 
         {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive =
@@ -243,9 +236,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             })}
           </ul>
 
-          <div className="my-4 border-t border-border" />
-
-          <ul className="flex flex-col gap-1">
+          <ul className="mt-auto flex flex-col gap-1 pt-4">
             {bottomNavItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
@@ -305,70 +296,39 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               ) : null}
             </div>
           ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/60 focus:bg-muted/60 focus:outline-none data-popup-open:bg-muted/60">
-              <Avatar className="size-8 shrink-0">
-                {profile?.avatar_url ? (
-                  <AvatarImage
-                    src={profile.avatar_url}
-                    alt={profile.full_name ?? "Avatar"}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
-                  {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                    profile?.email?.split('@')[0]?.charAt(0)?.toUpperCase() ??
-                    "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {profile?.full_name ?? "User"}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {profile?.email?.split('@')[0] ?? ""}
-                </p>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side="top"
-              sideOffset={6}
-              className="min-w-56 bg-popover text-popover-foreground ring-border"
+        </div>
+
+        {/* Support / WhatsApp */}
+        <div className="shrink-0 border-border px-3">
+          <p className="mb-1.5 px-0.5 text-center text-[11px] leading-snug text-muted-foreground">
+            Need help? Contact our IT support team
+          </p>
+          <a
+            href={SUPPORT_WA}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-600/25 bg-emerald-600/[0.06] px-3 py-2 text-sm font-medium text-emerald-500 transition-colors hover:bg-emerald-600/10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="4 4 16 16"
+              fill="currentColor"
             >
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=profile"
-                    onClick={onClose}
-                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-                  />
-                }
-              >
-                <User className="size-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=whatsapp"
-                    onClick={onClose}
-                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-                  />
-                }
-              >
-                <Settings className="size-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem
-                onClick={signOut}
-                className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <LogOut className="size-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <g transform="scale(1.5) translate(-4 -4)">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564c.173.087.289.129.332.202.043.073.043.423-.101.827z" />
+              </g>
+            </svg>
+            WhatsApp support
+          </a>
+        </div>
+
+        {/* Version badge */}
+        <div className="flex shrink-0 justify-center pt-2 pb-3">
+          <span className="inline-flex items-center rounded-full border border-red-600/25 bg-red-600/10 px-2.5 py-0.5 font-mono text-[10px] font-bold tracking-wide text-red-500">
+            {APP_VERSION}
+          </span>
         </div>
       </aside>
     </>

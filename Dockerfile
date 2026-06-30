@@ -1,6 +1,6 @@
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
 # Install production + dev deps so the builder has everything it needs.
-FROM node:20-alpine AS deps
+FROM node:26.4.0-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN npm ci
 
 # ─── Stage 2: builder ─────────────────────────────────────────────────────────
 # Build the Next.js app with standalone output enabled.
-FROM node:20-alpine AS builder
+FROM node:26.4.0-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -22,7 +22,7 @@ RUN npm run build
 
 # ─── Stage 3: runner ──────────────────────────────────────────────────────────
 # Minimal production image — only the standalone bundle + static assets.
-FROM node:20-alpine AS runner
+FROM node:26.4.0-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
