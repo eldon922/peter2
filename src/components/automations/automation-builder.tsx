@@ -372,7 +372,7 @@ function AgentSelect({
       <option value="">Select an agent…</option>
       {members.map((m) => (
         <option key={m.user_id} value={m.user_id}>
-          {m.full_name || m.email || m.user_id}
+          {m.full_name || m.username || m.user_id}
         </option>
       ))}
       {value && !selected && (

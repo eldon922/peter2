@@ -54,14 +54,14 @@ export interface Account {
 /**
  * Hydrated member row for the Settings → Members tab. Combines
  * the profile and its account_role for a single member of the
- * caller's account. Sensitive fields (email) are populated only
+ * caller's account. Sensitive fields (username) are populated only
  * when the caller has admin+ — agents and viewers see name +
  * avatar + role only.
  */
 export interface AccountMember {
   user_id: string;
   full_name: string;
-  email: string | null;
+  username: string | null;
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;

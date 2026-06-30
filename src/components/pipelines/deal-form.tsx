@@ -358,7 +358,7 @@ export function DealForm({
                 <option value="">Unassigned</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.full_name || p.email}
+                    {p.full_name || p.email?.split('@')[0]}
                   </option>
                 ))}
               </select>

@@ -137,8 +137,8 @@ export function SettingsOverview({
     };
   }, [user, accountId, canManageMembers]);
 
-  const displayName = profile?.full_name || profile?.email || 'Your account';
-  const initial = (profile?.full_name || profile?.email || 'U').charAt(0).toUpperCase();
+  const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'Your account';
+  const initial = (profile?.full_name || profile?.email?.split('@')[0] || 'U').charAt(0).toUpperCase();
   const roleMeta = accountRole ? ROLE_META[accountRole] : null;
   const RoleIcon = roleMeta?.icon;
 
@@ -235,7 +235,7 @@ export function SettingsOverview({
           </div>
           {profile?.email ? (
             <div className="truncate text-sm text-muted-foreground">
-              {profile.email}
+              {profile.email.split('@')[0]}
             </div>
           ) : null}
         </div>
