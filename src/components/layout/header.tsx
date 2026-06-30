@@ -49,7 +49,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
 
   const initial =
     profile?.full_name?.charAt(0)?.toUpperCase() ??
-    profile?.email?.charAt(0)?.toUpperCase() ??
+    profile?.email?.split('@')[0]?.charAt(0)?.toUpperCase() ??
     "U";
 
   return (
@@ -102,7 +102,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
               {profile?.full_name ?? "User"}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {profile?.email ?? ""}
+              {profile?.email?.split('@')[0] ?? ""}
             </p>
           </div>
           <DropdownMenuSeparator className="bg-border" />

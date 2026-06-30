@@ -58,7 +58,7 @@ export async function GET() {
         {
           user_id: row.user_id,
           full_name: row.full_name ?? "",
-          email: canSeeEmails ? row.email : null,
+          email: canSeeEmails && row.email ? row.email.split('@')[0] : null,
           avatar_url: row.avatar_url,
           role: row.account_role,
           joined_at: row.created_at,

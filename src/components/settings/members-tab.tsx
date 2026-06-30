@@ -359,7 +359,7 @@ export function MembersTab() {
                               />
                             ) : null}
                             <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
-                              {(member.full_name || member.email || 'U')
+                              {(member.full_name || member.email?.split('@')[0] || 'U')
                                 .charAt(0)
                                 .toUpperCase()}
                             </AvatarFallback>
@@ -391,7 +391,7 @@ export function MembersTab() {
                       </div>
                       {member.email && (
                         <p className="truncate text-xs text-muted-foreground">
-                          {member.email}
+                          {member.email.split('@')[0]}
                         </p>
                       )}
                     </div>

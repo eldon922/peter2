@@ -36,18 +36,17 @@ export function ProfileForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [emailChangePending, setEmailChangePending] = useState(false);
 
   // Seed form state once the profile loads.
   useEffect(() => {
     if (!profile) return;
     setFullName(profile.full_name ?? '');
-    setEmail(profile.email ?? '');
+    setUsername(profile.email?.split('@')[0] ?? '');
   }, [profile]);
 
   // Cleanup object URLs to avoid leaks.
@@ -60,7 +59,7 @@ export function ProfileForm() {
   const currentAvatar =
     previewUrl ?? (!removeAvatar ? profile?.avatar_url ?? null : null);
 
-  const initial = (fullName || profile?.full_name || profile?.email || 'U')
+  const initial = (fullName || profile?.full_name || username || 'U')
     .charAt(0)
     .toUpperCase();
 
@@ -104,11 +103,6 @@ export function ProfileForm() {
       toast.error('Display name is required');
       return;
     }
-    const trimmedEmail = email.trim();
-    if (!EMAIL_RE.test(trimmedEmail)) {
-      toast.error('Enter a valid email address');
-      return;
-    }
 
     setSaving(true);
     try {
@@ -148,39 +142,12 @@ export function ProfileForm() {
       if (updateError) {
         throw new Error(`Save failed: ${updateError.message}`);
       }
-
-      // Email change goes through Supabase Auth, which emails a
-      // confirmation to both the old and new addresses. We don't
-      // touch profiles.email — Supabase will push the change there
-      // after the user clicks the link (handled by the handle_new_user
-      // trigger pattern in production deployments).
-      let emailSent = false;
-      if (trimmedEmail.toLowerCase() !== profile.email.toLowerCase()) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: trimmedEmail,
-        });
-        if (emailError) {
-          // Partial success: name/avatar saved but email didn't.
-          toast.success('Profile saved');
-          toast.error(`Email change failed: ${emailError.message}`);
-          setSaving(false);
-          await refreshProfile();
-          return;
-        }
-        emailSent = true;
-      }
-
-      setEmailChangePending(emailSent);
       setPendingAvatar(null);
       setPreviewUrl(null);
       setRemoveAvatar(false);
       await refreshProfile();
 
-      toast.success(
-        emailSent
-          ? 'Profile saved — check your email to confirm the address change'
-          : 'Profile saved',
-      );
+      toast.success('Profile saved');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       toast.error(msg);
@@ -192,7 +159,6 @@ export function ProfileForm() {
   const dirty =
     !!profile &&
     (fullName.trim() !== (profile.full_name ?? '') ||
-      email.trim().toLowerCase() !== (profile.email ?? '').toLowerCase() ||
       pendingAvatar !== null ||
       removeAvatar);
 
@@ -275,29 +241,17 @@ export function ProfileForm() {
             />
           </div>
 
-          {/* Email */}
+          {/* Username */}
           <div className="space-y-2">
-            <Label htmlFor="profile-email" className="text-foreground">
-              Email
+            <Label htmlFor="profile-username" className="text-foreground">
+              Username
             </Label>
             <Input
-              id="profile-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={saving}
-              required
+              id="profile-username"
+              type="text"
+              value={username}
+              disabled
             />
-            {emailChangePending && (
-              <p className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                <Mail className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  Check the inbox for <strong>{profile?.email}</strong> and{' '}
-                  <strong>{email}</strong> — both need to confirm before the
-                  change takes effect.
-                </span>
-              </p>
-            )}
           </div>
 
           {/* Read-only block */}

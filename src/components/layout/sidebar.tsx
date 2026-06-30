@@ -284,7 +284,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   gets truncated (long account names + narrow
                   sidebars). Cheap a11y win. */}
               <span className="truncate" title={account.name}>
-                {account.name}
+                {account.name.split('@')[0]}
               </span>
               {accountRole ? (
                 // Always render the chip — owners used to be
@@ -317,7 +317,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 ) : null}
                 <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
                   {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                    profile?.email?.charAt(0)?.toUpperCase() ??
+                    profile?.email?.split('@')[0]?.charAt(0)?.toUpperCase() ??
                     "U"}
                 </AvatarFallback>
               </Avatar>
@@ -326,7 +326,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   {profile?.full_name ?? "User"}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {profile?.email ?? ""}
+                  {profile?.email?.split('@')[0] ?? ""}
                 </p>
               </div>
             </DropdownMenuTrigger>

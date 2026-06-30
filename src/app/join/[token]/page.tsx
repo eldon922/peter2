@@ -183,7 +183,7 @@ export default function JoinPage() {
         if (res.status === 409) {
           setConflictMessage(
             payload.error ||
-              'You are already in another account. Sign in with a different email to join this one.',
+              'You are already in another account. Sign in with a different username to join this one.',
           );
         } else {
           toast.error(payload.error || 'Failed to accept invitation');
@@ -365,7 +365,7 @@ export default function JoinPage() {
               <p>
                 To join{' '}
                 <span className="text-popover-foreground">{peek.account_name}</span>,
-                sign out and sign up again with a different email address.
+                sign out and sign in again with a different username.
                 The invite link stays valid as long as it hasn&apos;t
                 expired.
               </p>
@@ -389,7 +389,7 @@ export default function JoinPage() {
                     Signing out…
                   </>
                 ) : (
-                  'Sign out & use a different email'
+                  'Sign out & use a different username'
                 )}
               </Button>
             </DialogFooter>
