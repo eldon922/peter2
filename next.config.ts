@@ -61,6 +61,10 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // Emit a self-contained server bundle for Docker.
+  // The .next/standalone directory includes a minimal node_modules copy
+  // and a server.js entry point — no full node_modules needed at runtime.
+  output: "standalone",
   /**
    * Cache-Control policy.
    *

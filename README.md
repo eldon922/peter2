@@ -76,7 +76,7 @@ cp .env.local.example .env.local   # fill in Supabase + Meta creds
 npm run dev
 ```
 
-Open <http://localhost:3000>. You'll be redirected to `/login` (or
+Open <http://localhost:3001>. You'll be redirected to `/login` (or
 `/dashboard` if already signed in).
 
 ## 🚀 Deploy on Hostinger (recommended)
