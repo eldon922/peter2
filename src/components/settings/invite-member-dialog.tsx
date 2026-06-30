@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -75,7 +76,9 @@ const ROLE_DESCRIPTIONS: Record<InviteRole, string> = {
 const MAX_LABEL_LEN = 80;
 
 interface CreatedInvite {
-  url: string;
+  /** Absent when `autoJoin` skipped the invitation system entirely
+   *  — there's no link to show in that case. */
+  url?: string;
   role: InviteRole;
   expiresInDays: number;
   /** Snapshotted at creation time so a later account rename can't
@@ -83,7 +86,10 @@ interface CreatedInvite {
   accountName: string;
   /** Only set in 'new' mode — the login credentials for the
    *  account we just provisioned, shown exactly once. */
-  newAccount?: { username: string; tempPassword: string };
+  newAccount?: { email: string; tempPassword: string };
+  /** True when `autoJoin` moved the user straight into the
+   *  account server-side — no invite link exists for this one. */
+  joined?: boolean;
 }
 
 export function InviteMemberDialog({
@@ -92,22 +98,24 @@ export function InviteMemberDialog({
   onCreated,
 }: InviteMemberDialogProps) {
   const { account } = useAuth();
-  const [mode, setMode] = useState<DialogMode>('existing');
+  const [mode, setMode] = useState<DialogMode>('new');
   const [role, setRole] = useState<InviteRole>('agent');
   const [expiry, setExpiry] = useState<string>('7');
   const [label, setLabel] = useState('');
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
+  const [autoJoin, setAutoJoin] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CreatedInvite | null>(null);
 
   function reset() {
-    setMode('existing');
+    setMode('new');
     setRole('agent');
     setExpiry('7');
     setLabel('');
     setUsername('');
     setFullName('');
+    setAutoJoin(true);
     setResult(null);
     setSubmitting(false);
   }
@@ -145,6 +153,7 @@ export function InviteMemberDialog({
               role,
               expiresInDays: Number(expiry),
               label: trimmedLabel || undefined,
+              autoJoin,
             }
           : {
               role,
@@ -170,16 +179,17 @@ export function InviteMemberDialog({
       }
 
       const data = (await res.json()) as {
-        url: string;
-        expiresInDays: number;
+        url?: string;
+        expiresInDays?: number;
         user?: { email: string };
         tempPassword?: string;
+        joined?: boolean;
       };
 
       setResult({
         url: data.url,
         role,
-        expiresInDays: data.expiresInDays,
+        expiresInDays: data.expiresInDays ?? Number(expiry),
         // Snapshot the account name into the result so the wa.me
         // share message has team context. Falls back to a generic
         // string if `account` hasn't loaded yet (shouldn't happen
@@ -190,6 +200,7 @@ export function InviteMemberDialog({
           data.user && data.tempPassword
             ? { username: data.user.email!.split('@')[0], tempPassword: data.tempPassword }
             : undefined,
+        joined: data.joined === true,
       });
       onCreated();
     } catch (err) {
@@ -201,7 +212,7 @@ export function InviteMemberDialog({
   }
 
   async function copyToClipboard() {
-    if (!result) return;
+    if (!result?.url) return;
     try {
       await navigator.clipboard.writeText(result.url);
       toast.success('Invite link copied');
@@ -223,16 +234,23 @@ export function InviteMemberDialog({
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   }
 
+  function handleOpenChange(next: boolean) {
+    // Reset state when the dialog closes — both for cancel and
+    // for dismissal after a successful create. The plaintext URL
+    // (and any temp password) is intentionally NOT preserved across
+    // opens. This is the single source of truth for closing the
+    // dialog — every close path (overlay click, ESC, Cancel, Done)
+    // must funnel through here, not call the `onOpenChange` prop
+    // directly, or the reset gets skipped and the next open shows
+    // stale credentials.
+    if (!next) reset();
+    onOpenChange(next);
+  }
+
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        // Reset state when the dialog closes — both for cancel and
-        // for dismissal after a successful create. The plaintext URL
-        // is intentionally NOT preserved across opens.
-        if (!next) reset();
-        onOpenChange(next);
-      }}
+      onOpenChange={handleOpenChange}
     >
       <DialogContent className="bg-popover border-border sm:max-w-md">
         {result ? (
@@ -240,10 +258,19 @@ export function InviteMemberDialog({
             <DialogHeader>
               <DialogTitle className="text-popover-foreground flex items-center gap-2">
                 <Sparkles className="text-primary size-4" />
-                {result.newAccount ? 'Account created' : 'Invite created'}
+                {result.joined
+                  ? 'Account created & joined'
+                  : result.newAccount
+                    ? 'Account created'
+                    : 'Invite created'}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                {result.newAccount ? (
+                {result.joined ? (
+                  <>
+                    They&apos;re already a member — no invite link needed. Just
+                    share the login below and they&apos;re in as{' '}
+                  </>
+                ) : result.newAccount ? (
                   <>
                     Share the login below and the invite link with your new
                     teammate. They&apos;ll sign in, then accept the invite to
@@ -258,12 +285,18 @@ export function InviteMemberDialog({
                 <span className="text-muted-foreground font-medium">
                   {result.role}
                 </span>
-                . The link is valid for{' '}
-                <span className="text-muted-foreground font-medium">
-                  {result.expiresInDays} day
-                  {result.expiresInDays === 1 ? '' : 's'}
-                </span>
-                .
+                {result.joined ? (
+                  '.'
+                ) : (
+                  <>
+                    . The link is valid for{' '}
+                    <span className="text-muted-foreground font-medium">
+                      {result.expiresInDays} day
+                      {result.expiresInDays === 1 ? '' : 's'}
+                    </span>
+                    .
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
 
@@ -319,61 +352,65 @@ export function InviteMemberDialog({
                 </>
               )}
 
-              <Label className="text-muted-foreground">Invite link</Label>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={result.url}
-                  className="bg-muted border-border text-foreground font-mono text-xs"
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-                <Button
-                  type="button"
-                  onClick={copyToClipboard}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
-                >
-                  <Copy className="size-4" />
-                  Copy
-                </Button>
-              </div>
+              {result.url && (
+                <>
+                  <Label className="text-muted-foreground">Invite link</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={result.url}
+                      className="bg-muted border-border text-foreground font-mono text-xs"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <Button
+                      type="button"
+                      onClick={copyToClipboard}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
+                    >
+                      <Copy className="size-4" />
+                      Copy
+                    </Button>
+                  </div>
 
-              {/* Higher-contrast amber than the original 10% / amber-200.
-                  Reviewed against slate-900 to meet WCAG AAA for body
-                  text (target ratio 7:1). Border bumped to /50, bg to
-                  /15, foreground promoted to amber-100 for the strong
-                  intro, amber-200 for the body. */}
-              <div className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2 text-xs text-amber-200">
-                <strong className="font-semibold text-amber-100">
-                  Save this link now.
-                </strong>{' '}
-                We never store the plaintext — once you close this dialog the
-                URL is gone. To re-share, revoke this invite and create a new
-                one.
-              </div>
+                  {/* Higher-contrast amber than the original 10% / amber-200.
+                      Reviewed against slate-900 to meet WCAG AAA for body
+                      text (target ratio 7:1). Border bumped to /50, bg to
+                      /15, foreground promoted to amber-100 for the strong
+                      intro, amber-200 for the body. */}
+                  <div className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2 text-xs text-amber-200">
+                    <strong className="font-semibold text-amber-100">
+                      Save this link now.
+                    </strong>{' '}
+                    We never store the plaintext — once you close this dialog
+                    the URL is gone. To re-share, revoke this invite and create
+                    a new one.
+                  </div>
 
-              {/* Anchor styled with `buttonVariants` rather than wrapping
-                  in <Button asChild>. The wacrm Button is the Base UI
-                  ButtonPrimitive — it has no Radix-style asChild slot.
-                  Direct anchor preserves right-click "Open in new tab"
-                  behaviour too. */}
-              <a
-                href={whatsappShareUrl(result.url)}
-                target="_blank"
-                rel="noreferrer noopener"
-                className={buttonVariants({
-                  variant: 'outline',
-                  className:
-                    'border-border text-muted-foreground hover:bg-muted w-full',
-                })}
-              >
-                <MessageCircle className="size-4" />
-                Send via WhatsApp
-              </a>
+                  {/* Anchor styled with `buttonVariants` rather than wrapping
+                      in <Button asChild>. The wacrm Button is the Base UI
+                      ButtonPrimitive — it has no Radix-style asChild slot.
+                      Direct anchor preserves right-click "Open in new tab"
+                      behaviour too. */}
+                  <a
+                    href={whatsappShareUrl(result.url)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className={buttonVariants({
+                      variant: 'outline',
+                      className:
+                        'border-border text-muted-foreground hover:bg-muted w-full',
+                    })}
+                  >
+                    <MessageCircle className="size-4" />
+                    Send via WhatsApp
+                  </a>
+                </>
+              )}
             </div>
 
             <DialogFooter className="bg-popover border-border">
               <Button
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleOpenChange(false)}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 Done
@@ -437,6 +474,29 @@ export function InviteMemberDialog({
                         className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                       />
                     </div>
+
+                    <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
+                      <div className="space-y-0.5">
+                        <Label
+                          htmlFor="auto-join"
+                          className="text-foreground font-medium"
+                        >
+                          Add directly, skip the invite link
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          Joins them to {account?.name ?? 'this account'} as{' '}
+                          {role} immediately — no link to send, nothing for them
+                          to click.
+                        </p>
+                      </div>
+                      <Switch
+                        id="auto-join"
+                        checked={autoJoin}
+                        onCheckedChange={(checked) =>
+                          setAutoJoin(checked === true)
+                        }
+                      />
+                    </div>
                   </>
                 )}
 
@@ -460,26 +520,28 @@ export function InviteMemberDialog({
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">
-                    Link valid for
-                  </Label>
-                  <Select
-                    value={expiry}
-                    onValueChange={(v) => v && setExpiry(v)}
-                  >
-                    <SelectTrigger className="bg-muted border-border text-foreground w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPIRY_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!(mode === 'new' && autoJoin) && (
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      Link valid for
+                    </Label>
+                    <Select
+                      value={expiry}
+                      onValueChange={(v) => v && setExpiry(v)}
+                    >
+                      <SelectTrigger className="bg-muted border-border text-foreground w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXPIRY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">
@@ -496,8 +558,9 @@ export function InviteMemberDialog({
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
                   <p className="text-muted-foreground text-xs">
-                    Helps you remember who you sent the link to in the pending
-                    list below.
+                    {mode === 'new' && autoJoin
+                      ? 'Helps you remember why this account was created, in the members audit log.'
+                      : 'Helps you remember who you sent the link to in the pending list below.'}
                   </p>
                 </div>
               </TabsContent>
@@ -506,7 +569,7 @@ export function InviteMemberDialog({
             <DialogFooter className="bg-popover border-border">
               <Button
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleOpenChange(false)}
                 className="border-border text-muted-foreground hover:bg-muted"
               >
                 Cancel
@@ -519,10 +582,16 @@ export function InviteMemberDialog({
                 {submitting ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Creating...
+                    {mode === 'new' && autoJoin
+                      ? 'Creating & joining...'
+                      : 'Creating...'}
                   </>
                 ) : mode === 'new' ? (
-                  'Create & invite'
+                  autoJoin ? (
+                    'Create & add to workspace'
+                  ) : (
+                    'Create & invite'
+                  )
                 ) : (
                   'Generate link'
                 )}

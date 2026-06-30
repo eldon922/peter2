@@ -2,25 +2,53 @@
 // /api/account/members/create-and-invite
 //
 //   POST — provision a brand-new Supabase Auth user (admin-side,
-//          since self-signup was removed) AND create a workspace
-//          invitation for them in one call.
+//          since self-signup was removed) AND either:
+//
+//            - `autoJoin: false` (default) — create a workspace
+//              invitation for them, same as before.
+//            - `autoJoin: true` — skip the invitation/token system
+//              entirely and move them straight into this account,
+//              server-side. No link, no click-through.
 //
 // This replaces the old flow where a new teammate without an
 // existing account would hit `/signup?invite=<token>` and create
 // their own login. With public signup gone, an admin must create
 // the `auth.users` row themselves — this route does that via the
-// service-role Admin API, then reuses the exact same invitation
-// logic as `POST /api/account/invitations` so the rest of the
-// join flow (`/join/<token>` → `redeem_invitation`) is untouched.
+// service-role Admin API, then either issues an invite (same logic
+// as `POST /api/account/invitations`) or joins them directly.
 //
-// Auth model
-// ----------
-// We generate a random temporary password and return it ONCE,
-// the same "shown once, never persisted in plaintext" contract
-// the invite token already uses. This sidesteps any dependency on
-// SMTP/email delivery being configured — the admin shares both
-// the login email+password and the invite link over WhatsApp/
-// Slack/whatever, same as the existing invite-only flow.
+// Why `autoJoin` can't just call the existing `redeem_invitation`
+// RPC
+// ----------------------------------------------------------------
+// `redeem_invitation` is SECURITY DEFINER but still reads
+// `auth.uid()` from the request's session to know who's redeeming.
+// A service-role call has no session — `auth.uid()` is NULL there,
+// so the RPC would raise "Unauthorized". There's no "redeem on
+// behalf of user X" parameter, by design (it would let a service
+// caller move *any* existing user's account, not just one we just
+// created).
+//
+// So `autoJoin` mode reimplements the RPC's three-step move
+// directly via the service-role client instead: re-point the new
+// user's profile at this account, mark a (synthetic, already-
+// accepted) invitation row for audit history, then delete their
+// now-orphaned personal account. This is safe ONLY because we just
+// created the user a few lines above — their personal account is
+// guaranteed fresh, empty, and sole-owned, which is exactly what
+// `redeem_invitation`'s own safety checks verify for the normal
+// link-based path. This code must never be reachable for an
+// arbitrary *existing* user — there is deliberately no "join this
+// already-registered email into my account" endpoint anywhere in
+// this codebase, and this one stays scoped to brand-new users only.
+//
+// Auth model (both modes)
+// ------------------------
+// We generate a random temporary password and return it ONCE, the
+// same "shown once, never persisted in plaintext" contract the
+// invite token already uses. This sidesteps any dependency on
+// SMTP/email delivery being configured — the admin shares the
+// login email+password (and, in invite mode, the link) over
+// WhatsApp/Slack/whatever, same as the existing invite-only flow.
 //
 // If you'd rather Supabase email the new user a "set your
 // password" link instead, swap the `admin.createUser` call below
@@ -67,9 +95,10 @@ export async function POST(request: Request) {
     const ctx = await requireRole('admin');
 
     // Two side effects in one call (create a user, then write an
-    // invitation row) — same bucket/limit as other admin member-
-    // management actions so this doesn't get a quieter ceiling
-    // than, say, the plain invite-create endpoint.
+    // invitation row or move them into the account) — same bucket/
+    // limit as other admin member-management actions so this
+    // doesn't get a quieter ceiling than, say, the plain invite-
+    // create endpoint.
     const limit = checkRateLimit(
       `admin:createAndInvite:${ctx.userId}`,
       RATE_LIMITS.adminAction
@@ -82,6 +111,7 @@ export async function POST(request: Request) {
       role?: unknown;
       expiresInDays?: unknown;
       label?: unknown;
+      autoJoin?: unknown;
     } | null;
 
     const username = typeof body?.username === 'string' ? body.username.trim() : '';
@@ -115,6 +145,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const autoJoin = body?.autoJoin === true;
+
     let label: string | null = null;
     if (typeof body?.label === 'string') {
       const trimmed = body.label.trim();
@@ -142,7 +174,8 @@ export async function POST(request: Request) {
     // fires on this insert exactly like it did for self-signup,
     // giving the new user a fresh personal `accounts` row + a
     // linked `profiles` row with role 'owner' — the empty,
-    // sole-owned state `redeem_invitation` requires.
+    // sole-owned state both `redeem_invitation` and the `autoJoin`
+    // path below require.
     //
     // Swap-in alternative: `supabaseAdmin().auth.admin
     //   .inviteUserByEmail(email, { data: { full_name: fullName } })`
@@ -186,9 +219,122 @@ export async function POST(request: Request) {
       );
     }
 
+    const newUserId = created.user.id;
+
     // ------------------------------------------------------------
-    // Step 2 — create the workspace invitation, identical to
-    // `POST /api/account/invitations`. Uses the caller's own
+    // autoJoin branch — move the new user into this account
+    // directly, server-side. No invitation row, no link, no click.
+    // ------------------------------------------------------------
+    if (autoJoin) {
+      // The trigger above runs synchronously in the same Postgres
+      // transaction as the auth.users insert, so the personal
+      // profile/account it created is already readable here.
+      const { data: profile, error: profileFetchError } = await supabaseAdmin()
+        .from('profiles')
+        .select('account_id')
+        .eq('user_id', newUserId)
+        .single();
+
+      if (profileFetchError || !profile?.account_id) {
+        console.error(
+          '[POST /api/account/members/create-and-invite] profile fetch error:',
+          profileFetchError
+        );
+        return NextResponse.json(
+          {
+            error:
+              "Account was created but we couldn't read its bootstrap profile. The user exists in Auth — check Supabase directly or retry without autoJoin.",
+            user: { id: newUserId, email: created.user.email },
+          },
+          { status: 500 }
+        );
+      }
+
+      const oldAccountId = profile.account_id as string;
+
+      // 1. Re-point the profile at this account (mirrors
+      //    `redeem_invitation`'s first UPDATE).
+      const { error: moveError } = await supabaseAdmin()
+        .from('profiles')
+        .update({ account_id: ctx.accountId, account_role: role })
+        .eq('user_id', newUserId);
+
+      if (moveError) {
+        console.error(
+          '[POST /api/account/members/create-and-invite] profile move error:',
+          moveError
+        );
+        return NextResponse.json(
+          {
+            error:
+              'Account was created but moving it into this workspace failed. The user exists in Auth with their own empty account — retry, or use the regular invite flow.',
+            user: { id: newUserId, email: created.user.email },
+          },
+          { status: 500 }
+        );
+      }
+
+      // 2. Clean up the now-orphaned personal account. Safe — it
+      //    was created moments ago by the trigger above, so it's
+      //    guaranteed empty and the profile has already been moved
+      //    off it (mirrors `redeem_invitation`'s cleanup DELETE).
+      const { error: cleanupError } = await supabaseAdmin()
+        .from('accounts')
+        .delete()
+        .eq('id', oldAccountId);
+
+      if (cleanupError) {
+        // Non-fatal — the user is correctly joined either way, this
+        // just leaves an orphan empty `accounts` row behind. Log it
+        // rather than failing the request over housekeeping.
+        console.error(
+          '[POST /api/account/members/create-and-invite] orphan account cleanup error:',
+          cleanupError
+        );
+      }
+
+      // 3. Synthetic, already-accepted invitation row purely so this
+      //    join shows up in the same audit trail as link-based ones
+      //    (Members tab's history, `created_by_user_id`, etc.). The
+      //    token/hash here is never generated or shown to anyone —
+      //    it can't be redeemed because `accepted_at` is already set.
+      const { hash } = generateInviteToken();
+      const { error: auditError } = await ctx.supabase
+        .from('account_invitations')
+        .insert({
+          account_id: ctx.accountId,
+          token_hash: hash,
+          role,
+          created_by_user_id: ctx.userId,
+          label,
+          expires_at: expiresAt.toISOString(),
+          accepted_at: new Date().toISOString(),
+          accepted_by_user_id: newUserId,
+        });
+
+      if (auditError) {
+        // Also non-fatal — the join itself already succeeded.
+        console.error(
+          '[POST /api/account/members/create-and-invite] audit row insert error:',
+          auditError
+        );
+      }
+
+      return NextResponse.json(
+        {
+          user: { id: newUserId, email: created.user.email },
+          tempPassword,
+          joined: true,
+          accountId: ctx.accountId,
+          role,
+        },
+        { status: 201 }
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Default branch — create the workspace invitation, identical
+    // to `POST /api/account/invitations`. Uses the caller's own
     // (RLS-scoped) client, not the service-role one, so this is
     // still subject to the same `account_invitations_modify`
     // policy (admin+ of ctx.accountId) as the plain invite route.
@@ -222,7 +368,7 @@ export async function POST(request: Request) {
         {
           error:
             "Account was created but the invitation failed. Use 'Invite member' to send one to this email.",
-          user: { id: created.user.id, email: created.user.email },
+          user: { id: newUserId, email: created.user.email },
         },
         { status: 500 }
       );
@@ -230,7 +376,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        user: { id: created.user.id, email: created.user.email },
+        user: { id: newUserId, email: created.user.email },
         tempPassword,
         invitation,
         token,
