@@ -11,8 +11,8 @@
 //   │ peek                 │ auth          │ render                   │
 //   ├──────────────────────┼───────────────┼─────────────────────────┤
 //   │ loading              │ —             │ spinner                  │
-//   │ ok:false (any reason)│ —             │ friendly error + signup  │
-//   │ ok:true              │ signed out    │ "Sign up" + "Sign in"    │
+//   │ ok:false (any reason)│ —             │ friendly error + sign in │
+//   │ ok:true              │ signed out    │ "Sign in" button          │
 //   │ ok:true              │ signed in     │ "Accept" button → redeem │
 //   └──────────────────────┴───────────────┴─────────────────────────┘
 //
@@ -259,27 +259,19 @@ export default function JoinPage() {
               >
                 Try again
               </Button>
-              <Link href="/signup">
-                <Button
-                  variant="outline"
-                  className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  Create a new account instead
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/signup">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                  Create a new account instead
-                </Button>
-              </Link>
               <Link href="/login">
                 <Button
                   variant="outline"
                   className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
+                  Sign in
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                   Sign in
                 </Button>
               </Link>
@@ -412,19 +404,12 @@ export default function JoinPage() {
     <Card className="w-full max-w-md border-border bg-card">
       {inviteHeader}
       <CardContent className="flex flex-col gap-2">
-        <Link href={`/signup?invite=${encodeURIComponent(token!)}`}>
-          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-            Create account &amp; join
-          </Button>
-        </Link>
         <Link href={`/login?invite=${encodeURIComponent(token!)}`}>
-          <Button
-            variant="outline"
-            className="w-full border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            I already have an account
+          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+            Sign in to accept invitation
           </Button>
         </Link>
+
       </CardContent>
     </Card>
   );
