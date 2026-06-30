@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MessageSquare, UsersRound } from "lucide-react";
 import { loginWithUsername } from "./actions";
 
 // `useSearchParams` opts the component out of static prerendering
@@ -71,12 +71,9 @@ function LoginPageInner() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
-              <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
-            )}
+          <div className="flex items-center gap-2">
+            <Image src="/favicon.ico" alt="favicon" width={32} height={32} />
+            <span className="text-lg font-semibold text-foreground">Peter2</span>
           </div>
           <CardTitle className="text-xl text-foreground">
             {inviteToken ? "Sign in to accept" : "Welcome back"}

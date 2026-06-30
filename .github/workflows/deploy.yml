@@ -1,4 +1,4 @@
-name: Build & Deploy WaCRM
+name: Build & Deploy Peter2
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - 'v*'
 
 env:
-  IMAGE_NAME: eldon922/wacrm-image
-  CONTAINER_NAME: wacrm-container
+  IMAGE_NAME: eldon922/peter2-image
+  CONTAINER_NAME: peter2-container
 
 jobs:
   build-and-push:
@@ -57,7 +57,7 @@ jobs:
               --memory-reservation="3G" \
               --cpus="0.8" \
               --restart=always \
-              --env-file ~/.wacrm-env \
+              --env-file ~/.peter2-env \
               --network="host" \
               --name ${{ env.CONTAINER_NAME }} \
               ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
