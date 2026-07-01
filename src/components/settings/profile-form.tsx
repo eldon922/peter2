@@ -46,7 +46,7 @@ export function ProfileForm() {
   useEffect(() => {
     if (!profile) return;
     setFullName(profile.full_name ?? '');
-    setUsername(profile.email?.split('@')[0] ?? '');
+    setUsername(profile.username ?? '');
   }, [profile]);
 
   // Cleanup object URLs to avoid leaks.

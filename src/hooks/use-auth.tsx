@@ -12,6 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
+import { getUsernameFromEmail } from "@/lib/username";
 import {
   canEditSettings as canEditSettingsFor,
   canManageMembers as canManageMembersFor,
@@ -24,6 +25,12 @@ interface Profile {
   id: string;
   full_name: string | null;
   email: string;
+  /**
+   * Local part of `email` (before the `@`), derived once in
+   * `fetchProfile` via `getUsernameFromEmail` — see `@/lib/username`.
+   * Read this instead of splitting `email` again at render time.
+   */
+  username: string;
   avatar_url: string | null;
   role: string | null;
   /**
@@ -230,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.id,
           full_name: data.full_name,
           email: data.email,
+          username: getUsernameFromEmail(data.email),
           avatar_url: data.avatar_url,
           role: data.role,
           // `beta_features` is `NOT NULL DEFAULT ARRAY[]` in the DB, but

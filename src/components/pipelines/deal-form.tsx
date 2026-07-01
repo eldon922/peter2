@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { getUsernameFromEmail } from "@/lib/username";
 import { CURRENCIES } from "@/lib/currency";
 import type {
   Contact,
@@ -116,7 +117,12 @@ export function DealForm({
       ]);
       if (cancelled) return;
       setContacts((c.data ?? []) as Contact[]);
-      setProfiles((p.data ?? []) as Profile[]);
+      setProfiles(
+        ((p.data ?? []) as Profile[]).map((row) => ({
+          ...row,
+          username: row.username ?? getUsernameFromEmail(row.email),
+        })),
+      );
     })();
     return () => {
       cancelled = true;
@@ -358,7 +364,7 @@ export function DealForm({
                 <option value="">Unassigned</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.full_name || p.email?.split('@')[0]}
+                    {p.full_name || p.username}
                   </option>
                 ))}
               </select>

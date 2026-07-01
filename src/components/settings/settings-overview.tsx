@@ -137,7 +137,7 @@ export function SettingsOverview({
     };
   }, [user, accountId, canManageMembers]);
 
-  const username = profile?.email?.split('@')[0];
+  const username = profile?.username;
   const displayName = profile?.full_name || username || 'Your account';
   const initial = (profile?.full_name || username || 'U').charAt(0).toUpperCase();
   const roleMeta = accountRole ? ROLE_META[accountRole] : null;

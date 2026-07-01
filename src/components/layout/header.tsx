@@ -46,7 +46,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const title = getPageTitle(pathname);
-  const username = profile?.email?.split('@')[0];
+  const username = profile?.username;
 
   const initial = (
     profile?.full_name ||

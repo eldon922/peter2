@@ -39,6 +39,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/use-auth';
+import { getUsernameFromEmail } from '@/lib/username';
 
 type InviteRole = 'admin' | 'agent' | 'viewer';
 
@@ -86,7 +87,7 @@ interface CreatedInvite {
   accountName: string;
   /** Only set in 'new' mode — the login credentials for the
    *  account we just provisioned, shown exactly once. */
-  newAccount?: { email: string; tempPassword: string };
+  newAccount?: { username: string; tempPassword: string };
   /** True when `autoJoin` moved the user straight into the
    *  account server-side — no invite link exists for this one. */
   joined?: boolean;
@@ -198,7 +199,7 @@ export function InviteMemberDialog({
         accountName: account?.name ?? 'our wacrm account',
         newAccount:
           data.user && data.tempPassword
-            ? { username: data.user.email!.split('@')[0], tempPassword: data.tempPassword }
+            ? { username: getUsernameFromEmail(data.user.email), tempPassword: data.tempPassword }
             : undefined,
         joined: data.joined === true,
       });

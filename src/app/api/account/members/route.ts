@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentAccount, toErrorResponse } from "@/lib/auth/account";
 import { canManageMembers, isAccountRole } from "@/lib/auth/roles";
+import { getUsernameFromEmail } from "@/lib/username";
 import type { AccountMember } from "@/types";
 
 interface ProfileRow {
@@ -58,7 +59,7 @@ export async function GET() {
         {
           user_id: row.user_id,
           full_name: row.full_name ?? "",
-          username: canSeeUsernames && row.email ? row.email.split('@')[0] : null,
+          username: canSeeUsernames && row.email ? getUsernameFromEmail(row.email) : null,
           avatar_url: row.avatar_url,
           role: row.account_role,
           joined_at: row.created_at,

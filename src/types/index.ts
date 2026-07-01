@@ -5,6 +5,13 @@ export interface Profile {
   user_id: string;
   full_name: string;
   email: string;
+  /**
+   * Local part of `email` (before the `@`), derived once when the
+   * profile row is loaded via `getUsernameFromEmail` — see
+   * `@/lib/username`. Prefer this over `email.split('@')[0]` at
+   * render time.
+   */
+  username: string;
   avatar_url?: string;
   /**
    * Legacy free-form role column from migration 001. Never read

@@ -78,7 +78,7 @@ import { ROLE_META } from './role-meta';
 interface Member {
   user_id: string;
   full_name: string;
-  email: string | null;
+  username: string | null;
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;
