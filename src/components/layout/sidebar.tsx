@@ -102,20 +102,9 @@ interface SidebarProps {
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { profile, profileLoading, account, accountRole, signOut } = useAuth();
+  const { account, accountRole} = useAuth();
   const totalUnread = useTotalUnread();
-  // Only surface the account-name strip when it actually carries
-  // information. A solo user's personal account is named after them
-  // (the 017 signup trigger seeds it from `full_name`), so showing it
-  // here would just duplicate the user name in the footer below. Once
-  // the account is renamed or the user joins a shared account, the
-  // name diverges and the strip becomes meaningful — that's the signal
-  // we gate on. Wait for the profile fetch to settle first, otherwise
-  // the strip flashes in once the row resolves (a layout jump).
-  const showAccountStrip =
-    !profileLoading &&
-    !!account?.name &&
-    account.name !== profile?.full_name;
+  const accountName = !(account?.ownerName) ? account?.name.split('@')[0] : account.ownerName;
 
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
@@ -261,20 +250,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
         {/* User section */}
         <div className="shrink-0 border-t border-border p-3">
-          {/* Account name display — surfaced only when the account
-              name differs from the user's own name (see
-              `showAccountStrip`). For a default solo account the two
-              match, so we hide it to avoid duplicating the user name
-              below; for renamed or shared accounts it tells the user
-              which account they're acting in. */}
-          {showAccountStrip && account?.name ? (
+          {/* Owner-name strip — shows the account owner's configured
+              display name (Settings > Profile, owner's row), gated
+              on `showAccountStrip` above. Not the signed-in user's
+              own name — see the comment there. */}
             <div className="mb-2 flex items-center gap-2 px-3 text-xs text-muted-foreground">
               <UsersRound className="size-3.5 shrink-0" />
               {/* `title=` exposes the full name on hover when it
-                  gets truncated (long account names + narrow
-                  sidebars). Cheap a11y win. */}
-              <span className="truncate" title={account.name}>
-                {account.name.split('@')[0]}
+                  gets truncated (long names + narrow sidebars).
+                  Cheap a11y win. */}
+              <span className="truncate" title={accountName}>
+                {accountName}
               </span>
               {accountRole ? (
                 // Always render the chip — owners used to be
@@ -295,7 +281,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 })()
               ) : null}
             </div>
-          ) : null}
         </div>
 
         {/* Support / WhatsApp */}

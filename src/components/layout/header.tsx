@@ -46,11 +46,15 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const title = getPageTitle(pathname);
+  const username = profile?.email?.split('@')[0];
 
-  const initial =
-    profile?.full_name?.charAt(0)?.toUpperCase() ??
-    profile?.email?.split('@')[0]?.charAt(0)?.toUpperCase() ??
-    "U";
+  const initial = (
+    profile?.full_name ||
+    username ||
+    "U"
+  )
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6">
@@ -81,7 +85,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
             {profile?.avatar_url ? (
               <AvatarImage
                 src={profile.avatar_url}
-                alt={profile.full_name ?? "Avatar"}
+                alt={!profile.full_name ? username : profile.full_name}
               />
             ) : null}
             <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
@@ -89,7 +93,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
             </AvatarFallback>
           </Avatar>
           <span className="hidden text-sm font-medium text-foreground sm:inline">
-            {profile?.full_name ?? "User"}
+            {!profile?.full_name ? username : profile.full_name}
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -99,10 +103,10 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         >
           <div className="px-2 py-1.5">
             <p className="truncate text-sm font-medium text-foreground">
-              {profile?.full_name ?? "User"}
+              {!profile?.full_name ? username : profile.full_name}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {profile?.email?.split('@')[0] ?? ""}
+              {username ?? ""}
             </p>
           </div>
           <DropdownMenuSeparator className="bg-border" />

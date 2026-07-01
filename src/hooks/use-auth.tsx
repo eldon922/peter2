@@ -42,6 +42,11 @@ interface AccountSummary {
   /** Default deal currency (ISO-4217). NOT NULL DEFAULT 'USD' in the
    *  DB (migration 021); narrowed to DEFAULT_CURRENCY when absent. */
   default_currency: string;
+  /** Display name of the account's owner (`profiles.full_name` for
+   *  the row where `account_role = 'owner'`) — NOT the signed-in
+   *  user; a non-owner member sees the owner's name here, not their
+   *  own. Null if the owner hasn't set one, or the lookup failed. */
+  ownerName: string | null;
 }
 
 interface AuthContextValue {
@@ -163,7 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .from("accounts")
             // default_currency added in migration 021; narrowed to the
             // USD fallback below for older schemas where it reads null.
-            .select("id, name, default_currency")
+            // owner_user_id (migration 017) is what lets us look up
+            // the owner's display name below — it's denormalised onto
+            // `accounts` specifically so this lookup doesn't need to
+            // scan every member's `profiles` row for account_role.
+            .select("id, name, default_currency, owner_user_id")
             .eq("id", data.account_id)
             .maybeSingle();
           if (accountErr) {
@@ -174,10 +183,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               code: accountErr.code,
             });
           } else if (account) {
+            // Second round-trip for the owner's `full_name`. Can't
+            // embed this in the query above without an FK-relationship
+            // in PostgREST's schema cache (see the point-lookup note
+            // on the profile fetch above), and owner_user_id doesn't
+            // uniquely identify a `profiles` row on its own (a user
+            // could in principle appear in `profiles` under a
+            // different account) — so filter on account_id too.
+            let ownerName: string | null = null;
+            const { data: ownerProfile, error: ownerErr } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("user_id", account.owner_user_id)
+              .eq("account_id", account.id)
+              .maybeSingle();
+            if (ownerErr) {
+              console.error("[AuthProvider] fetchOwnerProfile error:", {
+                message: ownerErr.message,
+                details: ownerErr.details,
+                hint: ownerErr.hint,
+                code: ownerErr.code,
+              });
+            } else if (ownerProfile) {
+              ownerName = ownerProfile.full_name;
+            }
+
             accountRow = {
               id: account.id,
               name: account.name,
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
+              ownerName,
             };
           }
         }
