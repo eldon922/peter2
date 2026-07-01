@@ -71,9 +71,11 @@ function LoginPageInner() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
-          <div className="flex items-center gap-2">
-            <Image src="/favicon.ico" alt="favicon" width={32} height={32} />
-            <span className="text-lg font-semibold text-foreground">Peter2</span>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Image src="/favicon.ico" alt="favicon" width={46} height={46} />
+            <span className="text-3xl font-semibold text-primary">
+              Peter2
+            </span>
           </div>
           <CardTitle className="text-xl text-foreground">
             {inviteToken ? "Sign in to accept" : "Welcome back"}
