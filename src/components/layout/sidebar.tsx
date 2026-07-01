@@ -8,7 +8,9 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
+import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import {
+  Bell,
   Crown,
   GitBranch,
   LayoutDashboard,
@@ -83,6 +85,7 @@ const navItems: NavItem[] = [
 
 const bottomNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/automations", label: "Automations", icon: Zap },
   { href: "/flows", label: "Flows", icon: Workflow, beta: true },
@@ -105,6 +108,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { account, accountRole} = useAuth();
   const totalUnread = useTotalUnread();
   const accountName = !(account?.ownerName) ? account?.name.split('@')[0] : account.ownerName;
+  const unreadNotifications = useUnreadNotifications();
 
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
@@ -188,6 +192,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               const showUnreadDot =
                 item.href === "/inbox" && totalUnread > 0 && !isActive;
 
+              // Unlike the inbox dot, the notifications count stays visible
+              // even while the page is active — it reflects unread state
+              // (cleared by marking notifications read), not "currently
+              // viewing this section".
+              const showNotificationBadge =
+                item.href === "/notifications" && unreadNotifications > 0;
+
               return (
                 <li key={item.href}>
                   <Link
@@ -217,6 +228,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                       >
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                         <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                      </span>
+                    )}
+                    {showNotificationBadge && (
+                      <span
+                        aria-label={`${unreadNotifications} unread notification${unreadNotifications === 1 ? "" : "s"}`}
+                        className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                      >
+                        {unreadNotifications > 9 ? "9+" : unreadNotifications}
                       </span>
                     )}
                   </Link>

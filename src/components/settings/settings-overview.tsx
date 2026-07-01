@@ -135,7 +135,7 @@ export function SettingsOverview({
     return () => {
       cancelled = true;
     };
-  }, [user, accountId, canManageMembers]);
+  }, [user?.id, accountId, canManageMembers]);
 
   const username = profile?.username;
   const displayName = profile?.full_name || username || 'Your account';
