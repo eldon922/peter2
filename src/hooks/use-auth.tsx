@@ -55,6 +55,10 @@ interface AccountSummary {
    *  user; a non-owner member sees the owner's name here, not their
    *  own. Null if the owner hasn't set one, or the lookup failed. */
   ownerName: string | null;
+  /** Avatar URL of the account's owner (`profiles.avatar_url` for the
+   *  row where `account_role = 'owner'`) — same lookup as `ownerName`.
+   *  Null if the owner hasn't set one, or the lookup failed. */
+  ownerAvatarUrl: string | null;
 }
 
 interface AuthContextValue {
@@ -206,9 +210,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // could in principle appear in `profiles` under a
             // different account) — so filter on account_id too.
             let ownerName: string | null = null;
+            let ownerAvatarUrl: string | null = null;
             const { data: ownerProfile, error: ownerErr } = await supabase
               .from("profiles")
-              .select("full_name")
+              .select("full_name, avatar_url")
               .eq("user_id", account.owner_user_id)
               .eq("account_id", account.id)
               .maybeSingle();
@@ -221,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               });
             } else if (ownerProfile) {
               ownerName = ownerProfile.full_name;
+              ownerAvatarUrl = ownerProfile.avatar_url;
             }
 
             accountRow = {
@@ -228,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               name: account.name,
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
               ownerName,
+              ownerAvatarUrl,
             };
           }
         }

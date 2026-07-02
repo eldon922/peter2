@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
   Crown,
@@ -21,7 +22,6 @@ import {
   User,
   UserCog,
   Users,
-  UsersRound,
   Workflow,
   X,
   Zap,
@@ -108,6 +108,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { account, accountRole} = useAuth();
   const totalUnread = useTotalUnread();
   const accountName = !(account?.ownerName) ? account?.name.split('@')[0] : account.ownerName;
+  const ownerAvatarUrl = account?.ownerAvatarUrl ?? null;
+  const ownerInitial = accountName ? accountName.charAt(0).toUpperCase() : "?";
   const unreadNotifications = useUnreadNotifications();
 
   // Close the drawer when route changes — users opened it to navigate,
@@ -274,7 +276,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               on `showAccountStrip` above. Not the signed-in user's
               own name — see the comment there. */}
             <div className="mb-2 flex items-center gap-2 px-3 text-xs text-muted-foreground">
-              <UsersRound className="size-3.5 shrink-0" />
+              <Avatar className="size-5 shrink-0">
+                {ownerAvatarUrl ? (
+                  <AvatarImage src={ownerAvatarUrl} alt={accountName} />
+                ) : null}
+                <AvatarFallback className="bg-primary/10 text-[9px] font-medium text-primary">
+                  {ownerInitial}
+                </AvatarFallback>
+              </Avatar>
               {/* `title=` exposes the full name on hover when it
                   gets truncated (long names + narrow sidebars).
                   Cheap a11y win. */}
