@@ -76,6 +76,12 @@ const ROLE_DESCRIPTIONS: Record<InviteRole, string> = {
 // rather than letting the user submit and bounce off a 400.
 const MAX_LABEL_LEN = 80;
 
+// Mirrors MIN_PASSWORD_LEN in
+// src/app/api/account/members/create-and-invite/route.ts (which itself
+// mirrors MIN_PASSWORD in password-form.tsx). Client-side check exists
+// only to fail fast with a clear inline error before the round-trip.
+const MIN_PASSWORD_LEN = 8;
+
 interface CreatedInvite {
   /** Absent when `autoJoin` skipped the invitation system entirely
    *  — there's no link to show in that case. */
@@ -87,7 +93,7 @@ interface CreatedInvite {
   accountName: string;
   /** Only set in 'new' mode — the login credentials for the
    *  account we just provisioned, shown exactly once. */
-  newAccount?: { username: string; tempPassword: string };
+  newAccount?: { username: string; tempPassword: string; isCustomPassword: boolean };
   /** True when `autoJoin` moved the user straight into the
    *  account server-side — no invite link exists for this one. */
   joined?: boolean;
@@ -106,6 +112,11 @@ export function InviteMemberDialog({
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [autoJoin, setAutoJoin] = useState(true);
+  // Off by default — leaves the password field hidden and lets the
+  // server hand out its generated diceware passphrase, same as before
+  // this option existed. Flip on to type in a password of your own.
+  const [setOwnPassword, setSetOwnPassword] = useState(false);
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CreatedInvite | null>(null);
 
@@ -117,6 +128,8 @@ export function InviteMemberDialog({
     setUsername('');
     setFullName('');
     setAutoJoin(true);
+    setSetOwnPassword(false);
+    setPassword('');
     setResult(null);
     setSubmitting(false);
   }
@@ -140,6 +153,14 @@ export function InviteMemberDialog({
       return;
     }
 
+    // Mirror the server's bounds check (see MIN_PASSWORD_LEN comment
+    // above) — same fail-fast-before-the-round-trip reasoning as the
+    // label check just above.
+    if (mode === 'new' && setOwnPassword && password.length < MIN_PASSWORD_LEN) {
+      toast.error(`Password must be at least ${MIN_PASSWORD_LEN} characters`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const endpoint =
@@ -155,6 +176,7 @@ export function InviteMemberDialog({
               expiresInDays: Number(expiry),
               label: trimmedLabel || undefined,
               autoJoin,
+              password: setOwnPassword ? password : undefined,
             }
           : {
               role,
@@ -184,6 +206,7 @@ export function InviteMemberDialog({
         expiresInDays?: number;
         user?: { email: string };
         tempPassword?: string;
+        isCustomPassword?: boolean;
         joined?: boolean;
       };
 
@@ -199,7 +222,11 @@ export function InviteMemberDialog({
         accountName: account?.name ?? 'our wacrm account',
         newAccount:
           data.user && data.tempPassword
-            ? { username: getUsernameFromEmail(data.user.email), tempPassword: data.tempPassword }
+            ? {
+                username: getUsernameFromEmail(data.user.email),
+                tempPassword: data.tempPassword,
+                isCustomPassword: data.isCustomPassword === true,
+              }
             : undefined,
         joined: data.joined === true,
       });
@@ -253,7 +280,7 @@ export function InviteMemberDialog({
       open={open}
       onOpenChange={handleOpenChange}
     >
-      <DialogContent className="bg-popover border-border sm:max-w-md">
+      <DialogContent className="bg-popover border-border sm:max-w-lg">
         {result ? (
           <>
             <DialogHeader>
@@ -315,7 +342,7 @@ export function InviteMemberDialog({
                   </div>
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">
-                      Temporary password
+                      Password
                     </Label>
                     <div className="flex gap-2">
                       <Input
@@ -498,6 +525,48 @@ export function InviteMemberDialog({
                         }
                       />
                     </div>
+
+                    <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
+                      <div className="space-y-0.5">
+                        <Label
+                          htmlFor="set-own-password"
+                          className="text-foreground font-medium"
+                        >
+                          Set their password myself
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          Off by default — we&apos;ll generate a random
+                          passphrase for you to hand over instead.
+                        </p>
+                      </div>
+                      <Switch
+                        id="set-own-password"
+                        checked={setOwnPassword}
+                        onCheckedChange={(checked) => {
+                          const next = checked === true;
+                          setSetOwnPassword(next);
+                          if (!next) setPassword('');
+                        }}
+                      />
+                    </div>
+
+                    {setOwnPassword && (
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">
+                          Password
+                        </Label>
+                        <Input
+                          type="text"
+                          placeholder="At least 8 characters"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="bg-muted border-border text-foreground placeholder:text-muted-foreground font-mono text-xs"
+                        />
+                        <p className="text-muted-foreground text-xs">
+                          They can change this from Settings once signed in.
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
 

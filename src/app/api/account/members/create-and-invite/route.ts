@@ -43,12 +43,17 @@
 //
 // Auth model (both modes)
 // ------------------------
-// We generate a random temporary password and return it ONCE, the
-// same "shown once, never persisted in plaintext" contract the
-// invite token already uses. This sidesteps any dependency on
-// SMTP/email delivery being configured — the admin shares the
-// login email+password (and, in invite mode, the link) over
-// WhatsApp/Slack/whatever, same as the existing invite-only flow.
+// By default we generate a random password and return it
+// ONCE, the same "shown once, never persisted in plaintext" contract
+// the invite token already uses. The admin can instead supply their
+// own `password` in the request body — e.g. because they want to set
+// something the new user already knows and will remember — which is
+// validated against the same length bounds as the self-service
+// change-password form and used verbatim instead of the generated
+// default. Either way this sidesteps any dependency on SMTP/email
+// delivery being configured — the admin shares the login email+
+// password (and, in invite mode, the link) over WhatsApp/Slack/
+// whatever, same as the existing invite-only flow.
 //
 // If you'd rather Supabase email the new user a "set your
 // password" link instead, swap the `admin.createUser` call below
@@ -76,6 +81,10 @@ import {
 
 const MAX_LABEL_LEN = 80;
 const MAX_FULL_NAME_LEN = 120;
+// Mirrors MIN_PASSWORD in src/components/settings/password-form.tsx —
+// keep the two in sync if the policy ever changes.
+const MIN_PASSWORD_LEN = 8;
+const MAX_PASSWORD_LEN = 72; // bcrypt's effective cap, which Supabase Auth uses under the hood
 
 // Deliberately loose — this is a sanity check to fail fast with a
 // clear 400, not a security boundary. Supabase's Admin API is the
@@ -119,6 +128,7 @@ export async function POST(request: Request) {
       expiresInDays?: unknown;
       label?: unknown;
       autoJoin?: unknown;
+      password?: unknown;
     } | null;
 
     const username = typeof body?.username === 'string' ? body.username.trim() : '';
@@ -153,6 +163,28 @@ export async function POST(request: Request) {
     }
 
     const autoJoin = body?.autoJoin === true;
+
+    // Optional admin-supplied password. Omitted/blank → we generate the
+    // diceware default below, same as before. Validated with the same
+    // bounds as the self-service change-password form so an admin can't
+    // hand out a login that Supabase Auth (or the user later) would
+    // reject.
+    let customPassword: string | null = null;
+    if (typeof body?.password === 'string' && body.password.length > 0) {
+      if (body.password.length < MIN_PASSWORD_LEN) {
+        return NextResponse.json(
+          { error: `'password' must be at least ${MIN_PASSWORD_LEN} characters` },
+          { status: 400 }
+        );
+      }
+      if (body.password.length > MAX_PASSWORD_LEN) {
+        return NextResponse.json(
+          { error: `'password' must be ${MAX_PASSWORD_LEN} characters or fewer` },
+          { status: 400 }
+        );
+      }
+      customPassword = body.password;
+    }
 
     let label: string | null = null;
     if (typeof body?.label === 'string') {
@@ -190,7 +222,10 @@ export async function POST(request: Request) {
     // link instead of you handing out a temp password. Requires
     // SMTP to be configured for this Supabase project.
     // ------------------------------------------------------------
-    const tempPassword = generateTempPassword();
+    // Admin-chosen password wins if given; otherwise fall back to the
+    // auto-generated diceware passphrase default.
+    const tempPassword = customPassword ?? generateTempPassword();
+    const isCustomPassword = customPassword !== null;
     const { data: created, error: createError } =
       await supabaseAdmin().auth.admin.createUser({
         email,
@@ -331,6 +366,7 @@ export async function POST(request: Request) {
         {
           user: { id: newUserId, email: created.user.email },
           tempPassword,
+          isCustomPassword,
           joined: true,
           accountId: ctx.accountId,
           role,
@@ -385,6 +421,7 @@ export async function POST(request: Request) {
       {
         user: { id: newUserId, email: created.user.email },
         tempPassword,
+        isCustomPassword,
         invitation,
         token,
         url: inviteUrl(token, getBaseUrl(request)),
