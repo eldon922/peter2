@@ -56,7 +56,6 @@
 // site.
 // ============================================================
 
-import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
 import { requireRole, toErrorResponse } from '@/lib/auth/account';
@@ -68,6 +67,7 @@ import {
 } from '@/lib/auth/invitations';
 import { isAccountRole } from '@/lib/auth/roles';
 import { supabaseAdmin } from '@/lib/automations/admin-client';
+import { generatePassphrase } from '@/lib/generators/passphrase';
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -83,11 +83,18 @@ const MAX_FULL_NAME_LEN = 120;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function generateTempPassword(): string {
-  // 24 bytes -> 32 base64url chars. Comfortably above any
-  // reasonable minimum length policy; the user is expected to
-  // change it (or you hand them a "set your password" reset link
-  // instead — see module header).
-  return randomBytes(24).toString('base64url');
+  // Bitwarden-style diceware passphrase (EFF long wordlist) instead of
+  // an opaque base64 blob: 6 words + a trailing digit is comfortably
+  // above any reasonable minimum length policy while staying easy to
+  // read and retype off a phone screen when handed over WhatsApp/Slack.
+  // The user is expected to change it (or you hand them a "set your
+  // password" reset link instead — see module header).
+  return generatePassphrase({
+    numWords: 6,
+    wordSeparator: '&',
+    capitalize: true,
+    includeNumber: true,
+  });
 }
 
 export async function POST(request: Request) {
