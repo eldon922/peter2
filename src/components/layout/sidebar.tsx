@@ -82,8 +82,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/broadcasts", label: "Broadcasts", icon: Radio },
   { href: "/templates", label: "Templates", icon: FileText },
+  { href: "/broadcasts", label: "Broadcasts", icon: Radio },
 ];
 
 const bottomNavItems = [
