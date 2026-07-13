@@ -506,29 +506,6 @@ export function InviteMemberDialog({
                     <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
                       <div className="space-y-0.5">
                         <Label
-                          htmlFor="auto-join"
-                          className="text-foreground font-medium"
-                        >
-                          Add directly, skip the invite link
-                        </Label>
-                        <p className="text-muted-foreground text-xs">
-                          Joins them to {account?.name ?? 'this account'} as{' '}
-                          {role} immediately — no link to send, nothing for them
-                          to click.
-                        </p>
-                      </div>
-                      <Switch
-                        id="auto-join"
-                        checked={autoJoin}
-                        onCheckedChange={(checked) =>
-                          setAutoJoin(checked === true)
-                        }
-                      />
-                    </div>
-
-                    <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
-                      <div className="space-y-0.5">
-                        <Label
                           htmlFor="set-own-password"
                           className="text-foreground font-medium"
                         >
@@ -589,6 +566,31 @@ export function InviteMemberDialog({
                     {ROLE_DESCRIPTIONS[role]}
                   </p>
                 </div>
+
+                {mode === 'new' && (
+                  <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="auto-join"
+                        className="text-foreground font-medium"
+                      >
+                        Add directly, skip the invite link
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        Joins them to {account?.name ?? 'this account'} as{' '}
+                        {role} immediately — no link to send, nothing for them
+                        to click.
+                      </p>
+                    </div>
+                    <Switch
+                      id="auto-join"
+                      checked={autoJoin}
+                      onCheckedChange={(checked) =>
+                        setAutoJoin(checked === true)
+                      }
+                    />
+                  </div>
+                )}
 
                 {!(mode === 'new' && autoJoin) && (
                   <div className="space-y-2">

@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
   Crown,
+  FileText,
   GitBranch,
   LayoutDashboard,
   MessageSquare,
@@ -81,6 +82,7 @@ const navItems: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/broadcasts", label: "Broadcasts", icon: Radio },
+  { href: "/templates", label: "Templates", icon: FileText },
 ];
 
 const bottomNavItems = [
