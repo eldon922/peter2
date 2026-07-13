@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { usePendingTemplates } from "@/hooks/use-pending-templates";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
@@ -113,6 +114,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const ownerAvatarUrl = account?.ownerAvatarUrl ?? null;
   const ownerInitial = accountName ? accountName.charAt(0).toUpperCase() : "?";
   const unreadNotifications = useUnreadNotifications();
+  const pendingTemplates = usePendingTemplates();
 
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
@@ -203,6 +205,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               const showNotificationBadge =
                 item.href === "/notifications" && unreadNotifications > 0;
 
+              // Same "stays visible while active" reasoning as the
+              // notifications badge — pending review state, not "currently
+              // viewing this section".
+              const showPendingTemplatesBadge =
+                item.href === "/templates" && pendingTemplates > 0;
+
               return (
                 <li key={item.href}>
                   <Link
@@ -240,6 +248,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                         className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
                       >
                         {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                      </span>
+                    )}
+                    {showPendingTemplatesBadge && (
+                      <span
+                        aria-label={`${pendingTemplates} template${pendingTemplates === 1 ? "" : "s"} pending review`}
+                        className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
+                      >
+                        {pendingTemplates > 9 ? "9+" : pendingTemplates}
                       </span>
                     )}
                   </Link>
