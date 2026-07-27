@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/hooks/use-auth';
 import { getUsernameFromEmail } from '@/lib/username';
 
@@ -58,18 +59,11 @@ interface InviteMemberDialogProps {
   onCreated: () => void;
 }
 
-const EXPIRY_OPTIONS: { value: string; label: string }[] = [
-  { value: '1', label: '1 day' },
-  { value: '7', label: '7 days' },
-  { value: '30', label: '30 days' },
+const EXPIRY_OPTIONS = [
+  { value: '1', labelKey: 'days1' },
+  { value: '7', labelKey: 'days7' },
+  { value: '30', labelKey: 'days30' },
 ];
-
-const ROLE_DESCRIPTIONS: Record<InviteRole, string> = {
-  admin: 'Can invite teammates, manage settings, send messages, and edit data.',
-  agent:
-    'Can use the inbox, contacts, broadcasts, automations, and flows. No settings or member access.',
-  viewer: 'Read-only access across every page. Cannot send or edit anything.',
-};
 
 // Server caps label at 80 chars (see src/app/api/account/invitations/route.ts).
 // Mirror it on the client so we short-circuit before the round-trip
@@ -104,6 +98,8 @@ export function InviteMemberDialog({
   onOpenChange,
   onCreated,
 }: InviteMemberDialogProps) {
+  const t = useTranslations('Settings.invite');
+  const tRoles = useTranslations('Settings.roles');
   const { account } = useAuth();
   const [mode, setMode] = useState<DialogMode>('new');
   const [role, setRole] = useState<InviteRole>('agent');
@@ -143,7 +139,7 @@ export function InviteMemberDialog({
     // net for that path.
     const trimmedLabel = label.trim();
     if (trimmedLabel.length > MAX_LABEL_LEN) {
-      toast.error(`Label must be ${MAX_LABEL_LEN} characters or fewer`);
+      toast.error(t('labelTooLong', { max: MAX_LABEL_LEN }));
       return;
     }
 
@@ -170,19 +166,19 @@ export function InviteMemberDialog({
       const payload =
         mode === 'new'
           ? {
-              username: trimmedUsername,
-              fullName: fullName.trim() || undefined,
-              role,
-              expiresInDays: Number(expiry),
-              label: trimmedLabel || undefined,
-              autoJoin,
-              password: setOwnPassword ? password : undefined,
-            }
+            username: trimmedUsername,
+            fullName: fullName.trim() || undefined,
+            role,
+            expiresInDays: Number(expiry),
+            label: trimmedLabel || undefined,
+            autoJoin,
+            password: setOwnPassword ? password : undefined,
+          }
           : {
-              role,
-              expiresInDays: Number(expiry),
-              label: trimmedLabel || undefined,
-            };
+            role,
+            expiresInDays: Number(expiry),
+            label: trimmedLabel || undefined,
+          };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -194,9 +190,9 @@ export function InviteMemberDialog({
         const responseBody = await res.json().catch(() => ({}));
         toast.error(
           responseBody.error ||
-            (mode === 'new'
-              ? 'Failed to create account and invitation'
-              : 'Failed to create invitation')
+          (mode === 'new'
+            ? 'Failed to create account and invitation'
+            : 'Failed to create invitation')
         );
         return;
       }
@@ -223,10 +219,10 @@ export function InviteMemberDialog({
         newAccount:
           data.user && data.tempPassword
             ? {
-                username: getUsernameFromEmail(data.user.email),
-                tempPassword: data.tempPassword,
-                isCustomPassword: data.isCustomPassword === true,
-              }
+              username: getUsernameFromEmail(data.user.email),
+              tempPassword: data.tempPassword,
+              isCustomPassword: data.isCustomPassword === true,
+            }
             : undefined,
         joined: data.joined === true,
       });
@@ -243,12 +239,12 @@ export function InviteMemberDialog({
     if (!result?.url) return;
     try {
       await navigator.clipboard.writeText(result.url);
-      toast.success('Invite link copied');
+      toast.success(t('copied'));
     } catch {
       // Most likely "not in a secure context" — happens on http://
       // local IPs. Surface the link in the toast so the admin can
       // hand-copy it.
-      toast.error('Clipboard blocked — copy the link manually');
+      toast.error(t('clipboardBlocked'));
     }
   }
 
@@ -258,7 +254,7 @@ export function InviteMemberDialog({
     // for users in multi-team contexts where "our wacrm account"
     // wouldn't be enough to disambiguate.
     const accountName = result?.accountName ?? 'our wacrm account';
-    const message = `Join ${accountName} on wacrm using this link (valid for ${result?.expiresInDays} days): ${url}`;
+    const message = t('whatsappMessage', { accountName, expiresInDays: result?.expiresInDays ?? 0, url });
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   }
 
@@ -284,13 +280,13 @@ export function InviteMemberDialog({
         {result ? (
           <>
             <DialogHeader>
-              <DialogTitle className="text-popover-foreground flex items-center gap-2">
-                <Sparkles className="text-primary size-4" />
+              <DialogTitle className="flex items-center gap-2 text-popover-foreground">
+                <Sparkles className="size-4 text-primary" />
                 {result.joined
                   ? 'Account created & joined'
                   : result.newAccount
                     ? 'Account created'
-                    : 'Invite created'}
+                    : t('inviteCreated')}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {result.joined ? (
@@ -304,27 +300,11 @@ export function InviteMemberDialog({
                     teammate. They&apos;ll sign in, then accept the invite to
                     join as{' '}
                   </>
-                ) : (
-                  <>
-                    Share this link with your new teammate. They&apos;ll be able
-                    to sign in and join the account as{' '}
-                  </>
-                )}
-                <span className="text-muted-foreground font-medium">
-                  {result.role}
-                </span>
-                {result.joined ? (
-                  '.'
-                ) : (
-                  <>
-                    . The link is valid for{' '}
-                    <span className="text-muted-foreground font-medium">
-                      {result.expiresInDays} day
-                      {result.expiresInDays === 1 ? '' : 's'}
-                    </span>
-                    .
-                  </>
-                )}
+                ) : t.rich('inviteCreatedDesc', {
+                  role: tRoles(result.role),
+                  days: result.expiresInDays,
+                  bold: (chunks: React.ReactNode) => <strong>{chunks}</strong>
+                })}
               </DialogDescription>
             </DialogHeader>
 
@@ -381,8 +361,7 @@ export function InviteMemberDialog({
               )}
 
               {result.url && (
-                <>
-                  <Label className="text-muted-foreground">Invite link</Label>
+                <><Label className="text-muted-foreground">{t('inviteLink')}</Label>
                   <div className="flex gap-2">
                     <Input
                       readOnly
@@ -396,29 +375,27 @@ export function InviteMemberDialog({
                       className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
                     >
                       <Copy className="size-4" />
-                      Copy
+                      {t('copy')}
                     </Button>
                   </div>
 
                   {/* Higher-contrast amber than the original 10% / amber-200.
-                      Reviewed against slate-900 to meet WCAG AAA for body
-                      text (target ratio 7:1). Border bumped to /50, bg to
-                      /15, foreground promoted to amber-100 for the strong
-                      intro, amber-200 for the body. */}
+                  Reviewed against slate-900 to meet WCAG AAA for body
+                  text (target ratio 7:1). Border bumped to /50, bg to
+                  /15, foreground promoted to amber-100 for the strong
+                  intro, amber-200 for the body. */}
                   <div className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-2 text-xs text-amber-200">
                     <strong className="font-semibold text-amber-100">
-                      Save this link now.
+                      {t('saveLinkNow')}
                     </strong>{' '}
-                    We never store the plaintext — once you close this dialog
-                    the URL is gone. To re-share, revoke this invite and create
-                    a new one.
+                    {t('saveLinkHint')}
                   </div>
 
                   {/* Anchor styled with `buttonVariants` rather than wrapping
-                      in <Button asChild>. The wacrm Button is the Base UI
-                      ButtonPrimitive — it has no Radix-style asChild slot.
-                      Direct anchor preserves right-click "Open in new tab"
-                      behaviour too. */}
+                  in <Button asChild>. The wacrm Button is the Base UI
+                  ButtonPrimitive — it has no Radix-style asChild slot.
+                  Direct anchor preserves right-click "Open in new tab"
+                  behaviour too. */}
                   <a
                     href={whatsappShareUrl(result.url)}
                     target="_blank"
@@ -426,12 +403,13 @@ export function InviteMemberDialog({
                     className={buttonVariants({
                       variant: 'outline',
                       className:
-                        'border-border text-muted-foreground hover:bg-muted w-full',
+                        'w-full border-border text-muted-foreground hover:bg-muted',
                     })}
                   >
                     <MessageCircle className="size-4" />
-                    Send via WhatsApp
+                    {t('sendViaWhatsApp')}
                   </a>
+
                 </>
               )}
             </div>
@@ -441,7 +419,7 @@ export function InviteMemberDialog({
                 onClick={() => handleOpenChange(false)}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                Done
+                {t('done')}
               </Button>
             </DialogFooter>
           </>
@@ -451,12 +429,12 @@ export function InviteMemberDialog({
               <DialogTitle className="text-popover-foreground">
                 {mode === 'new'
                   ? 'Create account & invite'
-                  : 'Invite a teammate'}
+                  : t('dialogTitle')}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {mode === 'new'
                   ? "Provision a login for someone who doesn't have one yet, then invite them to join."
-                  : 'Generate a one-time invite link for someone who already has a login.'}
+                  : t('dialogDesc')}
               </DialogDescription>
             </DialogHeader>
 
@@ -548,22 +526,22 @@ export function InviteMemberDialog({
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">Role</Label>
+                  <Label className="text-muted-foreground">{t('roleLabel')}</Label>
                   <Select
                     value={role}
                     onValueChange={(v) => v && setRole(v as InviteRole)}
                   >
-                    <SelectTrigger className="bg-muted border-border text-foreground w-full">
+                    <SelectTrigger className="w-full bg-muted border-border text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="agent">Agent</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="admin">{tRoles('admin')}</SelectItem>
+                      <SelectItem value="agent">{tRoles('agent')}</SelectItem>
+                      <SelectItem value="viewer">{tRoles('viewer')}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    {ROLE_DESCRIPTIONS[role]}
+                  <p className="text-xs text-muted-foreground">
+                    {tRoles(`${role}Hint` as 'adminHint' | 'agentHint' | 'viewerHint')}
                   </p>
                 </div>
 
@@ -594,20 +572,18 @@ export function InviteMemberDialog({
 
                 {!(mode === 'new' && autoJoin) && (
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">
-                      Link valid for
-                    </Label>
+                    <Label className="text-muted-foreground">{t('validForLabel')}</Label>
                     <Select
                       value={expiry}
                       onValueChange={(v) => v && setExpiry(v)}
                     >
-                      <SelectTrigger className="bg-muted border-border text-foreground w-full">
+                      <SelectTrigger className="w-full bg-muted border-border text-foreground">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {EXPIRY_OPTIONS.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
+                            {t(opt.labelKey as Parameters<typeof t>[0])}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -617,22 +593,20 @@ export function InviteMemberDialog({
 
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">
-                    Label{' '}
-                    <span className="text-muted-foreground text-xs">
-                      (optional)
-                    </span>
+                    {t('labelTitle')}{' '}
+                    <span className="text-xs text-muted-foreground">{t('optional')}</span>
                   </Label>
                   <Input
-                    placeholder="e.g. Sara — support team"
+                    placeholder={t('labelPlaceholder')}
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
                     maxLength={MAX_LABEL_LEN}
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-xs text-muted-foreground">
                     {mode === 'new' && autoJoin
                       ? 'Helps you remember why this account was created, in the members audit log.'
-                      : 'Helps you remember who you sent the link to in the pending list below.'}
+                      : t('labelHint')}
                   </p>
                 </div>
               </TabsContent>
@@ -644,7 +618,7 @@ export function InviteMemberDialog({
                 onClick={() => handleOpenChange(false)}
                 className="border-border text-muted-foreground hover:bg-muted"
               >
-                Cancel
+                {t('cancel')}
               </Button>
               <Button
                 onClick={handleCreate}
@@ -656,7 +630,7 @@ export function InviteMemberDialog({
                     <Loader2 className="size-4 animate-spin" />
                     {mode === 'new' && autoJoin
                       ? 'Creating & joining...'
-                      : 'Creating...'}
+                      : t('creating')}
                   </>
                 ) : mode === 'new' ? (
                   autoJoin ? (
@@ -665,7 +639,7 @@ export function InviteMemberDialog({
                     'Create & invite'
                   )
                 ) : (
-                  'Generate link'
+                  t('generateLink')
                 )}
               </Button>
             </DialogFooter>
