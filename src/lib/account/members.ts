@@ -19,7 +19,7 @@ export async function fetchAccountMembers(): Promise<AccountMember[]> {
   }
 }
 
-/** Display label for a member: full name → email → raw id. */
+/** Display label for a member: full name → username → raw id. */
 export function memberLabel(m: AccountMember): string {
-  return m.full_name || m.email || m.user_id;
+  return m.full_name || m.username || m.user_id;
 }
