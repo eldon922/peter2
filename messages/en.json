@@ -640,12 +640,13 @@
       "noRecipients": "No recipients found.",
       "noRecipientsFilter": "No recipients match this filter.",
       "table": {
-        "contact": "Contact",
+        "contact": "Contact Name",
         "phone": "Phone",
         "status": "Status",
         "sent": "Sent",
         "delivered": "Delivered",
         "read": "Read",
+        "timestamps": "Time",
         "error": "Error",
         "attempts": "Attempts",
         "phoneAttempted": "Attempted Number"

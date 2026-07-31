@@ -52,17 +52,20 @@ export const recipientStatusConfig: Record<RecipientStatus, StatusDisplay> = {
     label: "pending",
     classes: "bg-slate-500/10 text-muted-foreground border-slate-500/20",
   },
+  // These three match the funnel bars and stat cards on the broadcast
+  // detail page step for step: sent = brand, delivered = green,
+  // read = blue.
   sent: {
     label: "sent",
-    classes: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    classes: "bg-primary/10 text-primary border-primary/20",
   },
   delivered: {
     label: "delivered",
-    classes: "bg-primary/10 text-primary border-primary/20",
+    classes: "bg-green-500/10 text-green-400 border-green-500/20",
   },
   read: {
     label: "read",
-    classes: "bg-primary/10 text-primary border-primary/20",
+    classes: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   },
   replied: {
     label: "replied",
@@ -91,4 +94,18 @@ export function getRecipientStatus(status: string): StatusDisplay {
     recipientStatusConfig[status as RecipientStatus] ??
     recipientStatusConfig.pending
   );
+}
+
+/**
+ * Pulls the label colour out of a chip's `classes` so plain text can be
+ * tinted to match the chip — the recipients table colours each timestamp
+ * line after the status it belongs to.
+ *
+ * Reading it back off `classes` rather than storing a second copy keeps
+ * one source of truth, and keeps the class name written out in full
+ * where Tailwind can see it. Relies on the badge shape documented above:
+ * exactly one `text-*` class per entry.
+ */
+export function statusTextClass(status: StatusDisplay): string {
+  return status.classes.split(" ").find((c) => c.startsWith("text-")) ?? "";
 }

@@ -44,6 +44,8 @@ import { toast } from 'sonner';
 import {
   getBroadcastStatus,
   getRecipientStatus,
+  recipientStatusConfig,
+  statusTextClass,
 } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 
@@ -127,6 +129,17 @@ const RECIPIENT_STATUSES: readonly RecipientStatus[] = [
   'replied',
   'failed',
 ];
+
+/**
+ * Timestamp lines in the recipients table are tinted to match the status
+ * chip of the step each one records, so "delivered" reads the same green
+ * whether you're looking at the chip, the funnel bar, or the time.
+ */
+const STAMP_TINTS = {
+  sent: statusTextClass(recipientStatusConfig.sent),
+  delivered: statusTextClass(recipientStatusConfig.delivered),
+  read: statusTextClass(recipientStatusConfig.read),
+} as const;
 
 /**
  * CSV export helper — RFC 4180 quoting. Quote every field so
@@ -430,7 +443,7 @@ export default function BroadcastDetailPage() {
 
   const funnelSteps: FunnelStep[] = [
     { label: t('stats.sent'), value: broadcast.sent_count, color: 'bg-primary' },
-    { label: t('stats.delivered'), value: broadcast.delivered_count, color: 'bg-teal-500' },
+    { label: t('stats.delivered'), value: broadcast.delivered_count, color: 'bg-green-500' },
     { label: t('stats.read'), value: broadcast.read_count, color: 'bg-blue-500' },
     { label: t('stats.replied'), value: broadcast.replied_count, color: 'bg-indigo-500' },
   ];
@@ -647,7 +660,7 @@ export default function BroadcastDetailPage() {
           value={broadcast.delivered_count}
           total={broadcast.total_recipients}
           icon={<CheckCheck className="h-4 w-4" />}
-          color="bg-teal-500/10 text-teal-400"
+          color="bg-green-500/10 text-green-400"
         />
         <StatCard
           label={t('stats.read')}
@@ -753,10 +766,16 @@ export default function BroadcastDetailPage() {
                   <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.phone')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.attempts')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.sent')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.delivered')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.read')}</TableHead>
+                  {/* Cells here only ever hold "×2", so the word
+                      "Attempts" was setting this column's width by
+                      itself. Icon + tooltip keeps it narrow. */}
+                  <TableHead className="text-muted-foreground">
+                    <span className="inline-flex" title={t('table.attempts')}>
+                      <RotateCw className="h-3.5 w-3.5" aria-hidden />
+                      <span className="sr-only">{t('table.attempts')}</span>
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-muted-foreground">{t('table.timestamps')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.error')}</TableHead>
                   <TableHead className="text-muted-foreground" />
                 </TableRow>
@@ -770,6 +789,30 @@ export default function BroadcastDetailPage() {
                   // is just as misleading as a failed one.
                   const changed = numberChanged(recipient);
                   const attempts = recipient.attempt_count ?? 1;
+                  // Sent/delivered/read share one column, one line per
+                  // step the message actually reached — a missing line
+                  // means that step never happened, not that it's late.
+                  const stamps = [
+                    {
+                      label: t('table.sent'),
+                      at: recipient.sent_at,
+                      tint: STAMP_TINTS.sent,
+                    },
+                    {
+                      label: t('table.delivered'),
+                      at: recipient.delivered_at,
+                      tint: STAMP_TINTS.delivered,
+                    },
+                    {
+                      label: t('table.read'),
+                      at: recipient.read_at,
+                      tint: STAMP_TINTS.read,
+                    },
+                  ].flatMap(({ label, at, tint }) =>
+                    at
+                      ? [{ label, tint, value: new Date(at).toLocaleString() }]
+                      : [],
+                  );
                   return (
                     <TableRow key={recipient.id} className="border-border">
                       <TableCell className="font-medium text-foreground">
@@ -802,19 +845,19 @@ export default function BroadcastDetailPage() {
                         {attempts > 1 ? `×${attempts}` : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {recipient.sent_at
-                          ? new Date(recipient.sent_at).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.delivered_at
-                          ? new Date(recipient.delivered_at).toLocaleString()
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.read_at
-                          ? new Date(recipient.read_at).toLocaleString()
-                          : '-'}
+                        {stamps.length === 0
+                          ? '-'
+                          : stamps.map(({ label, value, tint }) => (
+                              <div
+                                key={label}
+                                className={`whitespace-nowrap text-xs ${tint}`}
+                              >
+                                {/* Dimmed by opacity, not a muted colour,
+                                    so the label stays the step's hue. */}
+                                <span className="opacity-60">{label}</span>{' '}
+                                {value}
+                              </div>
+                            ))}
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-xs text-red-400">
                         {recipient.error_message ?? '-'}

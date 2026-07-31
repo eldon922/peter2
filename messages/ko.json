@@ -640,12 +640,13 @@
       "noRecipients": "수신자가 없습니다.",
       "noRecipientsFilter": "이 필터와 일치하는 수신자가 없습니다.",
       "table": {
-        "contact": "연락처",
+        "contact": "연락처 이름",
         "phone": "전화번호",
         "status": "상태",
         "sent": "전송됨",
         "delivered": "전달됨",
         "read": "읽음",
+        "timestamps": "시간",
         "error": "오류",
         "attempts": "시도",
         "phoneAttempted": "시도한 번호"
