@@ -117,6 +117,34 @@ export function resolveVariables(
   });
 }
 
+// Contact ids are 36-char UUIDs, so a *count*-based page cap doesn't
+// bound the request size: 260 of them alone join into a ~9.6KB query
+// string, already past the ~8KB request-line/header limit most
+// reverse proxies in front of PostgREST (nginx, Kong) enforce by
+// default — the browser reports that as a generic "TypeError: Failed
+// to fetch" with no distinguishing HTTP status. Chunk by the joined
+// string length instead, well under that ceiling.
+const IN_CLAUSE_MAX_CHARS = 3000;
+
+function chunkIds(ids: string[]): string[][] {
+  const chunks: string[][] = [];
+  let current: string[] = [];
+  let currentLength = 0;
+
+  for (const id of ids) {
+    const addedLength = id.length + 1; // +1 for the joining comma
+    if (current.length > 0 && currentLength + addedLength > IN_CLAUSE_MAX_CHARS) {
+      chunks.push(current);
+      current = [];
+      currentLength = 0;
+    }
+    current.push(id);
+    currentLength += addedLength;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
 /**
  * Bulk-fetch contact_custom_values for a set of contacts. Returns an
  * index keyed by contact_id → field_id → value.
@@ -128,11 +156,7 @@ async function fetchCustomValueIndex(
   const index: CustomValueIndex = new Map();
   if (contactIds.length === 0) return index;
 
-  // Supabase PostgREST caps the .in(...) IN-clause roughly at 1000
-  // values. Page through to stay safe.
-  const PAGE = 500;
-  for (let i = 0; i < contactIds.length; i += PAGE) {
-    const slice = contactIds.slice(i, i + PAGE);
+  for (const slice of chunkIds(contactIds)) {
     const { data } = await supabase
       .from('contact_custom_values')
       .select('contact_id, custom_field_id, value')
@@ -145,6 +169,23 @@ async function fetchCustomValueIndex(
     }
   }
   return index;
+}
+
+/** Bulk-fetch contacts by id, chunked to stay under the request-size limit. */
+async function fetchContactsByIds(
+  supabase: ReturnType<typeof createClient>,
+  contactIds: string[],
+): Promise<Contact[]> {
+  const contacts: Contact[] = [];
+  for (const slice of chunkIds(contactIds)) {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .in('id', slice);
+    if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
+    contacts.push(...((data ?? []) as Contact[]));
+  }
+  return contacts;
 }
 
 export function useBroadcastSending(): UseBroadcastSendingReturn {
@@ -178,12 +219,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         const uniqueContactIds = [
           ...new Set(contactTags.map((ct) => ct.contact_id)),
         ];
-        const { data, error } = await supabase
-          .from('contacts')
-          .select('*')
-          .in('id', uniqueContactIds);
-        if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
-        contacts = data ?? [];
+        contacts = await fetchContactsByIds(supabase, uniqueContactIds);
       }
     } else if (audience.type === 'custom_field' && audience.customField) {
       contacts = await resolveCustomFieldAudience(supabase, audience.customField);
@@ -312,12 +348,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     const contactIds = [...new Set((matches ?? []).map((m) => m.contact_id))];
     if (contactIds.length === 0) return [];
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .in('id', contactIds);
-    if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
-    return data ?? [];
+    return fetchContactsByIds(supabase, contactIds);
   }
 
   async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
