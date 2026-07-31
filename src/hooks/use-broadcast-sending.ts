@@ -4,6 +4,18 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Contact, MessageTemplate } from '@/types';
+import {
+  chunkIds,
+  fetchCustomValueIndex,
+  resolveVariables,
+  type VariableMapping,
+} from '@/lib/broadcasts/variables';
+
+// Re-exported so existing importers of this hook keep working. The
+// implementations moved to lib/broadcasts/variables so the server-side
+// retry planner can share them — this module is `'use client'`, which
+// server code must not import from.
+export { resolveVariables, type VariableMapping };
 
 export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
 
@@ -21,18 +33,6 @@ export interface AudienceConfig {
   /** Contacts carrying any of these tags are subtracted from the result. */
   excludeTagIds?: string[];
 }
-
-/**
- * Variable mapping — each template placeholder (by key, usually "1",
- * "2", …) is resolved at send time. `field` maps to a built-in contact
- * field (name/phone/email/company); `custom_field` maps to a
- * contact_custom_values.value row keyed by the custom_fields.id stored
- * in `value`.
- */
-export type VariableMapping =
-  | { type: 'static'; value: string }
-  | { type: 'field'; value: string }
-  | { type: 'custom_field'; value: string };
 
 interface BroadcastPayload {
   name: string;
@@ -71,104 +71,15 @@ function sleep(ms: number) {
 
 interface BroadcastApiResult {
   phone: string;
+  /**
+   * The variant actually dialled — Meta accepted it on success, or it
+   * was the last one tried on failure. Distinct from `phone`, which
+   * always echoes the input and is the key results are matched on.
+   */
+  phone_attempted?: string;
   status: 'sent' | 'failed';
   whatsapp_message_id?: string;
   error?: string;
-}
-
-/** contactId → (customFieldId → value). */
-type CustomValueIndex = Map<string, Map<string, string>>;
-
-/**
- * Per-contact resolution of custom-field placeholders. Static and
- * built-in-field mappings resolve synchronously; custom fields read
- * from a pre-built index to avoid N+1 queries during the send loop.
- */
-export function resolveVariables(
-  variables: Record<string, VariableMapping>,
-  contact: Contact,
-  customValues?: Map<string, string>,
-): string[] {
-  // Keys are typically "1","2",... — numeric-aware sort keeps
-  // {{1}} before {{10}}.
-  const keys = Object.keys(variables).sort((a, b) => {
-    const an = Number(a);
-    const bn = Number(b);
-    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-    return a.localeCompare(b);
-  });
-
-  return keys.map((key) => {
-    const v = variables[key];
-    if (v.type === 'static') return v.value;
-
-    if (v.type === 'field') {
-      const fieldMap: Record<string, string | undefined> = {
-        name: contact.name,
-        phone: contact.phone,
-        email: contact.email,
-        company: contact.company,
-      };
-      return fieldMap[v.value] ?? '';
-    }
-
-    // custom_field
-    return customValues?.get(v.value) ?? '';
-  });
-}
-
-// Contact ids are 36-char UUIDs, so a *count*-based page cap doesn't
-// bound the request size: 260 of them alone join into a ~9.6KB query
-// string, already past the ~8KB request-line/header limit most
-// reverse proxies in front of PostgREST (nginx, Kong) enforce by
-// default — the browser reports that as a generic "TypeError: Failed
-// to fetch" with no distinguishing HTTP status. Chunk by the joined
-// string length instead, well under that ceiling.
-const IN_CLAUSE_MAX_CHARS = 3000;
-
-function chunkIds(ids: string[]): string[][] {
-  const chunks: string[][] = [];
-  let current: string[] = [];
-  let currentLength = 0;
-
-  for (const id of ids) {
-    const addedLength = id.length + 1; // +1 for the joining comma
-    if (current.length > 0 && currentLength + addedLength > IN_CLAUSE_MAX_CHARS) {
-      chunks.push(current);
-      current = [];
-      currentLength = 0;
-    }
-    current.push(id);
-    currentLength += addedLength;
-  }
-  if (current.length > 0) chunks.push(current);
-  return chunks;
-}
-
-/**
- * Bulk-fetch contact_custom_values for a set of contacts. Returns an
- * index keyed by contact_id → field_id → value.
- */
-async function fetchCustomValueIndex(
-  supabase: ReturnType<typeof createClient>,
-  contactIds: string[],
-): Promise<CustomValueIndex> {
-  const index: CustomValueIndex = new Map();
-  if (contactIds.length === 0) return index;
-
-  for (const slice of chunkIds(contactIds)) {
-    const { data } = await supabase
-      .from('contact_custom_values')
-      .select('contact_id, custom_field_id, value')
-      .in('contact_id', slice);
-
-    for (const row of data ?? []) {
-      const bucket = index.get(row.contact_id) ?? new Map<string, string>();
-      bucket.set(row.custom_field_id, row.value ?? '');
-      index.set(row.contact_id, bucket);
-    }
-  }
-  return index;
 }
 
 /** Bulk-fetch contacts by id, chunked to stay under the request-size limit. */
@@ -382,96 +293,6 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         throw new Error('No contacts found for this audience.');
       }
 
-      // ── Step 2: Create broadcast row ──────────────────────────────
-      setProgress(10);
-      const { data: broadcast, error: broadcastError } = await supabase
-        .from('broadcasts')
-        .insert({
-          user_id: user.id,
-          account_id: accountId,
-          name: payload.name,
-          template_name: payload.template.name,
-          template_language: payload.template.language ?? 'en_US',
-          template_variables: payload.variables,
-          audience_filter: {
-            type: payload.audience.type,
-            tagIds: payload.audience.tagIds,
-            customField: payload.audience.customField,
-            excludeTagIds: payload.audience.excludeTagIds,
-          },
-          status: 'sending',
-          total_recipients: contacts.length,
-          sent_count: 0,
-          delivered_count: 0,
-          read_count: 0,
-          replied_count: 0,
-          failed_count: 0,
-        })
-        .select()
-        .single();
-
-      if (broadcastError || !broadcast) {
-        throw new Error(
-          `Failed to create broadcast: ${broadcastError?.message ?? 'unknown error'}`,
-        );
-      }
-
-      // ── Step 3: Insert recipient rows ─────────────────────────────
-      setProgress(20);
-      const recipientRows = contacts.map((contact) => ({
-        broadcast_id: broadcast.id,
-        contact_id: contact.id,
-        status: 'pending' as const,
-      }));
-
-      for (let i = 0; i < recipientRows.length; i += INSERT_BATCH_SIZE) {
-        const batch = recipientRows.slice(i, i + INSERT_BATCH_SIZE);
-        const { error: recipientError } = await supabase
-          .from('broadcast_recipients')
-          .insert(batch);
-        if (recipientError) {
-          // Previous impl logged and marched on — the broadcast then ran
-          // with an incomplete recipient set, so webhook status updates
-          // couldn't find some rows and the aggregate counts drifted.
-          // Flip the broadcast to failed so the user sees the problem
-          // immediately, then throw to abort the send loop.
-          await supabase
-            .from('broadcasts')
-            .update({
-              status: 'failed',
-              failed_count: contacts.length,
-            })
-            .eq('id', broadcast.id);
-          throw new Error(
-            `Failed to insert recipient batch ${i / INSERT_BATCH_SIZE + 1}: ${recipientError.message}`,
-          );
-        }
-      }
-
-      // ── Step 4: Fetch recipients (joined contact) + preload custom values
-      setProgress(30);
-      const { data: recipients, error: recipientsFetchError } = await supabase
-        .from('broadcast_recipients')
-        .select('*, contact:contacts(*)')
-        .eq('broadcast_id', broadcast.id);
-
-      if (recipientsFetchError || !recipients) {
-        throw new Error('Failed to fetch broadcast recipients');
-      }
-
-      // One bulk fetch of custom values for every contact in this
-      // broadcast, avoiding N+1 during the send loop.
-      const contactIds = recipients
-        .map((r) => r.contact?.id)
-        .filter((id): id is string => Boolean(id));
-      const customValueIndex = await fetchCustomValueIndex(
-        supabase,
-        contactIds,
-      );
-
-      let failedCount = 0;
-      const totalRecipients = recipients.length;
-
       // Media-header templates (image/video/document) require a media
       // URL on every send. Collected in the personalize step and applied
       // to all recipients; falls back to the template's stored URL on the
@@ -485,20 +306,116 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       const messageParams =
         isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
 
+      // ── Step 2: Create broadcast row ──────────────────────────────
+      // Count columns are owned by the DB aggregate trigger (migrations
+      // 003/005) and derived from broadcast_recipients — never seeded
+      // or written here, or a manual value races the trigger.
+      setProgress(10);
+      const { data: broadcast, error: broadcastError } = await supabase
+        .from('broadcasts')
+        .insert({
+          user_id: user.id,
+          account_id: accountId,
+          name: payload.name,
+          template_name: payload.template.name,
+          template_language: payload.template.language ?? 'en_US',
+          template_variables: payload.variables,
+          // Persisted so a retry reproduces this exact media header
+          // instead of silently falling back to the template default.
+          header_media_url: headerMediaUrl || null,
+          audience_filter: {
+            type: payload.audience.type,
+            tagIds: payload.audience.tagIds,
+            customField: payload.audience.customField,
+            excludeTagIds: payload.audience.excludeTagIds,
+          },
+          status: 'sending',
+          total_recipients: contacts.length,
+        })
+        .select()
+        .single();
+
+      if (broadcastError || !broadcast) {
+        throw new Error(
+          `Failed to create broadcast: ${broadcastError?.message ?? 'unknown error'}`,
+        );
+      }
+
+      // ── Step 3: Resolve params, then insert recipient rows ────────
+      // Resolution happens BEFORE the insert so each row is born with
+      // its `template_params`. That makes the values durable: a retry
+      // replays exactly what was sent, and an abandoned tab still
+      // leaves retryable rows behind.
+      setProgress(20);
+      const customValueIndex = await fetchCustomValueIndex(
+        supabase,
+        contacts.map((c) => c.id),
+      );
+      const paramsByContact = new Map<string, string[]>(
+        contacts.map((contact) => [
+          contact.id,
+          resolveVariables(
+            payload.variables,
+            contact,
+            customValueIndex.get(contact.id),
+          ),
+        ]),
+      );
+
+      const recipientRows = contacts.map((contact) => ({
+        broadcast_id: broadcast.id,
+        contact_id: contact.id,
+        status: 'pending' as const,
+        template_params: paramsByContact.get(contact.id) ?? [],
+      }));
+
+      for (let i = 0; i < recipientRows.length; i += INSERT_BATCH_SIZE) {
+        const batch = recipientRows.slice(i, i + INSERT_BATCH_SIZE);
+        const { error: recipientError } = await supabase
+          .from('broadcast_recipients')
+          .insert(batch);
+        if (recipientError) {
+          // Previous impl logged and marched on — the broadcast then ran
+          // with an incomplete recipient set, so webhook status updates
+          // couldn't find some rows and the aggregate counts drifted.
+          // Flip the broadcast to failed so the user sees the problem
+          // immediately, then throw to abort the send loop. Only the
+          // status: failed_count belongs to the trigger.
+          await supabase
+            .from('broadcasts')
+            .update({ status: 'failed' })
+            .eq('id', broadcast.id);
+          throw new Error(
+            `Failed to insert recipient batch ${i / INSERT_BATCH_SIZE + 1}: ${recipientError.message}`,
+          );
+        }
+      }
+
+      // ── Step 4: Fetch recipients (joined contact) ─────────────────
+      setProgress(30);
+      const { data: recipients, error: recipientsFetchError } = await supabase
+        .from('broadcast_recipients')
+        .select('*, contact:contacts(*)')
+        .eq('broadcast_id', broadcast.id);
+
+      if (recipientsFetchError || !recipients) {
+        throw new Error('Failed to fetch broadcast recipients');
+      }
+
+      let failedCount = 0;
+      const totalRecipients = recipients.length;
+
       for (let i = 0; i < recipients.length; i += SEND_BATCH_SIZE) {
         const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
 
+        // Params were resolved and stored on the row at insert time, so
+        // read them back rather than recomputing — this is exactly what
+        // a later retry will replay.
         const apiRecipients = batch
           .filter((r) => r.contact?.phone)
           .map((r) => ({
             phone: r.contact!.phone as string,
-            params: r.contact
-              ? resolveVariables(
-                  payload.variables,
-                  r.contact,
-                  customValueIndex.get(r.contact.id),
-                )
-              : [],
+            params: (r.template_params as string[] | null) ?? [],
             ...(messageParams ? { messageParams } : {}),
           }));
 
@@ -550,6 +467,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
                   sent_at: new Date().toISOString(),
                   whatsapp_message_id: result.whatsapp_message_id ?? null,
                   error_message: null,
+                  // The variant Meta accepted, which may not be the
+                  // contact's stored number.
+                  phone_attempted: result.phone_attempted ?? phone,
                 })
                 .eq('id', recipient.id);
             } else {
@@ -559,6 +479,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
                 .update({
                   status: 'failed',
                   error_message: result.error ?? 'Unknown error',
+                  phone_attempted: result.phone_attempted ?? phone,
                 })
                 .eq('id', recipient.id);
             }

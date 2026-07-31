@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast, BroadcastRecipient, RecipientStatus } from '@/types';
 import { Button } from '@/components/ui/button';
+import { GatedButton } from '@/components/ui/gated-button';
+import { Input } from '@/components/ui/input';
+import { useCan } from '@/hooks/use-can';
+import { isValidHttpUrl, numberChanged } from '@/lib/broadcasts/variables';
 import {
   Table,
   TableBody,
@@ -32,6 +36,9 @@ import {
   Download,
   ChevronDown,
   Trash2,
+  RotateCw,
+  AlertTriangle,
+  ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -142,12 +149,16 @@ function downloadBlob(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Matches the broadcasts list page, which polls on the same signal. */
+const POLL_INTERVAL_MS = 5000;
+
 export default function BroadcastDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
   const tStatus = useTranslations('Broadcasts.status');
   const broadcastId = params.id as string;
+  const canSend = useCan('send-messages');
 
   const [broadcast, setBroadcast] = useState<Broadcast | null>(null);
   const [recipients, setRecipients] = useState<BroadcastRecipient[]>([]);
@@ -158,38 +169,103 @@ export default function BroadcastDetailPage() {
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
+  const [retrying, setRetrying] = useState<string | null>(null);
+  /**
+   * Set when the server refused a retry because it can't tell which
+   * media this broadcast sent. Holds the pending retry's scope so
+   * answering the prompt resumes exactly what was clicked.
+   */
+  const [mediaPrompt, setMediaPrompt] = useState<{
+    recipientId?: string;
+    url: string;
+    /** The server's explanation, shown as the dialog description. */
+    error: string;
+    /** image | video | document — drives the label and the preview. */
+    headerType: string;
+  } | null>(null);
+
+  // Same validation the personalize step applies to a media header, so
+  // a URL rejected there is rejected here and vice versa.
+  const mediaPromptError = useMemo<'missing' | 'invalid' | null>(() => {
+    if (!mediaPrompt) return null;
+    const value = mediaPrompt.url.trim();
+    if (!value) return 'missing';
+    if (!isValidHttpUrl(value)) return 'invalid';
+    return null;
+  }, [mediaPrompt]);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Plain function rather than useCallback, matching the broadcasts
+  // list page: the polling effect below re-reads it on every tick and
+  // keys off `isSending` alone, so a stable identity buys nothing.
+  async function refresh() {
+    try {
+      const supabase = createClient();
+
+      const { data: bc, error: bcError } = await supabase
+        .from('broadcasts')
+        .select('*')
+        .eq('id', broadcastId)
+        .single();
+
+      if (bcError) throw bcError;
+      setBroadcast(bc);
+
+      const { data: recs, error: recsError } = await supabase
+        .from('broadcast_recipients')
+        .select('*, contact:contacts(*)')
+        .eq('broadcast_id', broadcastId)
+        .order('created_at', { ascending: false });
+
+      if (recsError) throw recsError;
+      setRecipients(recs ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('notFound'));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const supabase = createClient();
+    refresh();
+  }, [broadcastId]);
 
-        const { data: bc, error: bcError } = await supabase
-          .from('broadcasts')
-          .select('*')
-          .eq('id', broadcastId)
-          .single();
-
-        if (bcError) throw bcError;
-        setBroadcast(bc);
-
-        const { data: recs, error: recsError } = await supabase
-          .from('broadcast_recipients')
-          .select('*, contact:contacts(*)')
-          .eq('broadcast_id', broadcastId)
-          .order('created_at', { ascending: false });
-
-        if (recsError) throw recsError;
-        setRecipients(recs ?? []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('notFound'));
-      } finally {
-        setLoading(false);
+  // Poll while a send or retry is fanning out so the funnel and the
+  // recipient rows advance live. Same pattern (and interval) as the
+  // list page, including pausing while the tab is hidden.
+  const isSending = broadcast?.status === 'sending';
+  useEffect(() => {
+    function startPolling() {
+      if (pollTimer.current) return;
+      pollTimer.current = setInterval(refresh, POLL_INTERVAL_MS);
+    }
+    function stopPolling() {
+      if (!pollTimer.current) return;
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+    function handleVisibilityChange() {
+      if (!isSending) return;
+      if (document.visibilityState === 'hidden') {
+        stopPolling();
+      } else {
+        refresh();
+        startPolling();
       }
     }
 
-    fetchData();
-  }, [broadcastId]);
+    if (isSending && document.visibilityState === 'visible') {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isSending]);
 
   const filteredRecipients = useMemo(
     () =>
@@ -199,12 +275,85 @@ export default function BroadcastDetailPage() {
     [recipients, statusFilter],
   );
 
+  /**
+   * Retry every failed recipient, or just one when `recipientId` is
+   * given. The server claims the rows and fans out after responding,
+   * so we refresh immediately and let polling carry the rest.
+   */
+  async function handleRetry(recipientId?: string) {
+    if (!broadcast) return;
+    setRetrying(recipientId ?? broadcast.id);
+    try {
+      const res = await fetch(`/api/broadcasts/${broadcastId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(recipientId ? { recipient_id: recipientId } : {}),
+          // Only present after the user answered the media prompt below.
+          ...(mediaPrompt?.url.trim()
+            ? { header_media_url: mediaPrompt.url.trim() }
+            : {}),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        // The server refuses rather than guessing whenever it can't
+        // reproduce the original message. Two of those refusals are
+        // answerable by the user, so ask instead of just reporting.
+        if (data.code === 'header_media_required') {
+          setMediaPrompt({
+            recipientId,
+            url: '',
+            error: data.error,
+            headerType: data.headerType ?? 'image',
+          });
+          return;
+        }
+        toast.error(
+          data.code === 'params_unrecoverable'
+            ? t('toastRetryUnrecoverable')
+            : data.code === 'template_missing'
+              ? t('toastRetryTemplateMissing')
+              : t('toastRetryFailed', { error: data.error ?? 'Unknown error' }),
+        );
+        return;
+      }
+
+      setMediaPrompt(null);
+
+      if (data.retrying === 0) {
+        toast.info(t('noFailedToRetry'));
+      } else if (data.remaining > 0) {
+        toast.success(
+          t('toastRetryPartial', {
+            count: data.retrying,
+            remaining: data.remaining,
+          }),
+        );
+      } else {
+        toast.success(t('toastRetryStarted', { count: data.retrying }));
+      }
+      await refresh();
+    } catch (err) {
+      toast.error(
+        t('toastRetryFailed', {
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }),
+      );
+    } finally {
+      setRetrying(null);
+    }
+  }
+
   function handleExport() {
     if (!broadcast) return;
     const header = [
       t('table.contact'),
       t('table.phone'),
+      t('table.phoneAttempted'),
       t('table.status'),
+      t('table.attempts'),
       t('table.sent'),
       t('table.delivered'),
       t('table.read'),
@@ -213,7 +362,9 @@ export default function BroadcastDetailPage() {
     const rows = recipients.map((r) => [
       r.contact?.name ?? '',
       r.contact?.phone ?? '',
+      r.phone_attempted ?? '',
       r.status,
+      String(r.attempt_count ?? 1),
       r.sent_at ?? '',
       r.delivered_at ?? '',
       r.read_at ?? '',
@@ -304,6 +455,34 @@ export default function BroadcastDetailPage() {
           </div>
         </div>
 
+        <div className="flex items-center gap-2">
+        {/* Retry failed — re-sends only the failed rows, folding the
+            results back into this broadcast's funnel. Disabled while a
+            fan-out is live so we never race the in-flight send. */}
+        {broadcast.failed_count > 0 && (
+          <GatedButton
+            canAct={canSend}
+            gateReason="send messages"
+            variant="outline"
+            size="sm"
+            disabled={broadcast.status === 'sending' || retrying !== null}
+            onClick={() => handleRetry()}
+            title={
+              broadcast.status === 'sending'
+                ? t('cannotRetrySending')
+                : t('retryHover')
+            }
+            className="border-amber-500/30 bg-transparent text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+          >
+            <RotateCw
+              className={`h-3.5 w-3.5 ${retrying === broadcast.id ? 'animate-spin' : ''}`}
+            />
+            {retrying === broadcast.id
+              ? t('retrying')
+              : t('retryFailed', { count: broadcast.failed_count })}
+          </GatedButton>
+        )}
+
         {/* Delete — inline-confirm pattern matches the pipeline-settings
             "Delete Pipeline" flow. Mid-send broadcasts can't be deleted
             because orphaning in-flight Meta messages would leave the
@@ -346,7 +525,94 @@ export default function BroadcastDetailPage() {
             {t('delete')}
           </Button>
         )}
+        </div>
       </div>
+
+      {/* Media prompt — the server refuses to guess which
+          image/video/document this broadcast originally sent, because
+          reusing the template's current default could re-send
+          different content with no indication anything changed. Ask
+          instead; the answer is stored on the broadcast, so this
+          appears once. Validation mirrors the personalize step. */}
+      {mediaPrompt && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-amber-300">
+                  {t('mediaPromptTitle')}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {mediaPrompt.error}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary" />
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t('mediaPromptLabel')}
+                  </label>
+                  <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium uppercase text-primary">
+                    {mediaPrompt.headerType}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="url"
+                    autoFocus
+                    value={mediaPrompt.url}
+                    onChange={(e) =>
+                      setMediaPrompt({ ...mediaPrompt, url: e.target.value })
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && mediaPromptError === null) {
+                        handleRetry(mediaPrompt.recipientId);
+                      }
+                    }}
+                    placeholder={t('mediaPromptPlaceholder')}
+                    className="min-w-[18rem] flex-1 border-border bg-muted text-foreground placeholder:text-muted-foreground"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={mediaPromptError !== null || retrying !== null}
+                    onClick={() => handleRetry(mediaPrompt.recipientId)}
+                    className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {retrying !== null ? t('retrying') : t('mediaPromptConfirm')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={retrying !== null}
+                    onClick={() => setMediaPrompt(null)}
+                    className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                  >
+                    {t('cancel')}
+                  </Button>
+                </div>
+                {/* Only images can be previewed inline; video/document
+                    URLs are taken on trust, same as the wizard. */}
+                {mediaPrompt.headerType === 'image' &&
+                  mediaPromptError === null && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mediaPrompt.url.trim()}
+                      alt={t('mediaPromptPreviewAlt')}
+                      className="mt-3 max-h-40 rounded-lg border border-border object-contain"
+                    />
+                  )}
+                {mediaPromptError === 'invalid' && (
+                  <p className="text-xs text-amber-300">{t('mediaPromptInvalid')}</p>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">{t('mediaPromptHint')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats — 6 cards: Total / Sent / Delivered / Read / Replied / Failed */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -475,15 +741,23 @@ export default function BroadcastDetailPage() {
                   <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.phone')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
+                  <TableHead className="text-muted-foreground">{t('table.attempts')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.sent')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.delivered')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.read')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.error')}</TableHead>
+                  <TableHead className="text-muted-foreground" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRecipients.map((recipient) => {
                   const rStatus = getRecipientStatus(recipient.status);
+                  // The contact was edited since this row was dialled,
+                  // so what's displayed is NOT what was messaged. Shown
+                  // on any status — a delivered row whose contact moved
+                  // is just as misleading as a failed one.
+                  const changed = numberChanged(recipient);
+                  const attempts = recipient.attempt_count ?? 1;
                   return (
                     <TableRow key={recipient.id} className="border-border">
                       <TableCell className="font-medium text-foreground">
@@ -491,6 +765,19 @@ export default function BroadcastDetailPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {recipient.contact?.phone ?? '-'}
+                        {changed && (
+                          <span
+                            className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
+                            title={t('numberChangedHint', {
+                              phone: recipient.phone_attempted ?? '',
+                            })}
+                          >
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            {t('triedNumber', {
+                              phone: recipient.phone_attempted ?? '',
+                            })}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span
@@ -498,6 +785,9 @@ export default function BroadcastDetailPage() {
                         >
                           {tStatus(rStatus.label)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {attempts > 1 ? `×${attempts}` : '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {recipient.sent_at
@@ -516,6 +806,34 @@ export default function BroadcastDetailPage() {
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-xs text-red-400">
                         {recipient.error_message ?? '-'}
+                      </TableCell>
+                      <TableCell>
+                        {recipient.status === 'failed' && (
+                          <GatedButton
+                            canAct={canSend}
+                            gateReason="send messages"
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              broadcast.status === 'sending' || retrying !== null
+                            }
+                            onClick={() => handleRetry(recipient.id)}
+                            title={
+                              changed
+                                ? t('retryChangedNumber', {
+                                    phone: recipient.contact?.phone ?? '',
+                                  })
+                                : t('retryRow')
+                            }
+                            className="h-7 border-border bg-transparent text-muted-foreground hover:bg-muted disabled:opacity-40"
+                          >
+                            <RotateCw
+                              className={`h-3 w-3 ${
+                                retrying === recipient.id ? 'animate-spin' : ''
+                              }`}
+                            />
+                          </GatedButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

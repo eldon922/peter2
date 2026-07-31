@@ -360,9 +360,9 @@
         "custom": "Custom Fields",
         "deals": "Deals",
         "tags": "Tags",
-      "noTags": "No tags",
-      "noDeals": "No deals",
-      "addNotePlaceholder": "Add a note..."
+        "noTags": "No tags",
+        "noDeals": "No deals",
+        "addNotePlaceholder": "Add a note..."
       },
       "actions": {
         "edit": "Edit",
@@ -646,7 +646,9 @@
         "sent": "Sent",
         "delivered": "Delivered",
         "read": "Read",
-        "error": "Error"
+        "error": "Error",
+        "attempts": "Attempts",
+        "phoneAttempted": "Attempted Number"
       },
       "stats": {
         "totalRecipients": "Total Recipients",
@@ -657,7 +659,28 @@
         "failed": "Failed"
       },
       "toastFailedDelete": "Failed to delete: {error}",
-      "toastDeleted": "Broadcast deleted"
+      "toastDeleted": "Broadcast deleted",
+      "retryFailed": "Retry Failed ({count})",
+      "retryHover": "Re-send to the recipients that failed",
+      "retrying": "Retrying…",
+      "retryRow": "Retry this recipient",
+      "retryChangedNumber": "Retry — will send to {phone}, which differs from the number originally tried",
+      "cannotRetrySending": "Cannot retry while a broadcast is actively sending",
+      "noFailedToRetry": "No failed recipients left to retry",
+      "numberChangedHint": "This contact's number changed after the send. It was tried on {phone}.",
+      "triedNumber": "tried {phone}",
+      "toastRetryStarted": "Retrying {count} recipient(s)",
+      "toastRetryPartial": "Retrying {count} recipient(s) — {remaining} more can be retried after this finishes",
+      "toastRetryFailed": "Failed to retry: {error}",
+      "toastRetryUnrecoverable": "This broadcast predates per-recipient template values being stored, so its personalization cannot be reproduced. Create a new broadcast for these recipients instead.",
+      "toastRetryTemplateMissing": "The template for this broadcast is no longer in your account. Run \"Sync from Meta\" in Settings, then retry.",
+      "mediaPromptTitle": "Which media did this broadcast send?",
+      "mediaPromptPlaceholder": "https://example.com/image.jpg",
+      "mediaPromptConfirm": "Retry with this media",
+      "mediaPromptHint": "We won't guess — reusing the template's current media could send different content than the original. This is saved on the broadcast, so you'll only be asked once.",
+      "mediaPromptLabel": "Media URL",
+      "mediaPromptInvalid": "Enter a valid http(s) URL.",
+      "mediaPromptPreviewAlt": "Media preview"
     },
     "new": {
       "title": "New Broadcast",

@@ -396,6 +396,13 @@ export interface Broadcast {
   template_language: string;
   template_variables?: Record<string, unknown>;
   audience_filter?: Record<string, unknown>;
+  /**
+   * Media URL for an IMAGE/VIDEO/DOCUMENT header template, captured at
+   * send time so a retry reproduces the original message instead of
+   * falling back to the template's stored URL. Added in migration 037;
+   * NULL on broadcasts created before it.
+   */
+  header_media_url?: string | null;
   scheduled_at?: string;
   status: BroadcastStatus;
   total_recipients: number;
@@ -428,6 +435,27 @@ export interface BroadcastRecipient {
    * Added in migration 003.
    */
   whatsapp_message_id?: string;
+  /**
+   * Send attempts planned for this row. 1 on insert; incremented each
+   * time a retry claims the row. Added in migration 037.
+   */
+  attempt_count?: number;
+  /** When a retry last claimed this row. NULL if never retried. */
+  last_attempt_at?: string | null;
+  /**
+   * The number actually dialled — including the `phoneVariants`
+   * variant Meta accepted, which may differ from `contact.phone`.
+   * NULL on rows sent before migration 037, in which case consumers
+   * fall back to the joined contact.
+   */
+  phone_attempted?: string | null;
+  /**
+   * Resolved positional template params actually sent, letting a retry
+   * replay the exact message. NULL on rows sent before migration 037;
+   * the retry planner then re-resolves from
+   * `broadcasts.template_variables`, or refuses if that is absent too.
+   */
+  template_params?: string[] | null;
   created_at: string;
   contact?: Contact;
 }

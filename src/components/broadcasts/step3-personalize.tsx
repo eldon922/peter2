@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, ArrowRight, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { bodyPlaceholderKeys, isValidHttpUrl } from '@/lib/broadcasts/variables';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -38,15 +39,6 @@ type MediaHeaderType = (typeof MEDIA_HEADER_TYPES)[number];
 
 function isMediaHeaderType(value: unknown): value is MediaHeaderType {
   return MEDIA_HEADER_TYPES.includes(value as MediaHeaderType);
-}
-
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 const contactFields = [
@@ -128,11 +120,15 @@ export function Step3Personalize({
     };
   }, []);
 
-  const placeholders = useMemo(() => {
-    const matches = template.body_text.match(/\{\{(\d+)\}\}/g);
-    if (!matches) return [];
-    return [...new Set(matches)].sort();
-  }, [template.body_text]);
+  // Extraction is shared with the retry planner (which needs to know
+  // whether a template has any placeholders at all before deciding a
+  // broadcast with no stored params is retryable). Re-wrapped to
+  // "{{N}}" and sorted exactly as before — this component keys its
+  // form rows and preview substitution off the braced form.
+  const placeholders = useMemo(
+    () => bodyPlaceholderKeys(template.body_text).map((key) => `{{${key}}}`).sort(),
+    [template.body_text],
+  );
 
   // Templates with an IMAGE/VIDEO/DOCUMENT header need a media URL at
   // send time — Meta requires the media component on every delivery and

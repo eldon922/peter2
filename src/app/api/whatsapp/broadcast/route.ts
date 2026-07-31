@@ -17,7 +17,20 @@ import {
 } from '@/lib/rate-limit'
 
 interface BroadcastResult {
+  /**
+   * Echoes the INPUT phone. Callers match results back on this field
+   * (see resultsByPhone in use-broadcast-sending), so it must never
+   * carry the variant that was actually dialled — use phone_attempted
+   * for that.
+   */
   phone: string
+  /**
+   * The variant Meta accepted, or the last one tried on failure. May
+   * differ from `phone` when the trunk-prefix fallback kicks in; the
+   * caller persists it so the broadcast page can show what was really
+   * dialled rather than the contact's current number.
+   */
+  phone_attempted?: string
   status: 'sent' | 'failed'
   whatsapp_message_id?: string
   error?: string
@@ -183,8 +196,13 @@ export async function POST(request: Request) {
       const variants = phoneVariants(sanitized)
       let sentMessageId: string | null = null
       let lastError: string | null = null
+      // Track the number actually dialled so the caller can persist it
+      // — a trunk-prefix variant may be what Meta accepted, and that
+      // never appears in contacts.phone.
+      let attemptedPhone = sanitized
 
       for (const variant of variants) {
+        attemptedPhone = variant
         try {
           const result = await sendTemplateMessage({
             phoneNumberId: config.phone_number_id,
@@ -214,6 +232,7 @@ export async function POST(request: Request) {
       if (sentMessageId) {
         results.push({
           phone: recipient.phone,
+          phone_attempted: attemptedPhone,
           status: 'sent',
           whatsapp_message_id: sentMessageId,
         })
@@ -225,6 +244,7 @@ export async function POST(request: Request) {
         )
         results.push({
           phone: recipient.phone,
+          phone_attempted: attemptedPhone,
           status: 'failed',
           error: lastError || 'Unknown error',
         })

@@ -263,6 +263,68 @@ Broadcast status + counts. Scope: `broadcasts:send`. `status` moves
 `sending` → `sent`; `delivered_count` / `read_count` keep climbing as
 Meta delivery webhooks arrive. `404` for another account's broadcast.
 
+### `POST /api/v1/broadcasts/{id}/retry`
+
+Re-send **only** the failed recipients of an existing broadcast, reusing
+its template and each recipient's original personalization. Scope:
+`broadcasts:send`. Takes no body. Results fold back into the same
+broadcast's counts — poll `GET /api/v1/broadcasts/{id}` for progress.
+
+```bash
+curl -X POST https://your-crm.example.com/api/v1/broadcasts/$ID/retry \
+  -H "Authorization: Bearer wacrm_live_xxx"
+```
+
+```json
+{
+  "data": {
+    "broadcast_id": "…",
+    "retrying": 12,
+    "remaining": 0
+  }
+}
+```
+
+Failed rows are capped at **150 per call** so the fan-out fits inside
+the request's duration budget; `remaining` reports how many are left,
+and calling again picks them up. Claiming a row is atomic, so two
+concurrent retries never double-send — the loser simply gets
+`retrying: 0`.
+
+A recipient whose contact has since been deleted cannot be retried (it
+has no number left to dial) and is re-recorded as failed with
+`Contact no longer exists`. A recipient whose contact's phone number was
+*edited* is retried on the **new** number.
+
+Errors. **Every refusal happens before any row is claimed**, so a
+rejected retry never consumes the failures it declined to send:
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| `404` | `not_found` | No such broadcast in your account |
+| `409` | `conflict` | The broadcast is still sending — wait for it to finish |
+| `422` | `params_unrecoverable` | Created before per-recipient template values were stored, so the original personalization can't be reproduced. Create a new broadcast for these recipients instead. |
+| `422` | `template_missing` | The template is no longer in this account, so the message can't be rebuilt. Run "Sync from Meta", then retry. |
+| `422` | `header_media_required` | A media-header broadcast predating stored media URLs — see below. |
+
+#### Supplying media for an older broadcast
+
+A broadcast created before media URLs were recorded has no way to know
+which image/video/document it sent. Rather than **guessing** — reusing
+the template's *current* default media, which may differ from what
+recipients originally received — the retry refuses and asks:
+
+```bash
+curl -X POST https://your-crm.example.com/api/v1/broadcasts/$ID/retry \
+  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{ "header_media_url": "https://cdn.example.com/july-promo.jpg" }'
+```
+
+The URL must be `http(s)` and is saved onto the broadcast, so you are
+only asked once. Broadcasts sent since media URLs started being recorded
+never hit this.
+
 ## Pagination
 
 Every list endpoint pages the same way. Request a page size with

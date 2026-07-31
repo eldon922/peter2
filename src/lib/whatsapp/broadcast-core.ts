@@ -25,20 +25,42 @@ import {
   isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
+  isRateLimitError,
 } from '@/lib/whatsapp/phone-utils';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
-import type { MessageTemplate } from '@/types';
+import type { SendTimeParams } from '@/lib/whatsapp/template-send-builder';
+import type { Contact, MessageTemplate } from '@/types';
 import { findOrCreateContact } from '@/lib/api/v1/contacts';
+import {
+  bodyPlaceholderKeys,
+  fetchCustomValueIndex,
+  isValidHttpUrl,
+  resolveVariables,
+  type VariableMapping,
+} from '@/lib/broadcasts/variables';
 
 /** Thrown by createBroadcast on a caller-visible failure; route maps it. */
 export class BroadcastError extends Error {
   readonly code: string;
   readonly status: number;
-  constructor(code: string, message: string, status: number) {
+  /**
+   * Extra machine-readable context for errors the UI has to act on
+   * rather than just display — e.g. `header_media_required` carries
+   * the header type so the prompt can label itself and preview an
+   * image correctly.
+   */
+  readonly details?: Record<string, unknown>;
+  constructor(
+    code: string,
+    message: string,
+    status: number,
+    details?: Record<string, unknown>
+  ) {
     super(message);
     this.name = 'BroadcastError';
     this.code = code;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -60,6 +82,12 @@ interface PlannedRecipient {
   recipientRowId: string;
   phone: string;
   params: string[];
+  /**
+   * Structured send-time values (currently the media-header URL). Set
+   * on retries of media-header templates, where the URL comes from
+   * `broadcasts.header_media_url` rather than the template default.
+   */
+  messageParams?: SendTimeParams;
 }
 
 export interface BroadcastPlan {
@@ -72,9 +100,108 @@ export interface BroadcastPlan {
   planned: PlannedRecipient[];
   /** Phones rejected up front (invalid E.164) — counted as failed. */
   rejected: number;
+  /**
+   * True when this plan re-sends already-failed rows. Changes how the
+   * terminal broadcast status is computed: a retry where everything
+   * fails again must not mark a partially-successful broadcast
+   * 'failed'.
+   */
+  isRetry?: boolean;
+  /** Failed rows left unclaimed because of MAX_RETRY_PER_CALL. */
+  remaining?: number;
 }
 
 const MAX_RECIPIENTS = 1000;
+
+/**
+ * Failed rows retried per call. The fan-out runs inside `after()`
+ * under a 60s maxDuration, and the pacing governor below imposes a
+ * ~10 msg/s ceiling — so 150 costs ~15s of governor floor and leaves
+ * ~35s for real Meta latency. Leftovers are reported as `remaining`
+ * and the caller retries again.
+ */
+const MAX_RETRY_PER_CALL = 150;
+
+/**
+ * Minimum spacing between send *starts*, ≈10 msg/s.
+ *
+ * Deliberately an interval governor rather than a fixed post-send
+ * sleep: we sleep only the remainder since the last send began, so
+ * when Meta is already slower than this the pacing costs nothing and
+ * doesn't eat the duration budget. It only bites when we would
+ * otherwise burst.
+ */
+const MIN_SEND_INTERVAL_MS = 100;
+
+/**
+ * Stop sending at this point so the loop finishes its DB writes before
+ * the 60s maxDuration kills the invocation. Rows not reached are
+ * marked failed with an explicit message rather than being silently
+ * stranded in 'pending', which is what happened before — invisible in
+ * the funnel and unreachable by any action.
+ */
+const DELIVER_BUDGET_MS = 50_000;
+
+/** Pause after a Meta throttling error before the single re-attempt. */
+const RATE_LIMIT_BACKOFF_MS = 2_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Load the per-account send context: Meta credentials plus the local
+ * template row used to build header/button components.
+ *
+ * Shared by createBroadcast and planBroadcastRetry — loading it once
+ * per broadcast rather than per recipient avoids an N+1, and guarding
+ * a malformed local row here fails loudly once instead of producing N
+ * identical opaque TypeErrors inside the send loop.
+ */
+async function loadSendContext(
+  db: SupabaseClient,
+  accountId: string,
+  templateName: string,
+  templateLanguage: string
+): Promise<{
+  phoneNumberId: string;
+  accessToken: string;
+  templateRow: MessageTemplate | null;
+}> {
+  const { data: config, error: configError } = await db
+    .from('whatsapp_config')
+    .select('*')
+    .eq('account_id', accountId)
+    .single();
+  if (configError || !config) {
+    throw new BroadcastError(
+      'whatsapp_not_configured',
+      'WhatsApp not configured. Please set up your WhatsApp integration first.',
+      400
+    );
+  }
+
+  const { data: rawTemplateRow } = await db
+    .from('message_templates')
+    .select('*')
+    .eq('account_id', accountId)
+    .eq('name', templateName)
+    .eq('language', templateLanguage)
+    .maybeSingle();
+  if (rawTemplateRow && !isMessageTemplate(rawTemplateRow)) {
+    throw new BroadcastError(
+      'template_malformed',
+      'Template row is malformed locally — run "Sync from Meta" in Settings to repair it before broadcasting.',
+      500
+    );
+  }
+
+  return {
+    phoneNumberId: config.phone_number_id,
+    accessToken: decrypt(config.access_token),
+    templateRow: (rawTemplateRow as MessageTemplate | null) ?? null,
+  };
+}
 
 /**
  * Validate + persist a broadcast, resolving each recipient to a
@@ -109,39 +236,14 @@ export async function createBroadcast(
     );
   }
 
-  // Config (fail fast + provides the audit trail owner already resolved
-  // by the caller). Meta send needs phone_number_id + decrypted token.
-  const { data: config, error: configError } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', accountId)
-    .single();
-  if (configError || !config) {
-    throw new BroadcastError(
-      'whatsapp_not_configured',
-      'WhatsApp not configured. Please set up your WhatsApp integration first.',
-      400
-    );
-  }
-  const accessToken = decrypt(config.access_token);
-
-  // Template row (once) for header/button components; guard a
-  // malformed local row rather than N identical opaque failures.
-  const { data: rawTemplateRow } = await db
-    .from('message_templates')
-    .select('*')
-    .eq('account_id', accountId)
-    .eq('name', templateName)
-    .eq('language', templateLanguage)
-    .maybeSingle();
-  if (rawTemplateRow && !isMessageTemplate(rawTemplateRow)) {
-    throw new BroadcastError(
-      'template_malformed',
-      'Template row is malformed locally — run "Sync from Meta" in Settings to repair it before broadcasting.',
-      500
-    );
-  }
-  const templateRow = (rawTemplateRow as MessageTemplate | null) ?? null;
+  // Meta credentials + template row (fail fast before anything is
+  // persisted or sent).
+  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
+    db,
+    accountId,
+    templateName,
+    templateLanguage
+  );
 
   // Resolve each recipient to a contact. Invalid phones are dropped
   // (counted as rejected) rather than aborting the whole broadcast.
@@ -211,6 +313,11 @@ export async function createBroadcast(
     throw new BroadcastError('internal', 'Failed to create broadcast', 500);
   }
 
+  // `template_params` is stored at insert (not at send) so the params
+  // survive an `after()` cutoff: a row that never got sent can still be
+  // retried with the exact values the caller supplied. Without this the
+  // API path persisted per-recipient params nowhere at all, leaving
+  // those broadcasts permanently un-retryable.
   const { data: recipientRows, error: rErr } = await db
     .from('broadcast_recipients')
     .insert(
@@ -218,6 +325,7 @@ export async function createBroadcast(
         broadcast_id: broadcast.id,
         contact_id: r.contactId,
         status: 'pending' as const,
+        template_params: r.params,
       }))
     )
     .select('id, contact_id');
@@ -238,11 +346,282 @@ export async function createBroadcast(
     broadcastId: broadcast.id,
     templateName,
     templateLanguage,
-    phoneNumberId: config.phone_number_id,
+    phoneNumberId,
     accessToken,
     templateRow,
     planned,
     rejected,
+  };
+}
+
+/** A failed recipient row joined to its contact, as read for a retry. */
+interface FailedRecipientRow {
+  id: string;
+  contact_id: string | null;
+  attempt_count: number | null;
+  template_params: unknown;
+  contact: Contact | null;
+}
+
+/**
+ * Build a {@link BroadcastPlan} that re-sends only the *failed*
+ * recipients of an existing broadcast.
+ *
+ * Params are resolved through a four-case ladder, because what is
+ * recoverable depends on when and how the broadcast was created:
+ *
+ *   1. `recipient.template_params` — the values actually sent. Exact
+ *      replay. Present on everything sent after migration 037.
+ *   2. `broadcasts.template_variables` — a mapping, re-resolved
+ *      against the contact. Covers wizard broadcasts predating 037.
+ *   3. Template has no body placeholders — nothing to recover.
+ *   4. Otherwise refuse. API broadcasts predating 037 stored
+ *      per-recipient params nowhere, and re-sending a personalized
+ *      template with blank variables is worse than not sending.
+ *
+ * Case 4 throws *before* any row is claimed, so a refusal never
+ * consumes the failures it declined to retry.
+ *
+ * The claim itself (failed → pending) is a compare-and-set and doubles
+ * as the concurrency guard: a second concurrent retry claims nothing.
+ * Resetting to 'pending' also matters for correctness downstream —
+ * 'failed' is terminal in the webhook status ladder, so a row left at
+ * 'failed' would have the new send's delivered/read callbacks
+ * rejected.
+ */
+export async function planBroadcastRetry(
+  db: SupabaseClient,
+  accountId: string,
+  broadcastId: string,
+  opts: { recipientId?: string; headerMediaUrl?: string } = {}
+): Promise<BroadcastPlan> {
+  const { data: broadcast, error: bErr } = await db
+    .from('broadcasts')
+    .select(
+      'id, template_name, template_language, template_variables, header_media_url, status'
+    )
+    .eq('id', broadcastId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  if (bErr) {
+    console.error('[broadcast-core] retry read broadcast error:', bErr);
+    throw new BroadcastError('internal', 'Failed to read broadcast', 500);
+  }
+  if (!broadcast) {
+    throw new BroadcastError('not_found', 'Broadcast not found', 404);
+  }
+  if (broadcast.status === 'sending') {
+    throw new BroadcastError(
+      'conflict',
+      'This broadcast is still sending. Wait for it to finish before retrying.',
+      409
+    );
+  }
+
+  const templateLanguage = broadcast.template_language || 'en_US';
+
+  // One extra row tells us whether anything is left over the cap
+  // without a second count query.
+  let query = db
+    .from('broadcast_recipients')
+    .select('id, contact_id, attempt_count, template_params, contact:contacts(*)')
+    .eq('broadcast_id', broadcastId)
+    .eq('status', 'failed')
+    .order('created_at', { ascending: true })
+    .limit(MAX_RETRY_PER_CALL + 1);
+  if (opts.recipientId) query = query.eq('id', opts.recipientId);
+
+  const { data: rawRows, error: rErr } = await query;
+  if (rErr) {
+    console.error('[broadcast-core] retry read recipients error:', rErr);
+    throw new BroadcastError('internal', 'Failed to read recipients', 500);
+  }
+
+  const allRows = (rawRows ?? []) as unknown as FailedRecipientRow[];
+  const rows = allRows.slice(0, MAX_RETRY_PER_CALL);
+  const remaining = Math.max(0, allRows.length - rows.length);
+
+  // A contact deleted since the send leaves contact_id NULL (migration
+  // 004), so there is no number to dial. Re-stamp with a reason rather
+  // than letting the row silently disappear from the retry.
+  const orphaned = rows.filter((r) => !r.contact?.phone);
+  const sendable = rows.filter((r) => r.contact?.phone);
+  for (const row of orphaned) {
+    await db
+      .from('broadcast_recipients')
+      .update({
+        status: 'failed',
+        error_message: 'Contact no longer exists',
+        last_attempt_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+  }
+
+  if (sendable.length === 0) {
+    return {
+      broadcastId,
+      templateName: broadcast.template_name,
+      templateLanguage,
+      phoneNumberId: '',
+      accessToken: '',
+      templateRow: null,
+      planned: [],
+      rejected: 0,
+      isRetry: true,
+      remaining,
+    };
+  }
+
+  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
+    db,
+    accountId,
+    broadcast.template_name,
+    templateLanguage
+  );
+
+  // Without the local template row we cannot tell whether this template
+  // has a media header or body placeholders, so every downstream
+  // decision would be a guess. createBroadcast tolerates a null row
+  // because its caller supplies everything explicitly; a retry has no
+  // such caller, so refuse rather than send a degraded message.
+  if (!templateRow) {
+    throw new BroadcastError(
+      'template_missing',
+      `Template "${broadcast.template_name}" (${templateLanguage}) is no longer in this account, so the original message cannot be rebuilt. Run "Sync from Meta" in Settings, then retry.`,
+      422
+    );
+  }
+
+  // Media headers need a URL on every send. We will NOT quietly fall
+  // back to the template's current default here: for a broadcast that
+  // predates header_media_url, that would re-send a different image
+  // than the original with no indication anything changed. Ask for it
+  // instead — the caller can supply one and we persist it so this is a
+  // one-time prompt.
+  const headerType = templateRow.header_type;
+  const isMediaHeader =
+    headerType === 'image' || headerType === 'video' || headerType === 'document';
+  const suppliedMediaUrl = opts.headerMediaUrl?.trim();
+  const storedMediaUrl = broadcast.header_media_url?.trim();
+  let headerMediaUrl = suppliedMediaUrl || storedMediaUrl || undefined;
+
+  if (isMediaHeader) {
+    if (!headerMediaUrl) {
+      throw new BroadcastError(
+        'header_media_required',
+        `This broadcast uses a ${headerType} header but predates media URLs being recorded, so we cannot tell which ${headerType} it sent. Supply the URL to retry with.`,
+        422,
+        { headerType }
+      );
+    }
+    if (!isValidHttpUrl(headerMediaUrl)) {
+      throw new BroadcastError(
+        'bad_request',
+        'The media URL must be a valid http(s) URL.',
+        400
+      );
+    }
+    // Persist a newly supplied URL so later retries don't re-prompt.
+    if (suppliedMediaUrl && suppliedMediaUrl !== storedMediaUrl) {
+      await db
+        .from('broadcasts')
+        .update({ header_media_url: suppliedMediaUrl })
+        .eq('id', broadcastId);
+    }
+  } else {
+    headerMediaUrl = undefined;
+  }
+
+  // Case 2 is the only one needing custom-field lookups; skip the
+  // round-trips entirely when every row already carries its params.
+  const needsResolution = sendable.filter((r) => !Array.isArray(r.template_params));
+  const templateVariables = (broadcast.template_variables ?? null) as Record<
+    string,
+    VariableMapping
+  > | null;
+  const templateHasPlaceholders =
+    bodyPlaceholderKeys(templateRow.body_text).length > 0;
+
+  if (needsResolution.length > 0 && !templateVariables && templateHasPlaceholders) {
+    // Case 4 — thrown before any claim, so the rows stay 'failed'.
+    throw new BroadcastError(
+      'params_unrecoverable',
+      'This broadcast was created before per-recipient template values were stored, so its personalization cannot be reproduced. Create a new broadcast for these recipients instead.',
+      422
+    );
+  }
+
+  const customValues =
+    needsResolution.length > 0 && templateVariables
+      ? await fetchCustomValueIndex(
+          db,
+          needsResolution.map((r) => r.contact!.id)
+        )
+      : new Map();
+
+  // Always explicit for media headers — validated above, never left to
+  // the builder's template-default fallback.
+  const messageParams: SendTimeParams | undefined = headerMediaUrl
+    ? { headerMediaUrl }
+    : undefined;
+
+  // Claim: compare-and-set on status. Only rows we actually win are
+  // planned, so concurrent retries can't double-send.
+  const planned: PlannedRecipient[] = [];
+  const claimedAt = new Date().toISOString();
+  for (const row of sendable) {
+    const contact = row.contact!;
+    const params = Array.isArray(row.template_params)
+      ? (row.template_params as string[])
+      : templateVariables
+        ? resolveVariables(templateVariables, contact, customValues.get(contact.id))
+        : [];
+
+    const { data: claimed, error: claimErr } = await db
+      .from('broadcast_recipients')
+      .update({
+        status: 'pending',
+        error_message: null,
+        attempt_count: (row.attempt_count ?? 1) + 1,
+        last_attempt_at: claimedAt,
+      })
+      .eq('id', row.id)
+      .eq('status', 'failed')
+      .select('id');
+    if (claimErr) {
+      console.error('[broadcast-core] retry claim error:', claimErr);
+      continue;
+    }
+    if (!claimed || claimed.length === 0) continue; // lost the race
+
+    planned.push({
+      recipientRowId: row.id,
+      phone: contact.phone as string,
+      params,
+      ...(messageParams ? { messageParams } : {}),
+    });
+  }
+
+  // Back to 'sending' so the list page resumes polling and Delete stays
+  // disabled while the fan-out runs.
+  if (planned.length > 0) {
+    await db
+      .from('broadcasts')
+      .update({ status: 'sending', updated_at: new Date().toISOString() })
+      .eq('id', broadcastId);
+  }
+
+  return {
+    broadcastId,
+    templateName: broadcast.template_name,
+    templateLanguage,
+    phoneNumberId,
+    accessToken,
+    templateRow,
+    planned,
+    rejected: 0,
+    isRetry: true,
+    remaining,
   };
 }
 
@@ -251,6 +630,10 @@ export async function createBroadcast(
  * (phone-variant retry) and stamp its `broadcast_recipients` row.
  * Best-effort per recipient — one failure never aborts the rest.
  * Designed to run inside `after()`.
+ *
+ * Paced by an interval governor (see MIN_SEND_INTERVAL_MS) so a fast
+ * Meta can't make us burst past its throughput limits, and bounded by
+ * DELIVER_BUDGET_MS so the invocation isn't killed mid-write.
  *
  * The per-status count columns on `broadcasts` are owned by the DB
  * aggregate trigger (migrations 003/005): each recipient-row update
@@ -264,13 +647,50 @@ export async function deliverBroadcast(
   plan: BroadcastPlan
 ): Promise<void> {
   let sentCount = 0;
+  const startedAt = Date.now();
+  let lastSendAt = 0;
 
-  for (const recipient of plan.planned) {
+  for (const [index, recipient] of plan.planned.entries()) {
+    // Deadline guard — stop while there is still time to write the
+    // remaining rows, rather than being killed mid-loop and stranding
+    // them in 'pending'.
+    if (Date.now() - startedAt > DELIVER_BUDGET_MS) {
+      const unsent = plan.planned.slice(index);
+      console.warn(
+        `[broadcast-core] delivery budget elapsed for ${plan.broadcastId}; ${unsent.length} recipient(s) not attempted`
+      );
+      for (const pending of unsent) {
+        await db
+          .from('broadcast_recipients')
+          .update({
+            status: 'failed',
+            error_message: 'Send window elapsed — retry again',
+            phone_attempted: pending.phone,
+            template_params: pending.params,
+          })
+          .eq('id', pending.recipientRowId);
+      }
+      break;
+    }
+
     const variants = phoneVariants(recipient.phone);
     let sentMessageId: string | null = null;
     let lastError: string | null = null;
+    // The number we actually dialled — a trunk-prefix variant may win,
+    // and that is what deserves recording, not the stored contact
+    // number.
+    let attemptedPhone = recipient.phone;
 
     for (const variant of variants) {
+      attemptedPhone = variant;
+
+      // Interval governor: sleep only the remainder since the last
+      // send began, so real Meta latency already counts toward the
+      // spacing and slow responses cost nothing extra.
+      const wait = MIN_SEND_INTERVAL_MS - (Date.now() - lastSendAt);
+      if (wait > 0) await sleep(wait);
+      lastSendAt = Date.now();
+
       try {
         const result = await sendTemplateMessage({
           phoneNumberId: plan.phoneNumberId,
@@ -279,6 +699,7 @@ export async function deliverBroadcast(
           templateName: plan.templateName,
           language: plan.templateLanguage,
           template: plan.templateRow ?? undefined,
+          messageParams: recipient.messageParams,
           params: recipient.params,
         });
         sentMessageId = result.messageId;
@@ -287,8 +708,35 @@ export async function deliverBroadcast(
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         lastError = message;
+
+        // Throttled: back off and give this variant exactly one more
+        // go before writing the row off. Looping here would only dig
+        // the rate-limit hole deeper.
+        if (isRateLimitError(message)) {
+          await sleep(RATE_LIMIT_BACKOFF_MS);
+          lastSendAt = Date.now();
+          try {
+            const retryResult = await sendTemplateMessage({
+              phoneNumberId: plan.phoneNumberId,
+              accessToken: plan.accessToken,
+              to: variant,
+              templateName: plan.templateName,
+              language: plan.templateLanguage,
+              template: plan.templateRow ?? undefined,
+              messageParams: recipient.messageParams,
+              params: recipient.params,
+            });
+            sentMessageId = retryResult.messageId;
+            lastError = null;
+            break;
+          } catch (retryError) {
+            lastError =
+              retryError instanceof Error ? retryError.message : 'Unknown error';
+          }
+        }
+
         // Only a "recipient not allowed" error is worth another variant.
-        if (!isRecipientNotAllowedError(message)) break;
+        if (!isRecipientNotAllowedError(lastError)) break;
       }
     }
 
@@ -301,6 +749,8 @@ export async function deliverBroadcast(
           sent_at: new Date().toISOString(),
           whatsapp_message_id: sentMessageId,
           error_message: null,
+          phone_attempted: attemptedPhone,
+          template_params: recipient.params,
         })
         .eq('id', recipient.recipientRowId);
     } else {
@@ -309,6 +759,8 @@ export async function deliverBroadcast(
         .update({
           status: 'failed',
           error_message: lastError || 'Unknown error',
+          phone_attempted: attemptedPhone,
+          template_params: recipient.params,
         })
         .eq('id', recipient.recipientRowId);
     }
@@ -317,10 +769,25 @@ export async function deliverBroadcast(
   // Terminal status only — counts are trigger-owned (see the note
   // above). If nothing sent, the broadcast failed outright; a partial
   // send is still 'sent' (per-recipient failures show in failed_count).
+  //
+  // On a retry, this run's tally is the wrong basis: a broadcast that
+  // originally sent 90 of 100 and then fails all 10 retries has
+  // sentCount === 0 here, and marking it 'failed' would erase the 90
+  // successes from the UI. Use the trigger-maintained total instead.
+  let broadcastSucceeded = sentCount > 0;
+  if (plan.isRetry) {
+    const { data: counts } = await db
+      .from('broadcasts')
+      .select('sent_count')
+      .eq('id', plan.broadcastId)
+      .maybeSingle();
+    broadcastSucceeded = (counts?.sent_count ?? sentCount) > 0;
+  }
+
   await db
     .from('broadcasts')
     .update({
-      status: sentCount > 0 ? 'sent' : 'failed',
+      status: broadcastSucceeded ? 'sent' : 'failed',
       updated_at: new Date().toISOString(),
     })
     .eq('id', plan.broadcastId);
