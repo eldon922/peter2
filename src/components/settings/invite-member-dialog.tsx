@@ -454,6 +454,26 @@ export function InviteMemberDialog({
               </TabsList>
 
               <TabsContent value={mode} className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('roleLabel')}</Label>
+                  <Select
+                    value={role}
+                    onValueChange={(v) => v && setRole(v as InviteRole)}
+                  >
+                    <SelectTrigger className="w-full bg-muted border-border text-foreground">
+                      <SelectValue>{tRoles(role)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">{tRoles('admin')}</SelectItem>
+                      <SelectItem value="agent">{tRoles('agent')}</SelectItem>
+                      <SelectItem value="viewer">{tRoles('viewer')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {tRoles(`${role}Hint` as 'adminHint' | 'agentHint' | 'viewerHint')}
+                  </p>
+                </div>
+
                 {mode === 'new' && (
                   <>
                     <div className="space-y-2">
@@ -522,52 +542,30 @@ export function InviteMemberDialog({
                         </p>
                       </div>
                     )}
-                  </>
-                )}
 
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">{t('roleLabel')}</Label>
-                  <Select
-                    value={role}
-                    onValueChange={(v) => v && setRole(v as InviteRole)}
-                  >
-                    <SelectTrigger className="w-full bg-muted border-border text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">{tRoles('admin')}</SelectItem>
-                      <SelectItem value="agent">{tRoles('agent')}</SelectItem>
-                      <SelectItem value="viewer">{tRoles('viewer')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {tRoles(`${role}Hint` as 'adminHint' | 'agentHint' | 'viewerHint')}
-                  </p>
-                </div>
-
-                {mode === 'new' && (
-                  <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
-                    <div className="space-y-0.5">
-                      <Label
-                        htmlFor="auto-join"
-                        className="text-foreground font-medium"
-                      >
-                        Add directly, skip the invite link
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Joins them to {account?.name ?? 'this account'} as{' '}
-                        {role} immediately — no link to send, nothing for them
-                        to click.
-                      </p>
+                    <div className="border-border flex items-start justify-between gap-3 rounded-md border p-3">
+                      <div className="space-y-0.5">
+                        <Label
+                          htmlFor="auto-join"
+                          className="text-foreground font-medium"
+                        >
+                          Add directly, skip the invite link
+                        </Label>
+                        <p className="text-muted-foreground text-xs">
+                          Joins them to {account?.name ?? 'this account'} as{' '}
+                          {role} immediately — no link to send, nothing for them
+                          to click.
+                        </p>
+                      </div>
+                      <Switch
+                        id="auto-join"
+                        checked={autoJoin}
+                        onCheckedChange={(checked) =>
+                          setAutoJoin(checked === true)
+                        }
+                      />
                     </div>
-                    <Switch
-                      id="auto-join"
-                      checked={autoJoin}
-                      onCheckedChange={(checked) =>
-                        setAutoJoin(checked === true)
-                      }
-                    />
-                  </div>
+                  </>
                 )}
 
                 {!(mode === 'new' && autoJoin) && (
