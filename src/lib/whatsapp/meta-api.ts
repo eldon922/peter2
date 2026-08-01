@@ -24,14 +24,51 @@ export interface MetaPhoneInfo {
 }
 
 interface MetaErrorResponse {
-  error?: { message?: string; code?: number; type?: string }
+  error?: {
+    message?: string
+    code?: number
+    type?: string
+    /**
+     * The extended explanation. Meta's error reference documents it on
+     * the limit-related send failures (130429 rate limit, 131048
+     * quality restriction, 131049 messaging limit, 131056 per-recipient
+     * rate limit) and points at it explicitly — "refer to the
+     * error.error_data.details value" — so dropping it discarded the
+     * most specific thing we were told.
+     */
+    error_data?: { details?: string }
+    /**
+     * Generic Graph API fields, not documented for the codes above.
+     * Kept as last-resort fallbacks so an unusual envelope still yields
+     * text rather than a bare status line.
+     */
+    error_user_msg?: string
+    error_user_title?: string
+  }
 }
 
 async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
   try {
     const data = (await response.json()) as MetaErrorResponse
-    if (data.error?.message) message = data.error.message
+    const err = data.error
+    // Most explanatory first, then narrowing fallbacks. Candidates are
+    // trimmed and blanks skipped so a present-but-empty field can't
+    // surface as a blank error message.
+    const detail = [
+      err?.error_data?.details,
+      err?.message,
+      err?.error_user_msg,
+      err?.error_user_title,
+    ]
+      .map((s) => s?.trim())
+      .find((s): s is string => !!s)
+
+    if (detail) {
+      // Keep the numeric code — Meta's error docs are indexed by it.
+      const tag = typeof err?.code === 'number' ? `#${err.code}` : ''
+      message = tag && !detail.includes(tag) ? `(${tag}) ${detail}` : detail
+    }
   } catch {
     // response body wasn't JSON — keep the fallback
   }

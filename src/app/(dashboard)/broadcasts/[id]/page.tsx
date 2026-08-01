@@ -860,7 +860,10 @@ export default function BroadcastDetailPage() {
                             ))}
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-xs text-red-400">
-                        {recipient.error_message ?? '-'}
+                        {/* `|| '-'`, not `?? '-'`: an empty-string
+                            error_message is as unhelpful as a null one
+                            and used to render as a blank cell. */}
+                        {recipient.error_message?.trim() || '-'}
                       </TableCell>
                       <TableCell>
                         {recipient.status === 'failed' && (

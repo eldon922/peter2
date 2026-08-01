@@ -13,6 +13,10 @@ import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
+import {
+  formatStatusError,
+  type WhatsAppStatusError,
+} from '@/lib/whatsapp/status-error'
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -84,6 +88,8 @@ interface WhatsAppWebhookEntry {
         status: string
         timestamp: string
         recipient_id: string
+        /** Populated on `status: 'failed'` — see formatStatusError. */
+        errors?: WhatsAppStatusError[]
       }>
     }
     field: string
@@ -358,7 +364,16 @@ async function handleStatusUpdate(status: {
   status: string
   timestamp: string
   recipient_id: string
+  errors?: WhatsAppStatusError[]
 }) {
+  // `messages` has no column for a failure reason, so for inbox / API
+  // sends the log is the only record of why Meta dropped it.
+  if (status.status === 'failed') {
+    console.warn(
+      `[webhook] Meta failed message ${status.id}: ${formatStatusError(status.errors)}`
+    )
+  }
+
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status. No
   //    `.select()`: message_id is NOT unique (migration 009 — Meta ids
@@ -401,6 +416,13 @@ async function handleStatusUpdate(status: {
     if (status.status === 'sent' && !('sent_at' in update)) update.sent_at = tsIso
     if (status.status === 'delivered') update.delivered_at = tsIso
     if (status.status === 'read') update.read_at = tsIso
+    // The only place an asynchronous failure's reason ever appears —
+    // a messaging-limit (131049) or quality-restriction (131048) drop
+    // that Meta reports here rather than on the send call. Without this
+    // the row says 'failed' and nothing else.
+    if (status.status === 'failed') {
+      update.error_message = formatStatusError(status.errors)
+    }
 
     const { error: recUpdateErr } = await supabaseAdmin()
       .from('broadcast_recipients')
