@@ -18,7 +18,11 @@ import {
 // Inbound processing can fan out to per-media Meta verification calls, so
 // give it headroom beyond the platform default (Vercel clamps this to the
 // plan's ceiling). Tune as needed.
-export const maxDuration = 60
+//
+// MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
+// (literal required — see the note there). Enforced by
+// broadcast-limits.test.ts.
+export const maxDuration = 300
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

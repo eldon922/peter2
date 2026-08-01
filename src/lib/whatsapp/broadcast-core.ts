@@ -21,16 +21,21 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendTemplateMessage } from '@/lib/whatsapp/meta-api';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
+  DELIVER_BUDGET_MS,
+  MAX_RECIPIENTS,
+  SEND_BATCH_DELAY_MS,
+  SEND_BATCH_SIZE,
+} from '@/lib/whatsapp/broadcast-limits';
+import {
   sanitizePhoneForMeta,
   isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
-  isRateLimitError,
 } from '@/lib/whatsapp/phone-utils';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import type { SendTimeParams } from '@/lib/whatsapp/template-send-builder';
 import type { Contact, MessageTemplate } from '@/types';
-import { findOrCreateContact } from '@/lib/api/v1/contacts';
+import { findOrCreateContactsBulk } from '@/lib/api/v1/contacts';
 import {
   bodyPlaceholderKeys,
   fetchCustomValueIndex,
@@ -107,43 +112,12 @@ export interface BroadcastPlan {
    * 'failed'.
    */
   isRetry?: boolean;
-  /** Failed rows left unclaimed because of MAX_RETRY_PER_CALL. */
+  /**
+   * Failed rows still awaiting a retry after this call's claim — a true
+   * count, so the caller can tell how many more passes are needed.
+   */
   remaining?: number;
 }
-
-const MAX_RECIPIENTS = 1000;
-
-/**
- * Failed rows retried per call. The fan-out runs inside `after()`
- * under a 60s maxDuration, and the pacing governor below imposes a
- * ~10 msg/s ceiling — so 150 costs ~15s of governor floor and leaves
- * ~35s for real Meta latency. Leftovers are reported as `remaining`
- * and the caller retries again.
- */
-const MAX_RETRY_PER_CALL = 150;
-
-/**
- * Minimum spacing between send *starts*, ≈10 msg/s.
- *
- * Deliberately an interval governor rather than a fixed post-send
- * sleep: we sleep only the remainder since the last send began, so
- * when Meta is already slower than this the pacing costs nothing and
- * doesn't eat the duration budget. It only bites when we would
- * otherwise burst.
- */
-const MIN_SEND_INTERVAL_MS = 100;
-
-/**
- * Stop sending at this point so the loop finishes its DB writes before
- * the 60s maxDuration kills the invocation. Rows not reached are
- * marked failed with an explicit message rather than being silently
- * stranded in 'pending', which is what happened before — invisible in
- * the funnel and unreachable by any action.
- */
-const DELIVER_BUDGET_MS = 50_000;
-
-/** Pause after a Meta throttling error before the single re-attempt. */
-const RATE_LIMIT_BACKOFF_MS = 2_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -249,22 +223,47 @@ export async function createBroadcast(
   // (counted as rejected) rather than aborting the whole broadcast.
   const resolved: { contactId: string; phone: string; params: string[] }[] = [];
   let rejected = 0;
+  // Sanitize and validate first — pure, no I/O — so the contact lookup
+  // sees only phones worth resolving.
+  const prepared: { phone: string; params: string[] }[] = [];
   for (const r of recipients) {
     const sanitized = sanitizePhoneForMeta(typeof r.to === 'string' ? r.to : '');
     if (!isValidE164(sanitized)) {
       rejected++;
       continue;
     }
-    const { id } = await findOrCreateContact(db, accountId, auditUserId, {
-      phone: sanitized,
-    });
-    resolved.push({
-      contactId: id,
+    prepared.push({
       phone: sanitized,
       params: Array.isArray(r.params)
         ? r.params.filter((p): p is string => typeof p === 'string')
         : [],
     });
+  }
+
+  // Resolve every recipient in a handful of round trips. This used to be
+  // a sequential `await` per recipient, which put N round trips of
+  // Postgres latency on the request path before the `after()` fan-out
+  // even began — the cost scaled with the recipient cap and had nothing
+  // to do with Meta throughput.
+  const contactIdByPhone = await findOrCreateContactsBulk(
+    db,
+    accountId,
+    auditUserId,
+    prepared.map((p) => p.phone)
+  );
+
+  for (const p of prepared) {
+    const contactId = contactIdByPhone.get(p.phone);
+    if (!contactId) {
+      // The resolver throws on any real failure, so a gap here would
+      // mean a silently dropped recipient — louder is better.
+      throw new BroadcastError(
+        'internal',
+        'Failed to resolve every recipient to a contact',
+        500
+      );
+    }
+    resolved.push({ contactId, phone: p.phone, params: p.params });
   }
 
   // Collapse recipients that resolved to the SAME contact (the caller
@@ -420,26 +419,34 @@ export async function planBroadcastRetry(
 
   const templateLanguage = broadcast.template_language || 'en_US';
 
-  // One extra row tells us whether anything is left over the cap
-  // without a second count query.
+  // `count: 'exact'` reports how many failed rows match in total,
+  // independent of the row window `limit` returns — so `remaining` below
+  // is a true count rather than a "there is at least one more" flag.
+  // PostgREST computes it in the same round trip; no second query.
   let query = db
     .from('broadcast_recipients')
-    .select('id, contact_id, attempt_count, template_params, contact:contacts(*)')
+    .select(
+      'id, contact_id, attempt_count, template_params, contact:contacts(*)',
+      { count: 'exact' }
+    )
     .eq('broadcast_id', broadcastId)
     .eq('status', 'failed')
     .order('created_at', { ascending: true })
-    .limit(MAX_RETRY_PER_CALL + 1);
+    .limit(MAX_RECIPIENTS);
   if (opts.recipientId) query = query.eq('id', opts.recipientId);
 
-  const { data: rawRows, error: rErr } = await query;
+  const { data: rawRows, error: rErr, count } = await query;
   if (rErr) {
     console.error('[broadcast-core] retry read recipients error:', rErr);
     throw new BroadcastError('internal', 'Failed to read recipients', 500);
   }
 
-  const allRows = (rawRows ?? []) as unknown as FailedRecipientRow[];
-  const rows = allRows.slice(0, MAX_RETRY_PER_CALL);
-  const remaining = Math.max(0, allRows.length - rows.length);
+  const rows = (rawRows ?? []) as unknown as FailedRecipientRow[];
+  // Fall back to the claimed rows when the driver reports no count: that
+  // yields remaining = 0, which understates rather than inventing a
+  // number the caller would act on.
+  const totalFailed = typeof count === 'number' ? count : rows.length;
+  const remaining = Math.max(0, totalFailed - rows.length);
 
   // A contact deleted since the send leaves contact_id NULL (migration
   // 004), so there is no number to dial. Re-stamp with a reason rather
@@ -631,9 +638,11 @@ export async function planBroadcastRetry(
  * Best-effort per recipient — one failure never aborts the rest.
  * Designed to run inside `after()`.
  *
- * Paced by an interval governor (see MIN_SEND_INTERVAL_MS) so a fast
- * Meta can't make us burst past its throughput limits, and bounded by
- * DELIVER_BUDGET_MS so the invocation isn't killed mid-write.
+ * Paced in groups of SEND_BATCH_SIZE with a SEND_BATCH_DELAY_MS pause
+ * between them — the same shape the dashboard's client-driven path uses
+ * (`use-broadcast-sending`), so the two agree on burst behaviour and not
+ * just on average rate. Bounded by DELIVER_BUDGET_MS so the invocation
+ * isn't killed mid-write.
  *
  * The per-status count columns on `broadcasts` are owned by the DB
  * aggregate trigger (migrations 003/005): each recipient-row update
@@ -648,12 +657,13 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
-  let lastSendAt = 0;
 
   for (const [index, recipient] of plan.planned.entries()) {
     // Deadline guard — stop while there is still time to write the
     // remaining rows, rather than being killed mid-loop and stranding
-    // them in 'pending'.
+    // them in 'pending'. Checked before the batch pause below, so an
+    // already-blown budget doesn't spend a further SEND_BATCH_DELAY_MS
+    // of the write reserve on a sleep it will never send after.
     if (Date.now() - startedAt > DELIVER_BUDGET_MS) {
       const unsent = plan.planned.slice(index);
       console.warn(
@@ -673,6 +683,15 @@ export async function deliverBroadcast(
       break;
     }
 
+    // Batch pacing, mirroring use-broadcast-sending: nothing throttles
+    // the sends inside a group, then one flat pause before the next.
+    // Expressed as a modulo on the flat index rather than a chunk loop
+    // so the per-recipient deadline guard above still runs — the client
+    // has no duration budget to guard, the server does.
+    if (index > 0 && index % SEND_BATCH_SIZE === 0) {
+      await sleep(SEND_BATCH_DELAY_MS);
+    }
+
     const variants = phoneVariants(recipient.phone);
     let sentMessageId: string | null = null;
     let lastError: string | null = null;
@@ -683,13 +702,6 @@ export async function deliverBroadcast(
 
     for (const variant of variants) {
       attemptedPhone = variant;
-
-      // Interval governor: sleep only the remainder since the last
-      // send began, so real Meta latency already counts toward the
-      // spacing and slow responses cost nothing extra.
-      const wait = MIN_SEND_INTERVAL_MS - (Date.now() - lastSendAt);
-      if (wait > 0) await sleep(wait);
-      lastSendAt = Date.now();
 
       try {
         const result = await sendTemplateMessage({
@@ -709,32 +721,11 @@ export async function deliverBroadcast(
         const message = error instanceof Error ? error.message : 'Unknown error';
         lastError = message;
 
-        // Throttled: back off and give this variant exactly one more
-        // go before writing the row off. Looping here would only dig
-        // the rate-limit hole deeper.
-        if (isRateLimitError(message)) {
-          await sleep(RATE_LIMIT_BACKOFF_MS);
-          lastSendAt = Date.now();
-          try {
-            const retryResult = await sendTemplateMessage({
-              phoneNumberId: plan.phoneNumberId,
-              accessToken: plan.accessToken,
-              to: variant,
-              templateName: plan.templateName,
-              language: plan.templateLanguage,
-              template: plan.templateRow ?? undefined,
-              messageParams: recipient.messageParams,
-              params: recipient.params,
-            });
-            sentMessageId = retryResult.messageId;
-            lastError = null;
-            break;
-          } catch (retryError) {
-            lastError =
-              retryError instanceof Error ? retryError.message : 'Unknown error';
-          }
-        }
-
+        // Throttling gets no special handling in-loop: the row is
+        // stamped failed with Meta's message and recovered by the retry
+        // endpoint, the same path every other failure takes. Re-sending
+        // inside the invocation only spent budget to reach the same row.
+        //
         // Only a "recipient not allowed" error is worth another variant.
         if (!isRecipientNotAllowedError(lastError)) break;
       }

@@ -102,21 +102,3 @@ export function phoneVariants(sanitized: string): string[] {
 export function isRecipientNotAllowedError(message: string): boolean {
   return /131030|not in allowed list|not in the allowed list/i.test(message)
 }
-
-/**
- * Returns true when the Meta API error indicates we are being
- * throttled — error code 130429 (rate limit hit), 131056 (pair rate
- * limit), or the generic text.
- *
- * Like isRecipientNotAllowedError this has to match on the message
- * string: throwMetaError flattens Meta's error envelope down to
- * `error.message` and discards the numeric `code`, so that is the only
- * signal that survives to callers. Threading the real code through is
- * a worthwhile follow-up.
- *
- * Lives here beside the other Meta-error predicate for consistency,
- * even though the file is nominally about phone numbers.
- */
-export function isRateLimitError(message: string): boolean {
-  return /130429|131056|rate limit|too many requests/i.test(message)
-}

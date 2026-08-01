@@ -5,11 +5,15 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Contact, MessageTemplate } from '@/types';
 import {
-  chunkIds,
   fetchCustomValueIndex,
   resolveVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
+import { chunkIds, chunkRows } from '@/lib/supabase/batching';
+import {
+  SEND_BATCH_DELAY_MS,
+  SEND_BATCH_SIZE,
+} from '@/lib/whatsapp/broadcast-limits';
 
 // Re-exported so existing importers of this hook keep working. The
 // implementations moved to lib/broadcasts/variables so the server-side
@@ -53,17 +57,6 @@ interface UseBroadcastSendingReturn {
   isProcessing: boolean;
   progress: number;
 }
-
-/**
- * Meta rate-limit buffer. 10 per batch + 1 s pause matches the spec
- * and keeps us comfortably under Meta's per-phone-number messaging
- * rate so a large broadcast never trips the upstream limiter.
- */
-const SEND_BATCH_SIZE = 10;
-const SEND_BATCH_DELAY_MS = 1000;
-
-/** `broadcast_recipients` inserts are independent of the send rate. */
-const INSERT_BATCH_SIZE = 200;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -213,9 +206,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         name: uniqueByPhone.get(phone)?.name ?? null,
       }));
 
-    const INSERT_CHUNK = 200;
-    for (let i = 0; i < missing.length; i += INSERT_CHUNK) {
-      const chunk = missing.slice(i, i + INSERT_CHUNK);
+    for (const chunk of chunkRows(missing)) {
       const { data: inserted, error: insertErr } = await supabase
         .from('contacts')
         .insert(chunk)
@@ -369,8 +360,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         template_params: paramsByContact.get(contact.id) ?? [],
       }));
 
-      for (let i = 0; i < recipientRows.length; i += INSERT_BATCH_SIZE) {
-        const batch = recipientRows.slice(i, i + INSERT_BATCH_SIZE);
+      for (const [batchIndex, batch] of chunkRows(recipientRows).entries()) {
         const { error: recipientError } = await supabase
           .from('broadcast_recipients')
           .insert(batch);
@@ -386,7 +376,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             .update({ status: 'failed' })
             .eq('id', broadcast.id);
           throw new Error(
-            `Failed to insert recipient batch ${i / INSERT_BATCH_SIZE + 1}: ${recipientError.message}`,
+            `Failed to insert recipient batch ${batchIndex + 1}: ${recipientError.message}`,
           );
         }
       }

@@ -30,7 +30,11 @@ import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit
 // planner caps a single call well inside that budget and reports any
 // leftovers as `remaining`, and deliverBroadcast stops early rather
 // than being cut off mid-write.
-export const maxDuration = 60;
+//
+// MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
+// (literal required — see the note there). Enforced by
+// broadcast-limits.test.ts.
+export const maxDuration = 300;
 
 export async function POST(
   request: Request,

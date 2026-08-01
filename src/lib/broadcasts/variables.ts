@@ -17,6 +17,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Contact } from '@/types';
 import { phonesMatch } from '@/lib/whatsapp/phone-utils';
+import { chunkIds } from '@/lib/supabase/batching';
 
 /**
  * Variable mapping — each template placeholder (by key, usually "1",
@@ -84,34 +85,6 @@ export function bodyPlaceholderKeys(bodyText: string | null | undefined): string
   const matches = bodyText.match(/\{\{(\d+)\}\}/g);
   if (!matches) return [];
   return [...new Set(matches.map((m) => m.replace(/[{}]/g, '')))];
-}
-
-// Contact ids are 36-char UUIDs, so a *count*-based page cap doesn't
-// bound the request size: 260 of them alone join into a ~9.6KB query
-// string, already past the ~8KB request-line/header limit most
-// reverse proxies in front of PostgREST (nginx, Kong) enforce by
-// default — the browser reports that as a generic "TypeError: Failed
-// to fetch" with no distinguishing HTTP status. Chunk by the joined
-// string length instead, well under that ceiling.
-const IN_CLAUSE_MAX_CHARS = 3000;
-
-export function chunkIds(ids: string[]): string[][] {
-  const chunks: string[][] = [];
-  let current: string[] = [];
-  let currentLength = 0;
-
-  for (const id of ids) {
-    const addedLength = id.length + 1; // +1 for the joining comma
-    if (current.length > 0 && currentLength + addedLength > IN_CLAUSE_MAX_CHARS) {
-      chunks.push(current);
-      current = [];
-      currentLength = 0;
-    }
-    current.push(id);
-    currentLength += addedLength;
-  }
-  if (current.length > 0) chunks.push(current);
-  return chunks;
 }
 
 /**

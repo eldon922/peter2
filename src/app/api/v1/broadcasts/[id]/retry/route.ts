@@ -40,7 +40,11 @@ import {
 
 // Same bound as POST /api/v1/broadcasts — see the note there. The
 // planner caps one call to fit, and reports leftovers as `remaining`.
-export const maxDuration = 60;
+//
+// MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
+// (literal required — see the note there). Enforced by
+// broadcast-limits.test.ts.
+export const maxDuration = 300;
 
 export async function POST(
   request: Request,

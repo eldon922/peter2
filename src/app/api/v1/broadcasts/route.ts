@@ -34,7 +34,12 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // bound, not a guarantee: a near-cap (MAX_RECIPIENTS) audience can
 // still exceed 60s, so very large sends should be split across
 // requests. A durable queue/cron drain is the complete fix (follow-up).
-export const maxDuration = 60;
+//
+// MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
+// — DELIVER_BUDGET_MS is derived from it. It cannot be imported: Next
+// statically analyzes route segment config and ignores non-literal
+// values. broadcast-limits.test.ts enforces the mirror.
+export const maxDuration = 300;
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
 import { resolveAuditUserId, ContactError } from '@/lib/api/v1/contacts';
 import {

@@ -9,6 +9,12 @@ import {
   type BroadcastPlan,
 } from './broadcast-core';
 import { phoneVariants } from './phone-utils';
+import {
+  DELIVER_BUDGET_MS,
+  MAX_RECIPIENTS,
+  SEND_BATCH_DELAY_MS,
+  SEND_BATCH_SIZE,
+} from './broadcast-limits';
 
 vi.mock('@/lib/whatsapp/encryption', () => ({
   decrypt: (v: string) => v,
@@ -45,33 +51,73 @@ interface Fixture {
 
 function makeDb(fixtures: Record<string, Fixture>) {
   const writes: Write[] = [];
+  /** Table name per resolved SELECT — lets tests bound round trips. */
+  const reads: string[] = [];
+  let insertSeq = 0;
 
   function builder(table: string) {
     const filters: [string, unknown][] = [];
     let op: 'select' | 'update' | 'insert' = 'select';
     let values: Record<string, unknown> = {};
     let rowMode: 'many' | 'single' = 'many';
+    // PostgREST semantics: `limit` bounds the returned window, while
+    // `count: 'exact'` reports how many rows matched in total. Modelling
+    // both is what lets tests catch a `remaining` derived from the
+    // window instead of the count.
+    let limitN: number | null = null;
+    let wantCount = false;
+    // PostgREST `or=(a,b,c)`. Only the `phone.like.*<suffix>` shape the
+    // bulk contact resolver emits is modelled.
+    let orSuffixes: string[] | null = null;
 
     const resolve = () => {
       const fixture = fixtures[table] ?? {};
       if (op === 'update' || op === 'insert') {
         writes.push({ table, op, values, filters: [...filters] });
-        const data = fixture.onUpdate
-          ? fixture.onUpdate(filters)
-          : [{ id: filters.find(([c]) => c === 'id')?.[1] ?? 'row' }];
-        return { data, error: null };
+        if (fixture.onUpdate) {
+          return { data: fixture.onUpdate(filters), error: null };
+        }
+        // A bulk insert echoes its rows back with synthetic ids, so a
+        // caller that `.select()`s the result can map ids to inputs —
+        // which is how the bulk contact resolver learns what it created.
+        if (op === 'insert' && Array.isArray(values.batch)) {
+          const data = (values.batch as Record<string, unknown>[]).map(
+            (row) => ({ id: `new-${insertSeq++}`, ...row })
+          );
+          return { data, error: null };
+        }
+        return {
+          data: [{ id: filters.find(([c]) => c === 'id')?.[1] ?? 'row' }],
+          error: null,
+        };
       }
+      reads.push(table);
       let rows = fixture.rows ?? [];
       for (const [col, val] of filters) {
         rows = rows.filter((r) => !(col in r) || r[col] === val);
       }
+      if (orSuffixes) {
+        const suffixes = orSuffixes;
+        rows = rows.filter((r) =>
+          suffixes.some((s) => String(r.phone ?? '').endsWith(s))
+        );
+      }
+      const matched = rows.length;
+      if (limitN !== null) rows = rows.slice(0, limitN);
       return rowMode === 'single'
         ? { data: rows[0] ?? null, error: null }
-        : { data: rows, error: null };
+        : {
+            data: rows,
+            error: null,
+            ...(wantCount ? { count: matched } : {}),
+          };
     };
 
     const chain = {
-      select: () => chain,
+      select: (_columns?: string, opts?: { count?: string }) => {
+        if (opts?.count) wantCount = true;
+        return chain;
+      },
       insert: (v: Record<string, unknown> | Record<string, unknown>[]) => {
         op = 'insert';
         values = Array.isArray(v) ? { batch: v } : v;
@@ -87,8 +133,17 @@ function makeDb(fixtures: Record<string, Fixture>) {
         return chain;
       },
       in: () => chain,
+      or: (expr: string) => {
+        orSuffixes = expr
+          .split(',')
+          .map((atom) => atom.replace(/^phone\.like\.\*/, ''));
+        return chain;
+      },
       order: () => chain,
-      limit: () => chain,
+      limit: (n?: number) => {
+        if (typeof n === 'number') limitN = n;
+        return chain;
+      },
       maybeSingle: () => {
         rowMode = 'single';
         return Promise.resolve(resolve());
@@ -105,6 +160,7 @@ function makeDb(fixtures: Record<string, Fixture>) {
   return {
     db: { from: (table: string) => builder(table) } as unknown as SupabaseClient,
     writes,
+    reads,
   };
 }
 
@@ -172,13 +228,113 @@ describe('createBroadcast validation', () => {
     ).rejects.toBeInstanceOf(BroadcastError);
   });
 
-  it('rejects more than 1000 recipients', async () => {
-    const recipients = Array.from({ length: 1001 }, () => ({
+  it('rejects more recipients than one pass can deliver', async () => {
+    // Derived from the cap rather than hard-coded: a literal stops
+    // exercising the guard the moment the delivery budget changes.
+    const recipients = Array.from({ length: MAX_RECIPIENTS + 1 }, () => ({
       to: '+14155550123',
     }));
     await expect(
       createBroadcast(db, 'acc', 'user', { templateName: 'promo', recipients })
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('createBroadcast contact resolution', () => {
+  function contactsDb(existing: Record<string, unknown>[] = []) {
+    return makeDb({
+      contacts: { rows: existing },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [TEMPLATE_NO_VARS] },
+      broadcasts: { rows: [{ id: 'b-1' }] },
+    });
+  }
+
+  it('resolves N recipients in a constant number of round trips', async () => {
+    // The point of the bulk resolver. Previously this was one (often
+    // two) sequential SELECTs per recipient, inline in the request —
+    // 50 recipients meant 50+ serial round trips before any send.
+    const { db, reads } = contactsDb();
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: Array.from({ length: 50 }, (_, i) => ({
+        to: `+1415555${String(i).padStart(4, '0')}`,
+      })),
+    });
+
+    expect(plan.planned).toHaveLength(50);
+    expect(plan.rejected).toBe(0);
+    expect(new Set(plan.planned.map((p) => p.recipientRowId)).size).toBe(50);
+
+    // All 50 suffixes fit one filter chunk, so exactly one lookup.
+    expect(reads.filter((t) => t === 'contacts')).toHaveLength(1);
+  });
+
+  it('reuses an existing contact instead of creating a duplicate', async () => {
+    const { db, writes } = contactsDb([
+      { id: 'c-existing', account_id: 'acc', phone: '14155550123' },
+    ]);
+
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+14155550123' }],
+    });
+
+    expect(plan.planned).toHaveLength(1);
+    const contactInserts = writes.filter(
+      (w) => w.table === 'contacts' && w.op === 'insert'
+    );
+    expect(contactInserts).toHaveLength(0);
+  });
+
+  it('matches a trunk-prefix variant the same way the single-row helper does', async () => {
+    // phonesMatch tolerates a trunk 0: 370063949836 ↔ 37063949836.
+    const { db, writes } = contactsDb([
+      { id: 'c-lt', account_id: 'acc', phone: '37063949836' },
+    ]);
+
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+370063949836' }],
+    });
+
+    expect(plan.planned).toHaveLength(1);
+    expect(
+      writes.filter((w) => w.table === 'contacts' && w.op === 'insert')
+    ).toHaveLength(0);
+  });
+
+  it('collapses duplicate phones into one recipient row', async () => {
+    const { db, writes } = contactsDb();
+
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [
+        { to: '+14155550123' },
+        { to: '+14155550123' },
+        { to: '+14155550124' },
+      ],
+    });
+
+    // Two contacts, and crucially only two rows in the bulk insert —
+    // inserting the duplicate would trip the unique index from 022.
+    expect(plan.planned).toHaveLength(2);
+    const insert = writes.find(
+      (w) => w.table === 'contacts' && w.op === 'insert'
+    );
+    expect((insert!.values.batch as unknown[]).length).toBe(2);
+  });
+
+  it('counts invalid phones as rejected without resolving them', async () => {
+    const { db } = contactsDb();
+
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+14155550123' }, { to: 'nonsense' }, { to: '' }],
+    });
+
+    expect(plan.planned).toHaveLength(1);
+    expect(plan.rejected).toBe(2);
   });
 });
 
@@ -244,6 +400,56 @@ describe('planBroadcastRetry', () => {
     expect(claim).toBeDefined();
     expect(claim!.filters).toContainEqual(['status', 'failed']);
     expect(claim!.values).toMatchObject({ error_message: null, attempt_count: 2 });
+  });
+
+  it('reports remaining as a true count of unclaimed failed rows', async () => {
+    // Regression: `remaining` was derived from a `limit(CAP + 1)` window,
+    // so it could only ever be 0 or 1 — the UI told a user with hundreds
+    // of failures that "1 more" was left, every single retry.
+    const overflow = MAX_RECIPIENTS + 25;
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast()] },
+      broadcast_recipients: {
+        rows: Array.from({ length: overflow }, (_, i) =>
+          failedRow({
+            id: `rec-${i}`,
+            contact_id: `c-${i}`,
+            template_params: ['Jane', '#1'],
+            contact: { id: `c-${i}`, phone: '14155550123', name: 'Jane' },
+          })
+        ),
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [TEMPLATE_ROW] },
+    });
+
+    const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(MAX_RECIPIENTS);
+    expect(plan.remaining).toBe(overflow - MAX_RECIPIENTS);
+  });
+
+  it('reports remaining as 0 when every failed row is claimed', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast()] },
+      broadcast_recipients: {
+        rows: Array.from({ length: 3 }, (_, i) =>
+          failedRow({
+            id: `rec-${i}`,
+            contact_id: `c-${i}`,
+            template_params: ['Jane', '#1'],
+            contact: { id: `c-${i}`, phone: '14155550123', name: 'Jane' },
+          })
+        ),
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [TEMPLATE_ROW] },
+    });
+
+    const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(3);
+    expect(plan.remaining).toBe(0);
   });
 
   it('plans nothing when the claim loses the race', async () => {
@@ -566,78 +772,79 @@ describe('deliverBroadcast', () => {
     expect(stamp!.values.template_params).toEqual(['Jane']);
   });
 
-  it('backs off once on a rate-limit error, then succeeds', async () => {
-    sendTemplateMessage
-      .mockRejectedValueOnce(new Error('130429 rate limit hit'))
-      .mockResolvedValueOnce({ messageId: 'wamid.2' });
-
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 1 }] } });
-    await deliverBroadcast(db, plan());
-
-    expect(sendTemplateMessage).toHaveBeenCalledTimes(2);
-    expect(writes.find((w) => w.values.status === 'sent')).toBeDefined();
-  });
-
-  it('gives up after a second rate-limit error rather than looping', async () => {
+  it('fails a throttled recipient outright rather than re-sending', async () => {
+    // Throttling has no in-loop backoff: the row carries Meta's message
+    // and the retry endpoint is the recovery path, same as any other
+    // failure. A second attempt inside the invocation would spend budget
+    // to arrive at this same row.
     sendTemplateMessage.mockRejectedValue(new Error('130429 rate limit hit'));
 
     const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 0 }] } });
     await deliverBroadcast(db, plan());
 
-    expect(sendTemplateMessage).toHaveBeenCalledTimes(2);
+    expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
     const stamp = writes.find((w) => w.values.status === 'failed');
     expect(stamp!.values.error_message).toMatch(/130429/);
   });
 
-  it('paces sends at least MIN_SEND_INTERVAL_MS apart', async () => {
+  /** One more than a full group, so exactly one batch boundary is crossed. */
+  const spanningTwoBatches = Array.from(
+    { length: SEND_BATCH_SIZE + 1 },
+    (_, i) => ({
+      recipientRowId: `rec-${i}`,
+      phone: '14155550123',
+      params: [] as string[],
+    })
+  );
+
+  it('sends a group unthrottled, then pauses once at the boundary', async () => {
     const at: number[] = [];
     sendTemplateMessage.mockImplementation(async () => {
       at.push(Date.now());
       return { messageId: 'wamid.x' };
     });
 
-    const { db } = makeDb({ broadcasts: { rows: [{ sent_count: 3 }] } });
-    await deliverBroadcast(
-      db,
-      plan({
-        planned: Array.from({ length: 3 }, (_, i) => ({
-          recipientRowId: `rec-${i}`,
-          phone: '14155550123',
-          params: [],
-        })),
-      })
-    );
+    const { db } = makeDb({
+      broadcasts: { rows: [{ sent_count: spanningTwoBatches.length }] },
+    });
+    await deliverBroadcast(db, plan({ planned: spanningTwoBatches }));
 
-    expect(at).toHaveLength(3);
-    for (let i = 1; i < at.length; i++) {
-      // 100ms floor, with a little slack for timer coarseness.
-      expect(at[i] - at[i - 1]).toBeGreaterThanOrEqual(90);
+    expect(at).toHaveLength(SEND_BATCH_SIZE + 1);
+
+    // Nothing paces sends *within* a group — that is the tradeoff of
+    // batch pacing over the per-message governor it replaced.
+    for (let i = 1; i < SEND_BATCH_SIZE; i++) {
+      expect(at[i] - at[i - 1]).toBeLessThan(50);
     }
+
+    // ...and one flat pause before the next group opens.
+    expect(at[SEND_BATCH_SIZE] - at[SEND_BATCH_SIZE - 1]).toBeGreaterThanOrEqual(
+      SEND_BATCH_DELAY_MS - 20
+    );
   });
 
-  it('adds no delay when Meta is already slower than the interval', async () => {
+  it('pays the batch pause on top of Meta latency, not instead of it', async () => {
+    const latencyMs = 20;
     sendTemplateMessage.mockImplementation(async () => {
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, latencyMs));
       return { messageId: 'wamid.x' };
     });
 
-    const { db } = makeDb({ broadcasts: { rows: [{ sent_count: 3 }] } });
+    const { db } = makeDb({
+      broadcasts: { rows: [{ sent_count: spanningTwoBatches.length }] },
+    });
     const started = Date.now();
-    await deliverBroadcast(
-      db,
-      plan({
-        planned: Array.from({ length: 3 }, (_, i) => ({
-          recipientRowId: `rec-${i}`,
-          phone: '14155550123',
-          params: [],
-        })),
-      })
-    );
+    await deliverBroadcast(db, plan({ planned: spanningTwoBatches }));
     const elapsed = Date.now() - started;
 
-    // 3 × 150ms of real latency. An additive post-send sleep would push
-    // this past 750ms; the interval governor must not.
-    expect(elapsed).toBeLessThan(650);
+    // SEND_BATCH_DELAY_MS is an unconditional sleep, unlike the
+    // compensating governor this replaced — real latency does NOT count
+    // toward it. maxDeliverableRecipients() is optimistic by exactly
+    // this much, which is why the API reports `remaining` rather than
+    // promising a single pass.
+    expect(elapsed).toBeGreaterThanOrEqual(
+      SEND_BATCH_DELAY_MS + spanningTwoBatches.length * latencyMs
+    );
   });
 
   it('keeps a partly-successful broadcast "sent" when every retry fails', async () => {
@@ -672,11 +879,13 @@ describe('deliverBroadcast deadline guard', () => {
 
   it('fails unsent rows explicitly rather than stranding them pending', async () => {
     // Jump the clock past the budget after the first send so the guard
-    // trips on the second iteration.
+    // trips on the second iteration. Derived from DELIVER_BUDGET_MS
+    // rather than hard-coded — a hard-coded advance silently stops
+    // exercising the guard the moment the budget is raised.
     let now = 0;
     vi.spyOn(Date, 'now').mockImplementation(() => now);
     sendTemplateMessage.mockImplementation(async () => {
-      now += 60_000;
+      now += DELIVER_BUDGET_MS + 1_000;
       return { messageId: 'wamid.x' };
     });
 

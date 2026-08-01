@@ -241,9 +241,14 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts \
       }'
 ```
 
-Recipients are capped at **1000 per request** — split larger sends.
-Invalid phone numbers are dropped and counted as `rejected`. Response
-(202):
+Recipients are capped per request at whatever one delivery pass can
+drain — the send loop's time budget divided by its per-message pacing
+cost. That is **2900 at the shipped defaults**, but tuning either
+constant moves it, so read the effective figure from the `400` message
+rather than hard-coding it. Note the cap assumes zero send latency, so a
+full-cap request will not finish in one pass in practice; the tail comes
+back as `remaining` for you to retry. Split larger sends. Invalid phone numbers are
+dropped and counted as `rejected`. Response (202):
 
 ```json
 {
@@ -285,9 +290,10 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts/$ID/retry \
 }
 ```
 
-Failed rows are capped at **150 per call** so the fan-out fits inside
-the request's duration budget; `remaining` reports how many are left,
-and calling again picks them up. Claiming a row is atomic, so two
+Failed rows are claimed per call under the same cap as a create request
+(above), so the fan-out fits inside the request's duration budget;
+`remaining` reports exactly how many are still awaiting a retry, and
+calling again picks them up. Claiming a row is atomic, so two
 concurrent retries never double-send — the loser simply gets
 `retrying: 0`.
 

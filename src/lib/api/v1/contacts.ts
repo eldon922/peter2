@@ -9,10 +9,20 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
+import { chunkIds, chunkRows } from '@/lib/supabase/batching';
+import {
+  findExistingContact,
+  isUniqueViolation,
+  type ExistingContact,
+} from '@/lib/contacts/dedupe';
 import { resolveImportTagIds } from '@/lib/contacts/resolve-import-tags';
 import { addContactTagAndDispatch } from '@/lib/contacts/tag-events';
-import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import {
+  sanitizePhoneForMeta,
+  isValidE164,
+  normalizePhone,
+  phonesMatch,
+} from '@/lib/whatsapp/phone-utils';
 
 /** Row select that embeds the contact's tags for serialization. */
 export const CONTACT_SELECT = '*, contact_tags(tags(*))';
@@ -149,6 +159,144 @@ export async function findOrCreateContact(
   }
 
   return { id: created.id, created: true };
+}
+
+/**
+ * Bulk form of {@link findOrCreateContact}: resolve many phones in a
+ * handful of round trips instead of one (or two) per phone.
+ *
+ * Motivation — the broadcast create path resolved recipients in a
+ * sequential `await` loop, so a 1000-recipient request cost 1000+
+ * sequential round trips *inline in the request*, before the `after()`
+ * fan-out even started. That is a Postgres-latency bound with nothing to
+ * do with Meta pacing, and it scaled linearly with the recipient cap.
+ *
+ * Matching semantics are identical to the single-row helper, because
+ * they are the same two steps: pre-filter in SQL on the last-8-digit
+ * suffix, then apply the strict `phonesMatch` in JS. Here the suffixes
+ * are OR'd into one query per chunk and candidates are bucketed by
+ * suffix, so matching stays O(n) rather than O(n×m).
+ *
+ * Returns a map from each input phone to its contact id. Inputs that
+ * normalize to the same contact (trunk-prefix variants, or a literal
+ * duplicate) share an entry — the caller collapses those later.
+ *
+ * Throws {@link ContactError} on a lookup failure, matching the single
+ * -row helper: a half-resolved audience must not silently become a
+ * partial send.
+ */
+export async function findOrCreateContactsBulk(
+  db: SupabaseClient,
+  accountId: string,
+  auditUserId: string,
+  phones: string[],
+): Promise<Map<string, string>> {
+  const resolved = new Map<string, string>();
+  const unique = [...new Set(phones)];
+  if (unique.length === 0) return resolved;
+
+  // Two phones can only match if they share this key: `phonesMatch` is
+  // either an exact normalized equality or a last-8-digit equality, and
+  // both imply the same bucket.
+  const bucketKey = (phone: string): string => {
+    const n = normalizePhone(phone);
+    return n.length >= 8 ? n.slice(-8) : n;
+  };
+
+  // ── 1. One lookup per chunk of suffixes, not per phone ──────────
+  const suffixes = [...new Set(unique.map(bucketKey))].filter(Boolean);
+  const candidates: ExistingContact[] = [];
+  // `chunkIds` bounds the joined filter length, keeping the query string
+  // under the ~8KB request-line ceiling proxies impose on PostgREST.
+  for (const chunk of chunkIds(suffixes.map((s) => `phone.like.*${s}`))) {
+    const { data, error } = await db
+      .from('contacts')
+      .select('*')
+      .eq('account_id', accountId)
+      .or(chunk.join(','));
+    if (error) {
+      console.error('[api/v1/contacts] bulk lookup error:', error);
+      throw new ContactError('Failed to look up contacts', 500);
+    }
+    candidates.push(...((data ?? []) as ExistingContact[]));
+  }
+
+  const byBucket = new Map<string, ExistingContact[]>();
+  for (const candidate of candidates) {
+    const key = bucketKey(candidate.phone);
+    const bucket = byBucket.get(key);
+    if (bucket) bucket.push(candidate);
+    else byBucket.set(key, [candidate]);
+  }
+
+  const missing: string[] = [];
+  for (const phone of unique) {
+    const hit = (byBucket.get(bucketKey(phone)) ?? []).find((c) =>
+      phonesMatch(c.phone, phone),
+    );
+    if (hit) resolved.set(phone, hit.id);
+    else missing.push(phone);
+  }
+
+  if (missing.length === 0) return resolved;
+
+  // ── 2. Insert the misses in bulk ────────────────────────────────
+  // Deduped by normalized key first: two inputs that normalize alike
+  // are one contact, and inserting both would trip the unique index
+  // from migration 022 and fail the whole statement.
+  const newByKey = new Map<string, string>();
+  for (const phone of missing) {
+    const key = normalizePhone(phone);
+    if (!newByKey.has(key)) newByKey.set(key, phone);
+  }
+
+  const idByKey = new Map<string, string>();
+  const pending = [...newByKey.values()];
+
+  for (const batch of chunkRows(pending)) {
+    const { data, error } = await db
+      .from('contacts')
+      .insert(
+        batch.map((phone) => ({
+          account_id: accountId,
+          user_id: auditUserId,
+          phone,
+          name: phone,
+          email: null,
+          company: null,
+        })),
+      )
+      .select('id, phone');
+
+    if (error || !data) {
+      // A concurrent create won the unique index, which fails the whole
+      // batch. Fall back to the single-row helper for this batch only —
+      // it carries the same 23505 backstop and re-resolves to the
+      // winner. Rare, and bounded to one batch.
+      if (isUniqueViolation(error)) {
+        for (const phone of batch) {
+          const { id } = await findOrCreateContact(db, accountId, auditUserId, {
+            phone,
+          });
+          idByKey.set(normalizePhone(phone), id);
+        }
+        continue;
+      }
+      console.error('[api/v1/contacts] bulk create error:', error);
+      throw new ContactError('Failed to create contacts', 500);
+    }
+
+    for (const row of data as { id: string; phone: string }[]) {
+      idByKey.set(normalizePhone(row.phone), row.id);
+    }
+  }
+
+  for (const phone of missing) {
+    const id = idByKey.get(normalizePhone(phone));
+    if (id) resolved.set(phone, id);
+  }
+
+  return resolved;
 }
 
 /**
