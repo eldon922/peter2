@@ -859,7 +859,11 @@ export default function BroadcastDetailPage() {
                               </div>
                             ))}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate text-xs text-red-400">
+                      {/* Wraps instead of truncating: a clipped WhatsApp
+                          error is unactionable, and `break-words` handles
+                          the long unspaced codes Meta returns. Overrides
+                          TableCell's default `whitespace-nowrap`. */}
+                      <TableCell className="max-w-xs whitespace-normal break-words text-xs text-red-400">
                         {/* `|| '-'`, not `?? '-'`: an empty-string
                             error_message is as unhelpful as a null one
                             and used to render as a blank cell. */}
