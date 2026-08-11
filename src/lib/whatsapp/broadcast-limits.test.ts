@@ -27,6 +27,7 @@ import {
 const ROUTES_WITH_MAX_DURATION = [
   'src/app/api/whatsapp/webhook/route.ts',
   'src/app/api/broadcasts/[id]/retry/route.ts',
+  'src/app/api/broadcasts/[id]/send/route.ts',
   'src/app/api/v1/broadcasts/route.ts',
   'src/app/api/v1/broadcasts/[id]/retry/route.ts',
 ];
@@ -108,16 +109,15 @@ describe('MAX_RECIPIENTS governs both the create and retry paths', () => {
   });
 });
 
-describe('both send paths pace identically', () => {
-  // The two paths used to run different mechanisms — a per-message
-  // interval governor on the server, burst-and-pause in the browser —
-  // which agreed on average rate but not on burst behaviour. They now
-  // share one shape, and these guard that they keep sharing it.
+describe('the fan-out paces from the shared constants', () => {
+  // Both send paths (a fresh wizard send and a retry) now go through
+  // `deliverBroadcast` in `after()` — the dashboard hook no longer
+  // loops batches from the browser itself (see
+  // `use-broadcast-sending.ts`'s Step 4), so there is exactly one
+  // place left that pages sends, and this guards that it still uses
+  // the shared constants rather than a hard-coded number.
 
-  const SEND_PATHS = [
-    'src/lib/whatsapp/broadcast-core.ts',
-    'src/hooks/use-broadcast-sending.ts',
-  ];
+  const SEND_PATHS = ['src/lib/whatsapp/broadcast-core.ts'];
 
   it.each(SEND_PATHS)('%s paces from the shared constants', (relPath) => {
     const source = readFileSync(join(process.cwd(), relPath), 'utf8');

@@ -185,6 +185,19 @@ export default function BroadcastDetailPage() {
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
   /**
+   * Set right after the server accepts a retry, so the progress bar
+   * below can track just *that* retry's slice rather than the whole
+   * broadcast. `baseline` is sent_count + failed_count at the moment
+   * the retry was accepted; `total` is how many rows it claimed. As
+   * polling advances those counts, (current - baseline) / total is
+   * this retry's own 0–100, distinct from the wizard's initial-send
+   * case below where there is no baseline to subtract.
+   */
+  const [retryTarget, setRetryTarget] = useState<{
+    total: number;
+    baseline: number;
+  } | null>(null);
+  /**
    * Set when the server refused a retry because it can't tell which
    * media this broadcast sent. Holds the pending retry's scope so
    * answering the prompt resumes exactly what was clicked.
@@ -347,6 +360,15 @@ export default function BroadcastDetailPage() {
 
       setMediaPrompt(null);
 
+      if (data.retrying > 0) {
+        // Snapshot before `refresh()` below moves the counts — this is
+        // the "before" the progress bar measures forward from.
+        setRetryTarget({
+          total: data.retrying,
+          baseline: broadcast.sent_count + broadcast.failed_count,
+        });
+      }
+
       if (data.retrying === 0) {
         toast.info(t('noFailedToRetry'));
       } else if (data.remaining > 0) {
@@ -440,6 +462,34 @@ export default function BroadcastDetailPage() {
   }
 
   const status = getBroadcastStatus(broadcast.status);
+
+  // Same 0–100 shape as the wizard's Step4ScheduleSend "Processing"
+  // overlay, driven by polling instead of a client-tracked counter
+  // since the fan-out itself now always runs server-side (both a
+  // fresh wizard send and a retry — see use-broadcast-sending.ts and
+  // /api/broadcasts/[id]/send).
+  //
+  // `retryTarget` set: scope to just that retry's claimed rows, so the
+  // bar moves visibly even when it's a handful of rows against a
+  // broadcast of thousands.
+  // `retryTarget` unset but still 'sending': this is either a fresh
+  // send just kicked off by the wizard (no retry was ever clicked on
+  // this page) or a page load that landed mid-send from elsewhere —
+  // either way, fall back to overall completion.
+  const completedCount = broadcast.sent_count + broadcast.failed_count;
+  const sendProgress = retryTarget
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            ((completedCount - retryTarget.baseline) / retryTarget.total) * 100,
+          ),
+        ),
+      )
+    : broadcast.total_recipients > 0
+      ? Math.min(100, Math.round((completedCount / broadcast.total_recipients) * 100))
+      : 0;
 
   const funnelSteps: FunnelStep[] = [
     { label: t('stats.sent'), value: broadcast.sent_count, color: 'bg-primary' },
@@ -552,6 +602,32 @@ export default function BroadcastDetailPage() {
         )}
         </div>
       </div>
+
+      {/* Sending progress — shown whenever the fan-out is actually
+          running server-side, whether that's the wizard's initial send
+          (just navigated here) or a retry kicked off from the button
+          above. Same visual shape as the wizard's own processing
+          overlay (Step4ScheduleSend), driven by polling instead of a
+          client-side counter. */}
+      {broadcast.status === 'sending' && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <p className="text-sm font-medium text-foreground">
+                {t('sendingProgress')}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-primary">{sendProgress}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-muted">
+            <div
+              className="h-1.5 rounded-full bg-primary transition-all duration-300"
+              style={{ width: `${sendProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Media prompt — the server refuses to guess which
           image/video/document this broadcast originally sent, because

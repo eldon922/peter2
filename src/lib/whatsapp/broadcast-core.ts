@@ -632,6 +632,127 @@ export async function planBroadcastRetry(
   };
 }
 
+/** A pending recipient row joined to its contact, as read for a send. */
+interface PendingRecipientRow {
+  id: string;
+  contact_id: string | null;
+  template_params: unknown;
+  contact: Contact | null;
+}
+
+/**
+ * Build a {@link BroadcastPlan} for a broadcast whose `broadcasts` row
+ * and `pending` `broadcast_recipients` rows already exist — created
+ * just before this call by the dashboard wizard (`use-broadcast-sending`),
+ * which still resolves the audience, creates the broadcast, and
+ * inserts recipient rows (each already carrying its resolved
+ * `template_params`) client-side.
+ *
+ * This function's only job is turning those rows into a plan for
+ * {@link deliverBroadcast}, the same way {@link planBroadcastRetry}
+ * does for a retry — so the wizard's actual Meta fan-out runs
+ * server-side in `after()` instead of looping batches from the
+ * browser. Unlike a retry there is no prior attempt to reconcile: no
+ * variable re-resolution, no claim/compare-and-set (nothing else can
+ * be racing a 'pending' row created moments ago in the same flow), no
+ * media-URL prompt (the wizard collected it before insert).
+ */
+export async function planBroadcastSend(
+  db: SupabaseClient,
+  accountId: string,
+  broadcastId: string
+): Promise<BroadcastPlan> {
+  const { data: broadcast, error: bErr } = await db
+    .from('broadcasts')
+    .select('id, template_name, template_language, header_media_url, status')
+    .eq('id', broadcastId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  if (bErr) {
+    console.error('[broadcast-core] send read broadcast error:', bErr);
+    throw new BroadcastError('internal', 'Failed to read broadcast', 500);
+  }
+  if (!broadcast) {
+    throw new BroadcastError('not_found', 'Broadcast not found', 404);
+  }
+
+  const templateLanguage = broadcast.template_language || 'en_US';
+
+  const { data: rawRows, error: rErr } = await db
+    .from('broadcast_recipients')
+    .select('id, contact_id, template_params, contact:contacts(*)')
+    .eq('broadcast_id', broadcastId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(MAX_RECIPIENTS);
+  if (rErr) {
+    console.error('[broadcast-core] send read recipients error:', rErr);
+    throw new BroadcastError('internal', 'Failed to read recipients', 500);
+  }
+
+  const rows = (rawRows ?? []) as unknown as PendingRecipientRow[];
+
+  // A contact deleted in the gap between the wizard's insert and this
+  // call leaves nothing to dial. Rare, but the window is real, and
+  // failing loudly here beats a row silently stuck 'pending' forever.
+  const orphaned = rows.filter((r) => !r.contact?.phone);
+  const sendable = rows.filter((r) => r.contact?.phone);
+  for (const row of orphaned) {
+    await db
+      .from('broadcast_recipients')
+      .update({ status: 'failed', error_message: 'Contact no longer exists' })
+      .eq('id', row.id);
+  }
+
+  if (sendable.length === 0) {
+    return {
+      broadcastId,
+      templateName: broadcast.template_name,
+      templateLanguage,
+      phoneNumberId: '',
+      accessToken: '',
+      templateRow: null,
+      planned: [],
+      rejected: 0,
+    };
+  }
+
+  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
+    db,
+    accountId,
+    broadcast.template_name,
+    templateLanguage
+  );
+
+  // `template_params` was resolved and stored by the wizard at insert
+  // time, so every row already carries exactly what to send — no
+  // variable resolution happens here, only the message shape.
+  const headerType = templateRow?.header_type;
+  const isMediaHeader =
+    headerType === 'image' || headerType === 'video' || headerType === 'document';
+  const headerMediaUrl = broadcast.header_media_url?.trim() || undefined;
+  const messageParams: SendTimeParams | undefined =
+    isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
+
+  const planned: PlannedRecipient[] = sendable.map((row) => ({
+    recipientRowId: row.id,
+    phone: row.contact!.phone as string,
+    params: Array.isArray(row.template_params) ? (row.template_params as string[]) : [],
+    ...(messageParams ? { messageParams } : {}),
+  }));
+
+  return {
+    broadcastId,
+    templateName: broadcast.template_name,
+    templateLanguage,
+    phoneNumberId,
+    accessToken,
+    templateRow,
+    planned,
+    rejected: 0,
+  };
+}
+
 /**
  * Fan out a {@link BroadcastPlan}: send each recipient's template
  * (phone-variant retry) and stamp its `broadcast_recipients` row.

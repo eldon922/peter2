@@ -57,24 +57,21 @@ export const DELIVER_BUDGET_MS =
   ROUTE_MAX_DURATION_SECONDS * 1000 - DELIVERY_WRITE_RESERVE_MS;
 
 // ============================================================
-// Send pacing — shared by BOTH send paths.
+// Send pacing — governs `deliverBroadcast`'s fan-out.
 //
-// The server fan-out (`deliverBroadcast`, running in `after()`) and the
-// dashboard's client-driven path (`use-broadcast-sending`, pacing from
-// the browser) use the same mechanism: send a group of SEND_BATCH_SIZE,
-// then pause SEND_BATCH_DELAY_MS before the next group. Previously the
-// server ran a per-message interval governor instead, so the two paths
-// had different burst behaviour under the same nominal rate.
+// `deliverBroadcast` (running in `after()`, for both a fresh wizard
+// send via /api/broadcasts/{id}/send and a retry via
+// /api/broadcasts/{id}/retry) sends a group of SEND_BATCH_SIZE, then
+// pauses SEND_BATCH_DELAY_MS before the next group. This is the only
+// place sends are paced — earlier the dashboard hook
+// (`use-broadcast-sending`) had its own client-driven loop pacing
+// itself from the browser against a since-removed route
+// (/api/whatsapp/broadcast); that loop is gone, so this module is now
+// the single source of truth rather than one of two.
 // ============================================================
 
 /**
  * Recipients sent per group before pausing.
- *
- * On the client this is also the POST body size for
- * /api/whatsapp/broadcast, which gives it a second job the server side
- * doesn't have: it is the failure blast radius. `use-broadcast-sending`
- * marks the *whole* batch failed when one POST throws, so raising this
- * to go faster also widens what a single network blip writes off.
  */
 export const SEND_BATCH_SIZE = 10;
 

@@ -10,10 +10,6 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { chunkIds, chunkRows } from '@/lib/supabase/batching';
-import {
-  SEND_BATCH_DELAY_MS,
-  SEND_BATCH_SIZE,
-} from '@/lib/whatsapp/broadcast-limits';
 
 // Re-exported so existing importers of this hook keep working. The
 // implementations moved to lib/broadcasts/variables so the server-side
@@ -56,23 +52,6 @@ interface UseBroadcastSendingReturn {
   createAndSendBroadcast: (payload: BroadcastPayload) => Promise<string>;
   isProcessing: boolean;
   progress: number;
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-interface BroadcastApiResult {
-  phone: string;
-  /**
-   * The variant actually dialled — Meta accepted it on success, or it
-   * was the last one tried on failure. Distinct from `phone`, which
-   * always echoes the input and is the key results are matched on.
-   */
-  phone_attempted?: string;
-  status: 'sent' | 'failed';
-  whatsapp_message_id?: string;
-  error?: string;
 }
 
 /** Bulk-fetch contacts by id, chunked to stay under the request-size limit. */
@@ -285,17 +264,11 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       }
 
       // Media-header templates (image/video/document) require a media
-      // URL on every send. Collected in the personalize step and applied
-      // to all recipients; falls back to the template's stored URL on the
-      // server when omitted.
-      const headerType = payload.template.header_type;
-      const isMediaHeader =
-        headerType === 'image' ||
-        headerType === 'video' ||
-        headerType === 'document';
+      // URL on every send. Collected in the personalize step, persisted
+      // on the broadcast row below, and turned back into a send-time
+      // `messageParams.headerMediaUrl` by the server
+      // (`planBroadcastSend`) when it builds the fan-out plan.
       const headerMediaUrl = payload.headerMediaUrl?.trim();
-      const messageParams =
-        isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
 
       // ── Step 2: Create broadcast row ──────────────────────────────
       // Count columns are owned by the DB aggregate trigger (migrations
@@ -381,130 +354,24 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         }
       }
 
-      // ── Step 4: Fetch recipients (joined contact) ─────────────────
-      setProgress(30);
-      const { data: recipients, error: recipientsFetchError } = await supabase
-        .from('broadcast_recipients')
-        .select('*, contact:contacts(*)')
-        .eq('broadcast_id', broadcast.id);
-
-      if (recipientsFetchError || !recipients) {
-        throw new Error('Failed to fetch broadcast recipients');
+      // ── Step 4: Hand the fan-out to the server ─────────────────────
+      // Every row above is already 'pending' with its template_params
+      // resolved, so from here this is exactly what a retry does:
+      // kick off /api/broadcasts/{id}/send, which plans the pending
+      // rows and delivers them in `after()` — the same server-side
+      // path `deliverBroadcast` uses for retries, instead of this hook
+      // looping batches against /api/whatsapp/broadcast itself. The
+      // actual send no longer depends on this tab staying open; the
+      // broadcast detail page polls `broadcasts`/`broadcast_recipients`
+      // for live progress once we navigate there.
+      setProgress(40);
+      const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
+        method: 'POST',
+      });
+      if (!sendRes.ok) {
+        const sendData = await sendRes.json().catch(() => ({}));
+        throw new Error(sendData.error || 'Failed to start sending');
       }
-
-      let failedCount = 0;
-      const totalRecipients = recipients.length;
-
-      for (let i = 0; i < recipients.length; i += SEND_BATCH_SIZE) {
-        const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
-
-        // Params were resolved and stored on the row at insert time, so
-        // read them back rather than recomputing — this is exactly what
-        // a later retry will replay.
-        const apiRecipients = batch
-          .filter((r) => r.contact?.phone)
-          .map((r) => ({
-            phone: r.contact!.phone as string,
-            params: (r.template_params as string[] | null) ?? [],
-            ...(messageParams ? { messageParams } : {}),
-          }));
-
-        if (apiRecipients.length === 0) continue;
-
-        try {
-          const res = await fetch('/api/whatsapp/broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              recipients: apiRecipients,
-              template_name: payload.template.name,
-              template_language: payload.template.language ?? 'en_US',
-            }),
-          });
-
-          const data = await res.json();
-
-          if (!res.ok) {
-            throw new Error(data.error || 'Broadcast API request failed');
-          }
-
-          const resultsByPhone = new Map<string, BroadcastApiResult>();
-          for (const r of (data.results ?? []) as BroadcastApiResult[]) {
-            resultsByPhone.set(r.phone, r);
-          }
-
-          for (const recipient of batch) {
-            const phone = recipient.contact?.phone;
-            const result = phone ? resultsByPhone.get(phone) : undefined;
-
-            if (!result) {
-              failedCount++;
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'failed',
-                  error_message: 'No phone number on contact',
-                })
-                .eq('id', recipient.id);
-              continue;
-            }
-
-            if (result.status === 'sent') {
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'sent',
-                  sent_at: new Date().toISOString(),
-                  whatsapp_message_id: result.whatsapp_message_id ?? null,
-                  error_message: null,
-                  // The variant Meta accepted, which may not be the
-                  // contact's stored number.
-                  phone_attempted: result.phone_attempted ?? phone,
-                })
-                .eq('id', recipient.id);
-            } else {
-              failedCount++;
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'failed',
-                  error_message: result.error ?? 'Unknown error',
-                  phone_attempted: result.phone_attempted ?? phone,
-                })
-                .eq('id', recipient.id);
-            }
-          }
-        } catch (err) {
-          for (const recipient of batch) {
-            failedCount++;
-            await supabase
-              .from('broadcast_recipients')
-              .update({
-                status: 'failed',
-                error_message: err instanceof Error ? err.message : 'Unknown error',
-              })
-              .eq('id', recipient.id);
-          }
-        }
-
-        const progressPct =
-          30 + Math.round(((i + batch.length) / totalRecipients) * 60);
-        setProgress(progressPct);
-
-        if (i + SEND_BATCH_SIZE < recipients.length) {
-          await sleep(SEND_BATCH_DELAY_MS);
-        }
-      }
-
-      // ── Step 5: Finalize status ───────────────────────────────────
-      // Aggregate counts are maintained by the DB trigger (migration
-      // 003); we only flip the final status here.
-      setProgress(95);
-      const finalStatus = failedCount === totalRecipients ? 'failed' : 'sent';
-      await supabase
-        .from('broadcasts')
-        .update({ status: finalStatus })
-        .eq('id', broadcast.id);
 
       setProgress(100);
       return broadcast.id;

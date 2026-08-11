@@ -670,6 +670,7 @@
       "noFailedToRetry": "No failed recipients left to retry",
       "numberChangedHint": "This contact's number changed after the send. It was tried on {phone}.",
       "triedNumber": "tried {phone}",
+      "sendingProgress": "Sending…",
       "toastRetryStarted": "Retrying {count} recipient(s)",
       "toastRetryPartial": "Retrying {count} recipient(s) — {remaining} more can be retried after this finishes",
       "toastRetryFailed": "Failed to retry: {error}",

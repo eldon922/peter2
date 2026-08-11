@@ -670,6 +670,7 @@
       "noFailedToRetry": "재시도할 실패 수신자가 없습니다",
       "numberChangedHint": "발송 이후 이 연락처의 번호가 변경되었습니다. {phone}(으)로 시도했습니다.",
       "triedNumber": "{phone} 시도함",
+      "sendingProgress": "전송 중…",
       "toastRetryStarted": "수신자 {count}명에게 재시도 중",
       "toastRetryPartial": "수신자 {count}명에게 재시도 중 — 완료 후 {remaining}명을 추가로 재시도할 수 있습니다",
       "toastRetryFailed": "재시도 실패: {error}",

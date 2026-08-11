@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   createBroadcast,
   planBroadcastRetry,
+  planBroadcastSend,
   deliverBroadcast,
   BroadcastError,
   type BroadcastPlan,
@@ -704,6 +705,117 @@ describe('planBroadcastRetry', () => {
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
     expect(plan.planned[0].messageParams).toBeUndefined();
+  });
+});
+
+function pendingRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 'rec-1',
+    contact_id: 'c-1',
+    status: 'pending',
+    template_params: ['Jane', '1234'],
+    contact: { id: 'c-1', phone: '14155550123', name: 'Jane' },
+    ...over,
+  };
+}
+
+describe('planBroadcastSend', () => {
+  it('errors when the broadcast does not exist (or belongs to another account)', async () => {
+    const { db } = makeDb({ broadcasts: { rows: [] } });
+    await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it('plans every pending recipient, replaying its stored template_params', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: {
+        rows: [
+          pendingRow(),
+          pendingRow({ id: 'rec-2', contact_id: 'c-2', template_params: ['Bo', '5678'], contact: { id: 'c-2', phone: '14155550124', name: 'Bo' } }),
+        ],
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(2);
+    expect(plan.planned[0]).toMatchObject({
+      recipientRowId: 'rec-1',
+      phone: '14155550123',
+      params: ['Jane', '1234'],
+    });
+    expect(plan.planned[1]).toMatchObject({
+      recipientRowId: 'rec-2',
+      phone: '14155550124',
+      params: ['Bo', '5678'],
+    });
+  });
+
+  it('does not re-resolve params — a row with none sends empty, never falls back to variable resolution', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: {
+        rows: [pendingRow({ template_params: null })],
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+    expect(plan.planned[0].params).toEqual([]);
+  });
+
+  it('fails an orphaned row (contact deleted) instead of planning it', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: {
+        rows: [pendingRow({ contact: null })],
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+    expect(plan.planned).toHaveLength(0);
+
+    const orphanWrite = writes.find(
+      (w) => w.table === 'broadcast_recipients' && w.op === 'update',
+    );
+    expect(orphanWrite?.values).toMatchObject({
+      status: 'failed',
+      error_message: 'Contact no longer exists',
+    });
+  });
+
+  it('carries the broadcast-stored media URL into messageParams for a media-header template', async () => {
+    const { db } = makeDb({
+      broadcasts: {
+        rows: [sentBroadcast({ status: 'sending', header_media_url: 'https://cdn/x.jpg' })],
+      },
+      broadcast_recipients: { rows: [pendingRow()] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'image' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+    expect(plan.planned[0].messageParams).toEqual({
+      headerMediaUrl: 'https://cdn/x.jpg',
+    });
+  });
+
+  it('returns an empty plan without touching Meta config when nothing is pending', async () => {
+    const { db, reads } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: { rows: [] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+    expect(plan.planned).toHaveLength(0);
+    expect(reads).not.toContain('whatsapp_config');
   });
 });
 
