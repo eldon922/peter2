@@ -887,7 +887,7 @@ export function MessageThread({
   const assignedAgentId = conversation.assigned_agent_id ?? null;
   const currentAssignee = profiles.find((p) => p.user_id === assignedAgentId);
   const assignLabel = assignedAgentId
-    ? (currentAssignee?.full_name ?? t("assigned"))
+    ? (profileLabel(currentAssignee) ?? t("assigned"))
     : t("assign");
 
   return (
