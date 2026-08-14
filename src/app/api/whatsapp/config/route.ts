@@ -185,7 +185,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { phone_number_id, waba_id, access_token, verify_token, pin } = body
+    const {
+      phone_number_id,
+      waba_id,
+      access_token,
+      verify_token,
+      pin,
+      app_id,
+      app_secret,
+    } = body
 
     if (!access_token || !phone_number_id) {
       return NextResponse.json(
@@ -251,12 +259,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // Encrypt sensitive tokens before storing
+    // Encrypt sensitive tokens before storing. The App Secret joins them:
+    // it is the HMAC key Meta signs webhooks with, so a plaintext copy in
+    // the database would be enough to forge deliveries (migration 041).
     let encryptedAccessToken: string
     let encryptedVerifyToken: string | null
+    let encryptedAppSecret: string | null
     try {
       encryptedAccessToken = encrypt(access_token)
       encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      encryptedAppSecret =
+        typeof app_secret === 'string' && app_secret.trim()
+          ? encrypt(app_secret.trim())
+          : null
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown encryption error'
       console.error('Encryption failed:', message)
@@ -358,6 +373,12 @@ export async function POST(request: Request) {
       waba_id: waba_id || null,
       access_token: encryptedAccessToken,
       verify_token: encryptedVerifyToken,
+      app_id: typeof app_id === 'string' && app_id.trim() ? app_id.trim() : null,
+      // Blank means "leave the stored secret alone" on an update, the
+      // same way the access token field works — the UI never sends the
+      // decrypted value back, so an empty box is "unchanged", not
+      // "clear it". A fresh insert has nothing to keep, so null stands.
+      ...(encryptedAppSecret ? { app_secret: encryptedAppSecret } : {}),
       status: registrationError ? 'disconnected' : 'connected',
       connected_at: registrationError ? null : new Date().toISOString(),
       registered_at: registrationError ? null : registeredAt,

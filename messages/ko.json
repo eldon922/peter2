@@ -1519,7 +1519,16 @@
       "step4_3": "위의 <strong>웹훅 콜백 URL</strong>을 붙여넣기",
       "step4_4": "여기서 설정한 것과 동일한 <strong>인증 토큰</strong>을 입력",
       "step4_5": "\"messages\" 웹훅 필드를 구독",
-      "metaDocs": "Meta WhatsApp API 문서"
+      "metaDocs": "Meta WhatsApp API 문서",
+      "metaAppTitle": "Meta 앱 자격 증명",
+      "metaAppDesc": "Meta for Developers → App Settings → Basic에서 확인할 수 있습니다. App Secret은 모든 수신 웹훅에 서명하며, 없으면 수신이 거부됩니다.",
+      "appId": "App ID",
+      "appIdHint": "이미지 헤더가 있는 템플릿을 제출할 때 필요합니다 (Meta의 Resumable Upload API).",
+      "appSecret": "App Secret",
+      "appSecretPlaceholder": "App Secret을 입력하세요",
+      "appSecretStoredPlaceholder": "저장됨 — 유지하려면 비워 두세요",
+      "appSecretHint": "저장 시 암호화되며 저장 후에는 다시 표시되지 않습니다.",
+      "appSecretStoredHint": "저장된 시크릿이 있습니다. 유지하려면 비워 두고, 교체하려면 새 값을 입력하세요."
     },
     "sections": {
       "overview": "개요",

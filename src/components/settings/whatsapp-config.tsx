@@ -94,6 +94,13 @@ export function WhatsAppConfig() {
   // Meta will silently drop every inbound event — that's the
   // multi-number bug that prompted this work.
   const isRegistered = Boolean(config?.registered_at);
+  // Meta App ID / App Secret (migration 041). The id is not a secret so
+  // it round-trips normally; the secret is write-only — the API never
+  // returns it, and an empty box on save means "keep what's stored".
+  const [appId, setAppId] = useState('');
+  const [appSecret, setAppSecret] = useState('');
+  const [showAppSecret, setShowAppSecret] = useState(false);
+  const hasStoredAppSecret = Boolean(config?.app_secret);
   const lastRegistrationError = config?.last_registration_error ?? null;
 
   const [verifyingRegistration, setVerifyingRegistration] = useState(false);
@@ -146,6 +153,8 @@ export function WhatsAppConfig() {
         setWabaId('');
         setAccessToken('');
         setVerifyToken('');
+        setAppId(data.app_id || '');
+        setAppSecret('');
         setPin('');
         setTokenEdited(false);
       }
@@ -154,6 +163,8 @@ export function WhatsAppConfig() {
 
       // Then verify health via the API (decrypts token + pings Meta)
       if (data) {
+        setAppId('');
+        setAppSecret('');
         try {
           const res = await fetch('/api/whatsapp/config', { method: 'GET' });
           const payload = await res.json();
@@ -232,6 +243,10 @@ export function WhatsAppConfig() {
         payload.access_token = accessToken.trim();
       } else if (config) {
         // Existing config — reuse stored encrypted token by decrypting on the
+        app_id: appId.trim() || null,
+        // Blank leaves the stored secret untouched (same contract as the
+        // access token) rather than wiping it.
+        app_secret: appSecret.trim() || null,
         // server. But our POST handler requires an access_token to verify
         // with Meta. If the user didn't change the token, we need to signal
         // that. Simplest: require token re-entry if they're updating.
@@ -724,6 +739,66 @@ export function WhatsAppConfig() {
           >
             {testing ? (
               <>
+        {/* Meta app credentials — sits directly under the webhook card
+            because that's what they're for: the App Secret is the key
+            Meta signs every webhook delivery with, so an inbound event
+            can't be trusted (or accepted) without it. Previously these
+            were env vars only, which meant no self-hoster could finish
+            setup from the UI. See migration 041. */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground">{t('metaAppTitle')}</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {t('metaAppDesc')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">{t('appId')}</Label>
+              <Input
+                placeholder="e.g. 123456789012345"
+                value={appId}
+                onChange={(e) => setAppId(e.target.value)}
+                disabled={!canEdit}
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">{t('appIdHint')}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">{t('appSecret')}</Label>
+              <div className="relative">
+                <Input
+                  type={showAppSecret ? 'text' : 'password'}
+                  placeholder={
+                    hasStoredAppSecret
+                      ? t('appSecretStoredPlaceholder')
+                      : t('appSecretPlaceholder')
+                  }
+                  value={appSecret}
+                  onChange={(e) => setAppSecret(e.target.value)}
+                  disabled={!canEdit}
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAppSecret(!showAppSecret)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showAppSecret ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {hasStoredAppSecret ? t('appSecretStoredHint') : t('appSecretHint')}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
                 <Loader2 className="size-4 animate-spin" />
                 {t('testing')}
               </>

@@ -292,6 +292,19 @@ export interface WhatsAppConfig {
   subscribed_apps_at?: string;
   /** Last error from /register; cleared on success. */
   last_registration_error?: string;
+  /**
+   * Meta App ID (migration 041). Not a secret. Used for the Resumable
+   * Upload API when submitting image-header templates. Falls back to
+   * the `META_APP_ID` env var when unset.
+   */
+  app_id?: string | null;
+  /**
+   * Meta App Secret, encrypted at rest (migration 041) — the HMAC key
+   * for inbound webhook signatures. Only ever read server-side; the
+   * client sees its presence, never its value. Falls back to the
+   * `META_APP_SECRET` env var when unset.
+   */
+  app_secret?: string | null;
 }
 
 // Raw Meta status enum. We persist this verbatim from Meta (sync + webhook)
