@@ -16,7 +16,10 @@ import {
 import { Radio, Plus, Loader2 } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
-import { getBroadcastStatus } from '@/lib/broadcast-status';
+import {
+  getBroadcastStatus,
+  percentOfRecipients,
+} from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 
 /**
@@ -41,7 +44,7 @@ function RateCell({
   /** Tailwind bg class for the fill, e.g. "bg-primary" */
   color: string;
 }) {
-  const pct = percent(value, total);
+  const pct = percentOfRecipients(value, total);
   return (
     <div className="flex items-center gap-2">
       <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">

@@ -109,3 +109,21 @@ export function getRecipientStatus(status: string): StatusDisplay {
 export function statusTextClass(status: StatusDisplay): string {
   return status.classes.split(" ").find((c) => c.startsWith("text-")) ?? "";
 }
+
+/**
+ * A broadcast funnel figure as a share of the audience.
+ *
+ * Every percentage the app shows for a broadcast — the stat cards, the
+ * funnel bars, and the delivery/read columns on the list — is a share of
+ * `total_recipients`, so the same broadcast reads the same number
+ * everywhere you look at it.
+ *
+ * They used to disagree: the funnel divided by `sent_count` instead, so
+ * a broadcast that reached 80 of 100 people and delivered to 40 showed
+ * "40%" on the card and the list but "50%" in the funnel. Both are
+ * defensible in isolation; showing both at once is not.
+ */
+export function percentOfRecipients(value: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
+}

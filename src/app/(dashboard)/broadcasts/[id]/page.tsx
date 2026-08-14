@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import {
   getBroadcastStatus,
   getRecipientStatus,
+  percentOfRecipients,
   recipientStatusConfig,
   statusTextClass,
 } from '@/lib/broadcast-status';
@@ -58,7 +59,7 @@ interface StatCardProps {
 }
 
 function StatCard({ label, value, total, icon, color }: StatCardProps) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  const pct = percentOfRecipients(value, total);
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
@@ -76,40 +77,88 @@ function StatCard({ label, value, total, icon, color }: StatCardProps) {
 interface FunnelStep {
   label: string;
   value: number;
+  /** Tailwind bg class for the fill, e.g. "bg-primary". */
   color: string;
+  /** Text colour that reads on top of `color`, in both themes. */
+  onColor: string;
 }
 
 /**
- * Pure-CSS funnel chart: decreasing-width rounded bars.
- * Width is relative to the largest step (typically Sent) so we
- * always render a full bar at the top and proportional tails.
+ * Pure-CSS funnel chart: decreasing-width rounded bars, each labelled
+ * with its count and its share of the audience.
+ *
+ * Measured against **Sent**, so the top bar is always 100% and each step
+ * below reads as "of the messages that went out, this many got here".
+ * That is deliberately a different denominator from the stat cards and
+ * the list page, which are shares of the whole audience — so the header
+ * spells the basis out. Without that label the two readings of the same
+ * broadcast look like a bug.
+ *
+ * Both the bar width and the percentage use that one denominator, so a
+ * bar's length and its own label always say the same thing.
+ *
+ * The label sits *inside* the bar, which is where it reads best but also
+ * where colour gets hard: `text-foreground` is near-black on indigo in
+ * light mode and near-white on green-500 in dark, and a short bar leaves
+ * half the text hanging off the fill onto the muted track. Rather than
+ * pick one colour that loses somewhere, the label is drawn twice — once
+ * in `text-foreground` for the track, and again in the fill's own
+ * foreground colour inside a box clipped to the fill. Each pixel of text
+ * is then painted in the colour that suits whatever is behind it, at any
+ * bar width, in either theme. Nothing is dimmed with `opacity`: a
+ * washed-out percentage was the first thing to become unreadable on the
+ * light-mode track.
  */
-function FunnelChart({ steps }: { steps: FunnelStep[] }) {
-  const max = Math.max(...steps.map((s) => s.value), 1);
+function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="mb-4 text-sm font-medium text-foreground">Funnel</h3>
+      <h3 className="mb-4 text-sm font-medium text-foreground">
+        Funnel
+        <span className="ml-2 text-xs font-normal text-muted-foreground">
+          % of sent
+        </span>
+      </h3>
       <div className="space-y-2">
         {steps.map((step) => {
-          const pctOfMax = Math.max(5, Math.round((step.value / max) * 100));
-          const pctOfSent =
-            steps[0].value > 0
-              ? Math.round((step.value / steps[0].value) * 100)
-              : 0;
+          const pct = percentOfRecipients(step.value, sent);
+          // Keep a sliver visible for any step that isn't zero — a step
+          // one person in a thousand reached should still be findable —
+          // but never draw a bar for a step nobody reached.
+          const width = step.value > 0 ? Math.max(2, pct) : 0;
+          const label = (
+            <>
+              {step.value.toLocaleString()}
+              <span className="ml-1.5 font-normal">({pct}%)</span>
+            </>
+          );
           return (
-            <div key={step.label} className="flex items-center gap-3">
-              <span className="w-20 shrink-0 text-xs text-muted-foreground">
+            // The label column is fixed-width, so on a phone it was
+            // eating the row and leaving the bar a stub — it shrinks
+            // below sm to give the bar room.
+            <div key={step.label} className="flex items-center gap-2 sm:gap-3">
+              <span className="w-16 shrink-0 text-xs text-muted-foreground sm:w-20">
                 {step.label}
               </span>
-              <div className="relative h-7 flex-1 rounded-full bg-muted">
+              <div className="relative h-7 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-7 rounded-full ${step.color} transition-[width] duration-500`}
-                  style={{ width: `${pctOfMax}%` }}
+                  className={`h-full rounded-full ${step.color} transition-[width] duration-500`}
+                  style={{ width: `${width}%` }}
                 />
-                <span className="absolute inset-0 flex items-center px-3 text-xs font-medium text-foreground">
-                  {step.value.toLocaleString()}
-                  <span className="ml-2 text-muted-foreground/80">
-                    ({pctOfSent}%)
+                <span className="absolute inset-y-0 left-0 flex items-center whitespace-nowrap px-3 text-xs font-semibold tabular-nums text-foreground">
+                  {label}
+                </span>
+                {/* Same label, same position, clipped to the fill. Purely
+                    presentational — the copy above is the one screen
+                    readers announce. */}
+                <span
+                  aria-hidden
+                  className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-500"
+                  style={{ width: `${width}%` }}
+                >
+                  <span
+                    className={`flex h-full items-center whitespace-nowrap px-3 text-xs font-semibold tabular-nums ${step.onColor}`}
+                  >
+                    {label}
                   </span>
                 </span>
               </div>
@@ -510,35 +559,36 @@ export default function BroadcastDetailPage() {
       ? Math.min(100, Math.round((completedCount / broadcast.total_recipients) * 100))
       : 0;
 
+  // `onColor` is the text colour drawn on top of each fill. The primary
+  // bar uses the theme's paired token; the three raw Tailwind fills are
+  // saturated enough at 500 that white reads on them in both themes.
   const funnelSteps: FunnelStep[] = [
-    { label: t('stats.sent'), value: broadcast.sent_count, color: 'bg-primary' },
-    { label: t('stats.delivered'), value: broadcast.delivered_count, color: 'bg-green-500' },
-    { label: t('stats.read'), value: broadcast.read_count, color: 'bg-blue-500' },
-    { label: t('stats.replied'), value: broadcast.replied_count, color: 'bg-indigo-500' },
+    { label: t('stats.sent'), value: broadcast.sent_count, color: 'bg-primary', onColor: 'text-primary-foreground' },
+    { label: t('stats.delivered'), value: broadcast.delivered_count, color: 'bg-green-500', onColor: 'text-white' },
+    { label: t('stats.read'), value: broadcast.read_count, color: 'bg-blue-500', onColor: 'text-white' },
+    { label: t('stats.replied'), value: broadcast.replied_count, color: 'bg-indigo-500', onColor: 'text-white' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <Button
             variant="outline"
             size="icon"
             onClick={() => router.push('/broadcasts')}
-            className="border-border"
+            className="border-border shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">{broadcast.name}</h1>
-              <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`}
-              >
-                {tStatus(status.label)}
-              </span>
-            </div>
+          <div className="min-w-0">
+            {/* Wraps rather than truncates — the name is the thing you
+                came here to identify, so it gets as many lines as it
+                needs. `break-words` handles an unspaced run. */}
+            <h1 className="text-2xl font-bold break-words text-foreground">
+              {broadcast.name}
+            </h1>
             <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
               <span>{t('template', { name: broadcast.template_name })}</span>
               <span>-</span>
@@ -780,7 +830,7 @@ export default function BroadcastDetailPage() {
         />
       </div>
 
-      <FunnelChart steps={funnelSteps} />
+      <FunnelChart steps={funnelSteps} sent={broadcast.sent_count} />
 
       {/* Recipients Table */}
       <div className="rounded-xl border border-border bg-card">
