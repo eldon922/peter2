@@ -383,6 +383,10 @@
       "enterCustomField": "Enter {name}...",
       "activityTab": {
         "title": "Activity History",
+      "phoneHistory": {
+        "title": "Previous numbers",
+        "changedOn": "until {date}"
+      },
         "noActivity": "No activity yet."
       },
       "notesTab": {

@@ -39,6 +39,7 @@ import {
   X,
   DollarSign,
   LayoutTemplate,
+  History,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -47,6 +48,13 @@ interface ContactDetailViewProps {
   onOpenChange: (open: boolean) => void;
   contactId: string | null;
   onUpdated: () => void;
+}
+
+/** A number this contact used to have (`contact_phone_history`). */
+interface PhoneHistoryEntry {
+  id: string;
+  phone: string;
+  changed_at: string;
 }
 
 export function ContactDetailView({
@@ -97,6 +105,12 @@ export function ContactDetailView({
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loadingDeals, setLoadingDeals] = useState(false);
 
+  // Previous numbers for this contact, newest first. Written by the
+  // trigger in migration 039 whenever `contacts.phone` changes — whether
+  // an agent edited it here or the sender auto-corrected a trunk-prefix
+  // variant — so it also covers changes this UI never saw.
+  const [phoneHistory, setPhoneHistory] = useState<PhoneHistoryEntry[]>([]);
+
   const fetchContact = useCallback(async () => {
     if (!contactId) return;
     setLoading(true);
@@ -115,6 +129,18 @@ export function ContactDetailView({
       setEditCompany(data.company ?? '');
     }
     setLoading(false);
+  }, [contactId, supabase]);
+
+  const fetchPhoneHistory = useCallback(async () => {
+    if (!contactId) return;
+
+    const { data } = await supabase
+      .from('contact_phone_history')
+      .select('id, phone, changed_at')
+      .eq('contact_id', contactId)
+      .order('changed_at', { ascending: false });
+
+    setPhoneHistory((data ?? []) as PhoneHistoryEntry[]);
   }, [contactId, supabase]);
 
   const fetchTags = useCallback(async () => {
@@ -183,12 +209,22 @@ export function ContactDetailView({
   useEffect(() => {
     if (open && contactId) {
       fetchContact();
+      fetchPhoneHistory();
       fetchTags();
       fetchNotes();
       fetchCustomFields();
       fetchDeals();
     }
-  }, [open, contactId, fetchContact, fetchTags, fetchNotes, fetchCustomFields, fetchDeals]);
+  }, [
+    open,
+    contactId,
+    fetchContact,
+    fetchPhoneHistory,
+    fetchTags,
+    fetchNotes,
+    fetchCustomFields,
+    fetchDeals,
+  ]);
 
   async function copyPhone() {
     if (!contact) return;
@@ -220,6 +256,9 @@ export function ContactDetailView({
     } else {
       toast.success(t('toastUpdated'));
       fetchContact();
+      // The trigger will have banked the old number if this save changed
+      // it, so pull the history back in rather than waiting for a reopen.
+      fetchPhoneHistory();
       onUpdated();
     }
     setSavingDetails(false);
@@ -504,6 +543,33 @@ export function ContactDetailView({
                       onChange={(e) => setEditPhone(e.target.value)}
                       className="bg-muted border-border text-foreground h-8 text-sm"
                     />
+                    {phoneHistory.length > 0 && (
+                      <div className="rounded-md border border-border bg-muted/40 px-2.5 py-2">
+                        <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                          <History className="size-3" />
+                          {t('phoneHistory.title')}
+                        </p>
+                        <ul className="mt-1.5 space-y-1">
+                          {phoneHistory.map((entry) => (
+                            <li
+                              key={entry.id}
+                              className="flex items-baseline justify-between gap-2 text-[11px]"
+                            >
+                              <span className="font-mono text-muted-foreground line-through">
+                                {entry.phone}
+                              </span>
+                              <span className="shrink-0 text-muted-foreground/80">
+                                {t('phoneHistory.changedOn', {
+                                  date: new Date(
+                                    entry.changed_at,
+                                  ).toLocaleDateString(),
+                                })}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs">{t('email')}</Label>
