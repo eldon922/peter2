@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { Message, MessageReaction } from "@/types";
 import {
@@ -119,12 +119,51 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
   );
 }
 
-function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof useTranslations> }) {
+/**
+ * True when the bubble's content ends in a run of flowing text, i.e. the
+ * cases where the timestamp can sit on the last line the way WhatsApp
+ * places it. Media without a caption, documents and locations end in a
+ * fixed-size block instead, so those keep the timestamp on its own row.
+ */
+function endsInText(message: Message): boolean {
+  switch (message.content_type) {
+    case "text":
+      return true;
+    case "image":
+    case "video":
+    case "template":
+      return Boolean(message.content_text);
+    case "interactive":
+      return !message.interactive_payload;
+    case "audio":
+    case "document":
+    case "location":
+      return false;
+    default:
+      return true;
+  }
+}
+
+function MessageContent({
+  message,
+  t,
+  trailing,
+}: {
+  message: Message;
+  t: ReturnType<typeof useTranslations>;
+  /**
+   * Invisible copy of the timestamp row, appended inside the final text
+   * paragraph so the last line reserves exactly the space the absolutely
+   * positioned meta occupies. Only supplied when `endsInText(message)`.
+   */
+  trailing?: ReactNode;
+}) {
   switch (message.content_type) {
     case "text":
       return (
         <p className="whitespace-pre-wrap break-words text-sm">
           {message.content_text}
+          {trailing}
         </p>
       );
 
@@ -139,6 +178,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap break-words text-sm">
               {message.content_text}
+              {trailing}
             </p>
           )}
         </div>
@@ -159,6 +199,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap break-words text-sm">
               {message.content_text}
+              {trailing}
             </p>
           )}
         </div>
@@ -203,6 +244,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap break-words text-sm">
               {message.content_text}
+              {trailing}
             </p>
           )}
         </div>
@@ -238,6 +280,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
             </span>
             <p className="whitespace-pre-wrap break-words text-sm">
               {message.content_text || t("interactiveReply")}
+              {trailing}
             </p>
           </div>
         );
@@ -245,6 +288,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
       return (
         <p className="whitespace-pre-wrap break-words text-sm">
           {message.content_text || t("interactiveReply")}
+          {trailing}
         </p>
       );
     }
@@ -253,6 +297,7 @@ function MessageContent({ message, t }: { message: Message, t: ReturnType<typeof
       return (
         <p className="whitespace-pre-wrap break-words text-sm">
           {message.content_text || t("unsupported")}
+          {trailing}
         </p>
       );
   }
@@ -269,6 +314,49 @@ export function MessageBubble({
 
   const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
   const time = format(new Date(message.created_at), "HH:mm");
+
+  // Timestamp + delivery ticks, as WhatsApp lays them out: tucked into
+  // the bottom-right corner of the bubble, sharing the last line of text
+  // when it fits and dropping to a line of their own when it doesn't.
+  //
+  // That needs the row rendered twice. The visible copy is positioned
+  // absolutely in the corner (so it never pushes the bubble taller than
+  // the text needs); an invisible copy rides at the end of the final
+  // paragraph purely to reserve the matching run of inline space, which
+  // is what makes the text wrap around it. Rendering the same markup for
+  // both means the reservation is exact without measuring anything.
+  const meta = (
+    <span className="inline-flex items-center gap-1 align-bottom">
+      {/* AI badge — only on replies the auto-reply bot generated
+          (always outbound, so it sits on the primary fill). Lets
+          agents tell an AI reply from their own / a Flow's at a
+          glance. */}
+      {message.ai_generated && (
+        <span
+          className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
+          title={t("aiBadgeTitle")}
+        >
+          <Sparkles className="h-2.5 w-2.5" />
+          {t("aiBadge")}
+        </span>
+      )}
+      <span
+        className={cn(
+          "text-[10px] leading-none",
+          // Outbound bubbles sit on the primary fill, so the
+          // timestamp must read against that (not the neutral
+          // foreground) — otherwise it goes low-contrast in light
+          // mode. Inbound bubbles use the muted surface.
+          isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+        )}
+      >
+        {time}
+      </span>
+      {isAgent && <StatusIcon status={message.status} />}
+    </span>
+  );
+
+  const inlineMeta = endsInText(message);
 
   // Row alignment + width cap are owned by <MessageActions> so its hover
   // group matches the bubble's content area, not the full row.
@@ -294,40 +382,22 @@ export function MessageBubble({
             onPrimary={isAgent}
           />
         )}
-        <MessageContent message={message} t={t} />
-        <div
-          className={cn(
-            "mt-1 flex items-center gap-1",
-            isAgent ? "justify-end" : "justify-start",
-          )}
-        >
-          {/* AI badge — only on replies the auto-reply bot generated
-              (always outbound, so it sits on the primary fill). Lets
-              agents tell an AI reply from their own / a Flow's at a
-              glance. */}
-          {message.ai_generated && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
-              title={t("aiBadgeTitle")}
-            >
-              <Sparkles className="h-2.5 w-2.5" />
-              {t("aiBadge")}
-            </span>
-          )}
-          <span
-            className={cn(
-              "text-[10px]",
-              // Outbound bubbles sit on the primary fill, so the
-              // timestamp must read against that (not the neutral
-              // foreground) — otherwise it goes low-contrast in light
-              // mode. Inbound bubbles use the muted surface.
-              isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
-            )}
-          >
-            {time}
-          </span>
-          {isAgent && <StatusIcon status={message.status} />}
-        </div>
+        <MessageContent
+          message={message}
+          t={t}
+          trailing={
+            inlineMeta ? (
+              <span aria-hidden className="invisible inline-block pl-2">
+                {meta}
+              </span>
+            ) : undefined
+          }
+        />
+        {inlineMeta ? (
+          <span className="absolute bottom-2 right-3">{meta}</span>
+        ) : (
+          <div className="mt-1 flex justify-end">{meta}</div>
+        )}
       </div>
       {reactions && reactions.length > 0 && onToggleReaction && (
         <MessageReactions
