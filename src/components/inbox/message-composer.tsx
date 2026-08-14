@@ -29,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -630,101 +631,198 @@ export function MessageComposer({
         </div>
       ) : (
         <div className="flex items-end gap-2">
-          {/* Attach menu — photo / video / document / voice. */}
+          {/* Four separate controls ahead of the textarea cost ~180px of
+              a phone's width, which left the box too narrow to read a
+              sentence back in. Below sm they collapse into this single
+              menu; from sm up the individual buttons are back.
+
+              The trigger is gated on `readOnly` alone, not
+              `inputsDisabled`, because Send template is how an agent
+              re-opens an expired 24h window — disabling the only way to
+              reach it once the session lapses would be a trap. The items
+              carry their own gating instead. */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              disabled={inputsDisabled || busy}
-              title={
-                readOnly
-                  ? t("readOnlyTitle")
-                  : inputsDisabled
-                    ? undefined
-                    : t("attachMedia")
-              }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={readOnly}
+              title={readOnly ? t("readOnlyTitle") : t("moreActions")}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 xl:hidden"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Paperclip className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="border-border bg-popover">
-              <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>
+            {/* The shared DropdownMenuContent sizes itself to the trigger
+                (`w-(--anchor-width)`), and this trigger is a 36px icon —
+                so every label wrapped onto two lines. Pin a real width
+                and stop the items wrapping. */}
+            <DropdownMenuContent
+              align="start"
+              className="w-60 border-border bg-popover [&_[data-slot=dropdown-menu-item]]:gap-2 [&_[data-slot=dropdown-menu-item]]:whitespace-nowrap [&_[data-slot=dropdown-menu-item]]:px-3 [&_[data-slot=dropdown-menu-item]]:py-2.5"
+            >
+              <DropdownMenuItem onClick={onOpenTemplates}>
+                <LayoutTemplate className="mr-2 h-4 w-4" />
+                {t("sendTemplate")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDraft} disabled={drafting}>
+                {drafting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {t("draftWithAI")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
+                onClick={() => imageInputRef.current?.click()}
+                disabled={inputsDisabled || busy}
+              >
                 <ImageIcon className="mr-2 h-4 w-4" />
                 {t("photo")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>
+              <DropdownMenuItem
+                onClick={() => videoInputRef.current?.click()}
+                disabled={inputsDisabled || busy}
+              >
                 <Video className="mr-2 h-4 w-4" />
                 {t("video")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => documentInputRef.current?.click()}>
+              <DropdownMenuItem
+                onClick={() => documentInputRef.current?.click()}
+                disabled={inputsDisabled || busy}
+              >
                 <FileText className="mr-2 h-4 w-4" />
                 {t("document")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void startRecording()}>
+              <DropdownMenuItem
+                onClick={() => void startRecording()}
+                disabled={inputsDisabled || busy}
+              >
                 <Mic className="mr-2 h-4 w-4" />
                 {t("voiceNote")}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* + menu — interactive messages + quick replies. Gated on the
-              24h window like free-form text (interactive requires it). */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              disabled={inputsDisabled}
-              title={
-                readOnly
-                  ? t("readOnlyTitle")
-                  : inputsDisabled
-                    ? undefined
-                    : t("moreActions")
-              }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="border-border bg-popover">
-              <DropdownMenuItem onClick={() => openInteractiveBuilder()}>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
+                onClick={() => openInteractiveBuilder()}
+                disabled={inputsDisabled}
+              >
                 <MessageSquareDashed className="mr-2 h-4 w-4" />
                 {t("interactiveMessage")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setQuickReplyOpen(true)}>
+              <DropdownMenuItem
+                onClick={() => setQuickReplyOpen(true)}
+                disabled={inputsDisabled}
+              >
                 <Zap className="mr-2 h-4 w-4" />
                 {t("quickReplies")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <GatedButton
-            variant="ghost"
-            size="sm"
-            canAct={!readOnly}
-            gateReason="send messages"
-            title={readOnly ? undefined : t("sendTemplate")}
-            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-            onClick={onOpenTemplates}
-          >
-            <LayoutTemplate className="h-4 w-4" />
-          </GatedButton>
+          {/* xl and up: the same actions as individual controls.
+              The breakpoint is `xl`, not `sm`, because the composer only
+              gets a slice of the viewport — the thread sits between the
+              conversation list (320px) and the contact sidebar, so below
+              about 1280px the full button row leaves the text box too
+              narrow to read a sentence back in. */}
+          <div className="hidden items-end gap-2 xl:flex">
+            {/* Attach menu — photo / video / document / voice. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={inputsDisabled || busy}
+                title={
+                  readOnly
+                    ? t("readOnlyTitle")
+                    : inputsDisabled
+                      ? undefined
+                      : t("attachMedia")
+                }
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Paperclip className="h-4 w-4" />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="border-border bg-popover">
+                <DropdownMenuItem onClick={() => imageInputRef.current?.click()}>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  {t("photo")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>
+                  <Video className="mr-2 h-4 w-4" />
+                  {t("video")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => documentInputRef.current?.click()}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  {t("document")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void startRecording()}>
+                  <Mic className="mr-2 h-4 w-4" />
+                  {t("voiceNote")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <GatedButton
-            variant="ghost"
-            size="sm"
-            canAct={!readOnly}
-            gateReason="send messages"
-            disabled={drafting}
-            title={readOnly ? undefined : t("draftWithAI")}
-            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-primary"
-            onClick={handleDraft}
-          >
-            {drafting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-          </GatedButton>
+            {/* + menu — interactive messages + quick replies. Gated on the
+                24h window like free-form text (interactive requires it). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={inputsDisabled}
+                title={
+                  readOnly
+                    ? t("readOnlyTitle")
+                    : inputsDisabled
+                      ? undefined
+                      : t("moreActions")
+                }
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="border-border bg-popover">
+                <DropdownMenuItem onClick={() => openInteractiveBuilder()}>
+                  <MessageSquareDashed className="mr-2 h-4 w-4" />
+                  {t("interactiveMessage")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setQuickReplyOpen(true)}>
+                  <Zap className="mr-2 h-4 w-4" />
+                  {t("quickReplies")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <GatedButton
+              variant="ghost"
+              size="sm"
+              canAct={!readOnly}
+              gateReason="send messages"
+              title={readOnly ? undefined : t("sendTemplate")}
+              className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+              onClick={onOpenTemplates}
+            >
+              <LayoutTemplate className="h-4 w-4" />
+            </GatedButton>
+
+            <GatedButton
+              variant="ghost"
+              size="sm"
+              canAct={!readOnly}
+              gateReason="send messages"
+              disabled={drafting}
+              title={readOnly ? undefined : t("draftWithAI")}
+              className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-primary"
+              onClick={handleDraft}
+            >
+              {drafting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+            </GatedButton>
+          </div>
 
           <textarea
             ref={textareaRef}
@@ -745,7 +843,11 @@ export function MessageComposer({
             // The placeholder text also surfaces the read-only state.
             title={readOnly ? t("readOnlyTitle") : undefined}
             className={cn(
-              "flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50",
+              // `min-w-0`: a textarea's intrinsic width comes from its
+              // `cols` default (~20 chars), and a flex item won't shrink
+              // below that on its own — so on a narrow phone the row
+              // would overflow instead of the box getting smaller.
+              "min-w-0 flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-muted-foreground outline-none transition-colors focus:border-primary/50",
               (sessionExpired || readOnly) && "cursor-not-allowed opacity-50"
             )}
           />
