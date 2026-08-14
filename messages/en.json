@@ -427,6 +427,7 @@
       "rowsReady_plural": "{count} rows ready",
       "preview": "Preview · first {count}",
       "previewTags": "{tags} tag · {contacts} contact",
+      "previewDuplicates": "{count} duplicate {count, plural, =1 {row} other {rows}} removed",
       "previewTags_plural": "{tags} tags · {contacts} contacts",
       "moreRows": "+ {count} more row not shown",
       "moreRows_plural": "+ {count} more rows not shown",

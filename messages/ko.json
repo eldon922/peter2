@@ -459,7 +459,8 @@
       "toastSkipped_plural": "중복 {count}건을 건너뛰었습니다",
       "toastFailed": "연락처 {count}개를 가져오지 못했습니다",
       "toastFailed_plural": "연락처 {count}개를 가져오지 못했습니다",
-      "toastError": "가져오기 실패"
+      "toastError": "가져오기 실패",
+      "previewDuplicates": "중복 {count}행이 제거되었습니다"
     },
     "customFields": {
       "title": "커스텀 필드",

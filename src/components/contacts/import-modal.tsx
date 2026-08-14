@@ -133,6 +133,15 @@ export function ImportModal({
 
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<ParsedContactRow[]>([]);
+  /**
+   * In-file duplicates dropped at parse time, carried through to the
+   * result summary so they're still reported as skipped. De-duping here
+   * rather than at import time keeps the preview, the "rows ready" chip
+   * and the Import button count all describing the same set of contacts —
+   * they previously listed the raw CSV rows, so a file with the same
+   * number twice showed (and offered to import) it twice.
+   */
+  const [inFileDuplicates, setInFileDuplicates] = useState(0);
   const [hasTagsColumn, setHasTagsColumn] = useState(false);
   const [hasCompanyColumn, setHasCompanyColumn] = useState(false);
   const [tagColorByKey, setTagColorByKey] = useState<Map<string, string>>(
@@ -149,6 +158,7 @@ export function ImportModal({
   function reset() {
     setFile(null);
     setParsedRows([]);
+    setInFileDuplicates(0);
     setHasTagsColumn(false);
     setHasCompanyColumn(false);
     setTagColorByKey(new Map());
@@ -178,13 +188,18 @@ export function ImportModal({
     if (rows.length === 0) {
       toast.error(t('toastNoValidRows'));
       setParsedRows([]);
+      setInFileDuplicates(0);
       setHasTagsColumn(false);
       setHasCompanyColumn(false);
       setTagColorByKey(new Map());
       return;
     }
 
-    setParsedRows(rows);
+    // Collapse repeats of the same number now, so everything downstream —
+    // preview, counts, insert — works from one list.
+    const { unique, duplicates } = dedupeByPhone(rows);
+    setParsedRows(unique);
+    setInFileDuplicates(duplicates);
     setHasTagsColumn(csvHasTags);
     setHasCompanyColumn(csvHasCompany);
 
@@ -219,14 +234,14 @@ export function ImportModal({
         throw new Error('Your profile is not linked to an account.');
 
       let imported = 0;
-      let skipped = 0;
+      // In-file duplicates were already collapsed at parse time; they
+      // still count as skipped in the summary.
+      let skipped = inFileDuplicates;
       let failed = 0;
 
-      // 1) De-dupe within the file by normalized phone (keep first).
-      const { unique, duplicates: inFileDupes } = dedupeByPhone(parsedRows);
-      skipped += inFileDupes;
+      const unique = parsedRows;
 
-      // 2) Skip numbers already in this account. One read of the
+      // 1) Skip numbers already in this account. One read of the
       //    generated `phone_normalized` column (migration 022) → Set.
       const { data: existingRows } = await supabase
         .from('contacts')
@@ -248,7 +263,7 @@ export function ImportModal({
         return true;
       });
 
-      // 3) Resolve tag names → ids (admin+ may auto-create missing tags).
+      // 2) Resolve tag names → ids (admin+ may auto-create missing tags).
       //    Skip the round-trip when the import carries no tag names.
       const allTagNames = toInsert.flatMap((row) => row.tagNames);
       let tagIdByKey = new Map<string, string>();
@@ -264,7 +279,7 @@ export function ImportModal({
 
       const tagAssignments: ContactTagAssignment[] = [];
 
-      // 4) Batch insert the genuinely-new rows in chunks of 50. The DB
+      // 3) Batch insert the genuinely-new rows in chunks of 50. The DB
       //    unique index is the backstop: a 23505 (race, or a format
       //    that normalizes equal) counts as skipped, not failed.
       const chunkSize = 50;
@@ -328,7 +343,7 @@ export function ImportModal({
         }
       }
 
-      // 5) Wire tags onto the contacts we just created. Failure here must
+      // 4) Wire tags onto the contacts we just created. Failure here must
       //    not mask a successful contact import.
       let tagsAssigned = 0;
       try {
@@ -473,6 +488,12 @@ export function ImportModal({
                   {t('preview', { count: preview.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {inFileDuplicates > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted/90 px-2 py-0.5 text-[11px] text-amber-500">
+                      <AlertTriangle className="size-3" />
+                      {t('previewDuplicates', { count: inFileDuplicates })}
+                    </span>
+                  )}
                   {tagStats.rowsWithTags > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-muted/90 px-2 py-0.5 text-[11px] text-muted-foreground">
                       <Tag className="text-primary/80 size-3" />
