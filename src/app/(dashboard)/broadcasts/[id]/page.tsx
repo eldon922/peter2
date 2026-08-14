@@ -599,6 +599,16 @@ export default function BroadcastDetailPage() {
           </div>
         </div>
 
+        {/* The status chip lives with the actions at every width — one
+            row holding "what state is this in" and "what can I do about
+            it". `w-full` below md guarantees that row is its own line
+            (with the chip at its left end) instead of wrapping
+            unpredictably; from md up it shrinks to sit beside the title. */}
+        <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+        <span className={`inline-flex shrink-0 ${statusChipClass}`}>
+          {tStatus(status.label)}
+        </span>
+
         <div className="flex items-center gap-2">
         {/* Retry failed — re-sends only the failed rows, folding the
             results back into this broadcast's funnel. Disabled while a
@@ -958,26 +968,40 @@ export default function BroadcastDetailPage() {
                       ? [{ label, tint, value: new Date(at).toLocaleString() }]
                       : [],
                   );
+                  // Rendered in the phone column at sm+, and stacked under
+                  // the contact name below it. The number-changed warning
+                  // has to travel with whichever one is showing — it's the
+                  // only signal that the row was dialled at a number the
+                  // contact no longer has.
+                  const phoneBlock = (
+                    <>
+                      {recipient.contact?.phone ?? '-'}
+                      {changed && (
+                        <span
+                          className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
+                          title={t('numberChangedHint', {
+                            phone: recipient.phone_attempted ?? '',
+                          })}
+                        >
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          {t('triedNumber', {
+                            phone: recipient.phone_attempted ?? '',
+                          })}
+                        </span>
+                      )}
+                    </>
+                  );
+                  const errorText = recipient.error_message?.trim();
                   return (
                     <TableRow key={recipient.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">
+                      <TableCell className="max-w-[9rem] truncate font-medium text-foreground sm:max-w-xs">
                         {recipient.contact?.name ?? 'Unknown'}
+                        <span className="mt-0.5 block whitespace-normal text-xs font-normal text-muted-foreground sm:hidden">
+                          {phoneBlock}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {recipient.contact?.phone ?? '-'}
-                        {changed && (
-                          <span
-                            className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
-                            title={t('numberChangedHint', {
-                              phone: recipient.phone_attempted ?? '',
-                            })}
-                          >
-                            <AlertTriangle className="h-3 w-3 shrink-0" />
-                            {t('triedNumber', {
-                              phone: recipient.phone_attempted ?? '',
-                            })}
-                          </span>
-                        )}
+                      <TableCell className="hidden text-muted-foreground sm:table-cell">
+                        {phoneBlock}
                       </TableCell>
                       <TableCell>
                         <span
