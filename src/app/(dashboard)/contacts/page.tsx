@@ -321,6 +321,11 @@ function SortableHead({
     fetchContacts();
   }, [fetchContacts]);
 
+  const handleImported = useCallback(async () => {
+    await fetchTags();
+    await fetchContacts();
+  }, [fetchTags, fetchContacts]);
+
   function openAddForm() {
     setEditContact(null);
     setEditContactTags([]);
@@ -972,10 +977,17 @@ function SortableHead({
       />
 
       {/* Import Modal */}
+      {/* An import can auto-create tags (admin+), and the rows it creates
+          carry them. `fetchContacts` maps each contact_tag id through
+          `tagsMap` and drops anything it doesn't know, so refreshing only
+          the contacts left brand-new tags invisible until a reload.
+          Refetching the tag catalogue first repopulates the map — and
+          because `fetchContacts` depends on it, the contacts effect
+          re-runs on its own with the tags resolvable. */}
       <ImportModal
         open={importOpen}
         onOpenChange={setImportOpen}
-        onImported={fetchContacts}
+        onImported={handleImported}
       />
 
       {/* Custom Fields Manager (admin+) */}
