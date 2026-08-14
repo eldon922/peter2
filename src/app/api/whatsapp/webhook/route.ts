@@ -17,6 +17,10 @@ import {
   formatStatusError,
   type WhatsAppStatusError,
 } from '@/lib/whatsapp/status-error'
+import {
+  findBroadcastSentMessage,
+  type BroadcastSentMessage,
+} from '@/lib/whatsapp/broadcast-message'
 import { createLogger } from '@/lib/log'
 
 const log = createLogger('webhook')
@@ -607,33 +611,17 @@ async function lookupInternalIdByMetaId(
 }
 
 /**
- * Persist an inbound reaction. WhatsApp reactions are not new messages —
- * they're per-(target, actor) state. We upsert / delete on
- * `message_reactions`, never write a row into `messages`.
- *
- * Best-effort: a missing parent (we never received it) is logged and
- * skipped so the webhook still acks 200 to Meta.
+ * Persist a reaction against an already-resolved target message.
+ * WhatsApp reactions are not new messages — they're per-(target, actor)
+ * state. We upsert / delete on `message_reactions`, never write a row
+ * into `messages`.
  */
-async function handleReaction(
-  message: WhatsAppMessage,
+async function applyReaction(
+  reaction: { message_id: string; emoji: string },
+  targetInternalId: string,
   conversationId: string,
   contactId: string
 ) {
-  const reaction = message.reaction
-  if (!reaction?.message_id) return
-
-  const targetInternalId = await lookupInternalIdByMetaId(
-    reaction.message_id,
-    conversationId
-  )
-  if (!targetInternalId) {
-    console.warn(
-      '[webhook] reaction target message not found; skipping',
-      reaction.message_id
-    )
-    return
-  }
-
   // Empty emoji = removal (per Meta's Cloud API spec).
   if (!reaction.emoji) {
     const { error: delError } = await supabaseAdmin()
@@ -665,6 +653,194 @@ async function handleReaction(
   }
 }
 
+/**
+ * Write the broadcast message `sent` describes into `messages`, so a
+ * reaction has something to point at. Returns the new row's id.
+ *
+ * See lib/whatsapp/broadcast-message.ts for why broadcasts don't create
+ * these rows up front.
+ */
+async function materializeBroadcastMessage(
+  sent: BroadcastSentMessage,
+  conversationId: string,
+  wamid: string
+): Promise<string | null> {
+  // Re-check inside the resolved conversation. If it already existed,
+  // a concurrent delivery of this same reaction (Meta retries) could
+  // have materialized the message since our first lookup.
+  const existing = await lookupInternalIdByMetaId(wamid, conversationId)
+  if (existing) return existing
+
+  const { data, error } = await supabaseAdmin()
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_type: 'agent',
+      content_type: 'template',
+      content_text: sent.bodyText,
+      media_url: sent.mediaUrl,
+      template_name: sent.templateName,
+      message_id: wamid,
+      status: sent.status,
+      // Backdated to when the broadcast actually went out, so the bubble
+      // sorts to when it was sent rather than landing at "now", above
+      // every real message in the thread.
+      ...(sent.sentAt ? { created_at: sent.sentAt } : {}),
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error(
+      '[webhook] failed to materialize broadcast message:',
+      error.message
+    )
+    return null
+  }
+  return data.id as string
+}
+
+/**
+ * Handle an inbound reaction end to end.
+ *
+ * A reaction is always *about* a message we already delivered, so the
+ * contact necessarily exists by the time one arrives. Running it through
+ * the find-or-create path meant an unattachable reaction still minted a
+ * contact + conversation and then gave up — leaving an empty thread in
+ * the inbox with nothing to open. Everything here resolves by lookup,
+ * and the only row we create is a conversation we're about to put a
+ * real message into.
+ *
+ * Two kinds of target:
+ *
+ *   - A message in `messages` — anything sent or received through the
+ *     inbox. Direct hit.
+ *   - A broadcast, which has no `messages` row at all. Reconstructed
+ *     from `broadcast_recipients` and written on demand, which is the
+ *     case that used to produce the blank thread.
+ */
+async function handleInboundReaction(
+  message: WhatsAppMessage,
+  accountId: string,
+  configOwnerUserId: string,
+  senderPhone: string
+) {
+  const reaction = message.reaction
+  if (!reaction?.message_id) return
+
+  const contact = await findExistingContact(
+    supabaseAdmin(),
+    accountId,
+    senderPhone
+  )
+  if (!contact) {
+    console.warn(
+      '[webhook] reaction from unknown contact; skipping',
+      senderPhone
+    )
+    return
+  }
+
+  const { data: convRows } = await supabaseAdmin()
+    .from('conversations')
+    .select('id')
+    .eq('account_id', accountId)
+    .eq('contact_id', contact.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+  const existingConversation = convRows?.[0]
+
+  if (existingConversation) {
+    const targetId = await lookupInternalIdByMetaId(
+      reaction.message_id,
+      existingConversation.id
+    )
+    if (targetId) {
+      await applyReaction(
+        reaction,
+        targetId,
+        existingConversation.id,
+        contact.id
+      )
+      return
+    }
+  }
+
+  // Not a message we store — try the broadcast side. Note this runs even
+  // when a conversation exists: someone who replied to a broadcast has a
+  // thread, but the broadcast itself still isn't in it.
+  const sent = await findBroadcastSentMessage(
+    supabaseAdmin(),
+    accountId,
+    reaction.message_id
+  )
+  if (!sent) {
+    console.warn(
+      '[webhook] reaction target message not found; skipping',
+      reaction.message_id
+    )
+    return
+  }
+  if (sent.contactId !== contact.id) {
+    // The wamid resolved, but to a broadcast row for somebody else.
+    // Attaching it here would file one contact's reaction under another's
+    // thread, so drop it — this should not be reachable.
+    console.warn(
+      '[webhook] reaction target belongs to a different contact; skipping',
+      reaction.message_id
+    )
+    return
+  }
+
+  const convResult = await findOrCreateConversation(
+    accountId,
+    configOwnerUserId,
+    contact.id
+  )
+  if (!convResult) return
+  const conversationId = convResult.conversation.id
+
+  const targetId = await materializeBroadcastMessage(
+    sent,
+    conversationId,
+    reaction.message_id
+  )
+  if (!targetId) {
+    // Roll back a conversation we created purely to hold this message.
+    // Leaving it would recreate the empty-thread symptom this path
+    // exists to prevent.
+    if (convResult.created) {
+      await supabaseAdmin()
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId)
+    }
+    return
+  }
+
+  if (convResult.created) {
+    // Fired only now that the thread has content in it. Setting
+    // last_message_* here too keeps the new thread from sorting to the
+    // bottom of the inbox on a null timestamp.
+    await supabaseAdmin()
+      .from('conversations')
+      .update({
+        last_message_text: sent.bodyText ?? `[${sent.templateName}]`,
+        last_message_at: sent.sentAt ?? new Date().toISOString(),
+      })
+      .eq('id', conversationId)
+
+    await dispatchWebhookEvent(
+      supabaseAdmin(),
+      accountId,
+      'conversation.created',
+      { conversation_id: conversationId, contact_id: contact.id }
+    )
+  }
+
+  await applyReaction(reaction, targetId, conversationId, contact.id)
+}
+
 async function processMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
@@ -680,6 +856,20 @@ async function processMessage(
 ) {
   const senderPhone = normalizePhone(message.from)
   const contactName = contact.profile.name
+
+  // Reactions never reach the find-or-create path below. They aren't
+  // messages, and routing them through it minted a contact + conversation
+  // for events that then had nothing to attach to — see
+  // handleInboundReaction for the full story.
+  if (message.type === 'reaction') {
+    await handleInboundReaction(
+      message,
+      accountId,
+      configOwnerUserId,
+      senderPhone
+    )
+    return
+  }
 
   // Find or create contact
   const contactOutcome = await findOrCreateContact(
@@ -700,23 +890,14 @@ async function processMessage(
   if (!convResult) return
   const conversation = convResult.conversation
 
-  // Emit conversation.created as soon as the thread is opened — BEFORE
-  // the reaction short-circuit below — so a conversation first opened by
-  // a reaction still fires the event, and a subscriber always sees the
-  // thread open before its first message.received.
+  // Emit conversation.created as soon as the thread is opened, so a
+  // subscriber always sees the thread open before its first
+  // message.received.
   if (convResult.created) {
     await dispatchWebhookEvent(supabaseAdmin(), accountId, 'conversation.created', {
       conversation_id: conversation.id,
       contact_id: contactRecord.id,
     })
-  }
-
-  // Reactions short-circuit here — they aren't messages. We never insert
-  // into `messages`, never bump unread_count, never update last_message_text.
-  // Done before parseMessageContent so the media-URL fetch is skipped.
-  if (message.type === 'reaction') {
-    await handleReaction(message, conversation.id, contactRecord.id)
-    return
   }
 
   // Parse message content based on type
@@ -794,6 +975,14 @@ async function processMessage(
     console.error('Error inserting message:', msgError)
     return
   }
+
+  log.info('inbound message stored', {
+    conversation: conversation.id,
+    type: contentType,
+    // The phone number itself stays out of the line — an operator
+    // tailing logs doesn't need customer PII to confirm delivery works.
+    contact: contactRecord.id,
+  })
 
   // Update conversation
   const { error: convError } = await supabaseAdmin()
