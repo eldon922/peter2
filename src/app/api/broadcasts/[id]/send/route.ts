@@ -25,6 +25,7 @@ import { supabaseAdmin } from '@/lib/flows/admin-client';
 import {
   planBroadcastSend,
   deliverBroadcast,
+  finalizeBroadcastStatus,
   BroadcastError,
 } from '@/lib/whatsapp/broadcast-core';
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit';
@@ -67,6 +68,13 @@ export async function POST(
     // explicit row ids already verified to belong to this account.
     if (plan.planned.length > 0) {
       after(() => deliverBroadcast(supabaseAdmin(), plan));
+    } else {
+      // Nothing to fan out — every recipient row was orphaned, or the
+      // wizard's insert produced none. The wizard has already stamped the
+      // broadcast 'sending', and without this it would stay there for
+      // good: the list and detail pages poll on exactly that status, so a
+      // stranded row means a 5-second Supabase poll that never stops.
+      await finalizeBroadcastStatus(supabaseAdmin(), id, 0);
     }
 
     return NextResponse.json({ sending: plan.planned.length });

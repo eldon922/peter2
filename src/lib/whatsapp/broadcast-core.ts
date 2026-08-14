@@ -781,6 +781,7 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
+
   log.info('fan-out started', {
     broadcast: plan.broadcastId,
     recipients: plan.planned.length,
@@ -788,7 +789,13 @@ export async function deliverBroadcast(
     retry: Boolean(plan.isRetry),
   });
 
-
+  // Everything below runs inside try/finally so the terminal status is
+  // written even when the loop throws (an unreachable DB, a bug in the
+  // send path). Leaving the row on 'sending' is not a cosmetic problem:
+  // both the list and detail pages poll *because* a broadcast is
+  // 'sending', so a stranded row means those pages poll Supabase every
+  // five seconds forever, for every viewer, with nothing left to report.
+  try {
   for (const [index, recipient] of plan.planned.entries()) {
     // Deadline guard — stop while there is still time to write the
     // remaining rows, rather than being killed mid-loop and stranding
@@ -888,29 +895,66 @@ export async function deliverBroadcast(
     }
   }
 
-  // Terminal status only — counts are trigger-owned (see the note
-  // above). If nothing sent, the broadcast failed outright; a partial
-  // send is still 'sent' (per-recipient failures show in failed_count).
-  //
-  // On a retry, this run's tally is the wrong basis: a broadcast that
-  // originally sent 90 of 100 and then fails all 10 retries has
-  // sentCount === 0 here, and marking it 'failed' would erase the 90
-  // successes from the UI. Use the trigger-maintained total instead.
-  let broadcastSucceeded = sentCount > 0;
-  if (plan.isRetry) {
+  } finally {
+    // Terminal status only — counts are trigger-owned (see the note
+    // above). If nothing sent, the broadcast failed outright; a partial
+    // send is still 'sent' (per-recipient failures show in failed_count).
+    //
+    // On a retry, this run's tally is the wrong basis: a broadcast that
+    // originally sent 90 of 100 and then fails all 10 retries has
+    // sentCount === 0 here, and marking it 'failed' would erase the 90
+    // successes from the UI. Use the trigger-maintained total instead.
+    //
+    // Guarded on its own so a failure here can't mask whatever error
+    // brought us into the `finally` — that error still propagates to the
+    // caller's logs.
+    try {
+      await finalizeBroadcastStatus(db, plan.broadcastId, sentCount, plan.isRetry);
+      log.info('fan-out finished', {
+        broadcast: plan.broadcastId,
+        sent: sentCount,
+        of: plan.planned.length,
+        ms: Date.now() - startedAt,
+      });
+    } catch (error) {
+      console.error(
+        `[broadcast-core] failed to finalize status for ${plan.broadcastId}:`,
+        error
+      );
+    }
+  }
+}
+
+/**
+ * Move a broadcast off `sending` onto its terminal status.
+ *
+ * `sentThisRun` is what the current invocation managed to send. On a
+ * retry (or when the caller has no tally of its own, e.g. a plan that
+ * turned out to have nothing to deliver) the trigger-maintained
+ * `sent_count` is consulted instead, so an earlier partial success isn't
+ * relabelled as an outright failure.
+ */
+export async function finalizeBroadcastStatus(
+  db: SupabaseClient,
+  broadcastId: string,
+  sentThisRun: number,
+  consultStoredCount = false
+): Promise<void> {
+  let succeeded = sentThisRun > 0;
+  if (consultStoredCount || sentThisRun === 0) {
     const { data: counts } = await db
       .from('broadcasts')
       .select('sent_count')
-      .eq('id', plan.broadcastId)
+      .eq('id', broadcastId)
       .maybeSingle();
-    broadcastSucceeded = (counts?.sent_count ?? sentCount) > 0;
+    succeeded = (counts?.sent_count ?? sentThisRun) > 0;
   }
 
   await db
     .from('broadcasts')
     .update({
-      status: broadcastSucceeded ? 'sent' : 'failed',
+      status: succeeded ? 'sent' : 'failed',
       updated_at: new Date().toISOString(),
     })
-    .eq('id', plan.broadcastId);
+    .eq('id', broadcastId);
 }
