@@ -645,6 +645,9 @@ function SortableHead({
                   aria-label="Select all contacts on this page"
                 />
               </TableHead>
+              <TableHead className="w-12 text-right text-muted-foreground">
+                {t('tableColumns.row')}
+              </TableHead>
               <SortableHead
                 column="name"
                 label={t('tableColumns.name')}
@@ -690,7 +693,7 @@ function SortableHead({
           <TableBody>
             {loading ? (
               <TableRow className="border-border">
-                <TableCell colSpan={8} className="text-center py-12">
+                <TableCell colSpan={9} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Loader2 className="size-6 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">{t('loading')}</p>
@@ -699,7 +702,7 @@ function SortableHead({
               </TableRow>
             ) : contacts.length === 0 ? (
               <TableRow className="border-border">
-                <TableCell colSpan={8} className="text-center py-12">
+                <TableCell colSpan={9} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <Users className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
@@ -724,7 +727,7 @@ function SortableHead({
                 </TableCell>
               </TableRow>
             ) : (
-              contacts.map((contact) => (
+              contacts.map((contact, index) => (
                 <TableRow
                   key={contact.id}
                   className="border-border hover:bg-muted/50 cursor-pointer"
@@ -736,6 +739,12 @@ function SortableHead({
                       onCheckedChange={() => toggleSelect(contact.id)}
                       aria-label={`Select ${contact.name || contact.phone}`}
                     />
+                  </TableCell>
+                  {/* Absolute position in the result set, not the page —
+                      row 1 of page 2 reads 26, so the number lines up
+                      with the "showing X–Y of Z" footer. */}
+                  <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    {page * PAGE_SIZE + index + 1}
                   </TableCell>
                   <TableCell className="text-foreground font-medium">
                     {contact.name || <span className="text-muted-foreground italic">{t('unnamed')}</span>}

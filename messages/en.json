@@ -292,6 +292,7 @@
       "clearSelection": "Clear",
       "deleteSelected": "Delete selected",
       "tableColumns": {
+        "row": "#",
         "name": "Name",
         "phone": "Phone",
         "email": "Email",
