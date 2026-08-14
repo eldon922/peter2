@@ -94,12 +94,6 @@ export function WhatsAppConfig() {
   const [verifyToken, setVerifyToken] = useState('');
   const [pin, setPin] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
-
-  // True once /register has succeeded on Meta's side (timestamp set
-  // in the row). When false, the saved config is metadata-only and
-  // Meta will silently drop every inbound event — that's the
-  // multi-number bug that prompted this work.
-  const isRegistered = Boolean(config?.registered_at);
   // Meta App ID / App Secret (migration 041). The id is not a secret so
   // it round-trips normally; the secret is write-only — the API never
   // returns it, and an empty box on save means "keep what's stored".
@@ -107,6 +101,12 @@ export function WhatsAppConfig() {
   const [appSecret, setAppSecret] = useState('');
   const [showAppSecret, setShowAppSecret] = useState(false);
   const hasStoredAppSecret = Boolean(config?.app_secret);
+
+  // True once /register has succeeded on Meta's side (timestamp set
+  // in the row). When false, the saved config is metadata-only and
+  // Meta will silently drop every inbound event — that's the
+  // multi-number bug that prompted this work.
+  const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
 
   const [verifyingRegistration, setVerifyingRegistration] = useState(false);
@@ -153,24 +153,24 @@ export function WhatsAppConfig() {
         setVerifyToken('');
         setPin('');
         setTokenEdited(false);
+        setAppId(data.app_id || '');
+        setAppSecret('');
       } else {
         setConfig(null);
         setPhoneNumberId('');
         setWabaId('');
         setAccessToken('');
         setVerifyToken('');
-        setAppId(data.app_id || '');
-        setAppSecret('');
         setPin('');
         setTokenEdited(false);
+        setAppId('');
+        setAppSecret('');
       }
       // Clear any stale probe result when reloading the row.
       setRegistrationProbe(null);
 
       // Then verify health via the API (decrypts token + pings Meta)
       if (data) {
-        setAppId('');
-        setAppSecret('');
         try {
           const res = await fetch('/api/whatsapp/config', { method: 'GET' });
           const payload = await res.json();
@@ -243,16 +243,16 @@ export function WhatsAppConfig() {
         // requires it on first save or when changing numbers; for a
         // simple token rotation, leaving it blank skips re-register.
         pin: pin.trim() || null,
+        app_id: appId.trim() || null,
+        // Blank leaves the stored secret untouched (same contract as the
+        // access token) rather than wiping it.
+        app_secret: appSecret.trim() || null,
       };
 
       if (tokenEdited && accessToken !== MASKED_TOKEN && accessToken.trim()) {
         payload.access_token = accessToken.trim();
       } else if (config) {
         // Existing config — reuse stored encrypted token by decrypting on the
-        app_id: appId.trim() || null,
-        // Blank leaves the stored secret untouched (same contract as the
-        // access token) rather than wiping it.
-        app_secret: appSecret.trim() || null,
         // server. But our POST handler requires an access_token to verify
         // with Meta. If the user didn't change the token, we need to signal
         // that. Simplest: require token re-entry if they're updating.
@@ -499,21 +499,28 @@ export function WhatsAppConfig() {
         {config && (
           <Alert
             className={
+              // No tinted fill on the registered state — the card sits on
+              // the panel surface and the border alone carries the status.
+              // The green is a darker one so it holds contrast in light
+              // mode, where emerald-200/400 washed out against the card.
               isRegistered
-                ? 'bg-emerald-950/30 border-emerald-700/50'
+                ? 'bg-transparent border-emerald-600/50'
                 : 'bg-amber-950/30 border-amber-700/50'
             }
           >
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 {isRegistered ? (
-                  <CheckCircle2 className="size-4 text-emerald-400" />
+                  <CheckCircle2 className="size-4 text-emerald-700 dark:text-emerald-500" />
                 ) : (
                   <AlertTriangle className="size-4 text-amber-400" />
                 )}
                 <AlertTitle
                   className={
-                    'mb-0 ' + (isRegistered ? 'text-emerald-200' : 'text-amber-200')
+                    'mb-0 ' +
+                    (isRegistered
+                      ? 'text-emerald-700 dark:text-emerald-500'
+                      : 'text-amber-200')
                   }
                 >
                   {isRegistered
@@ -562,7 +569,13 @@ export function WhatsAppConfig() {
               <div className="mt-3 rounded border border-border bg-card/60 px-3 py-2 space-y-1.5 text-[11px]">
                 <p className="font-medium text-foreground">
                   {t('diagnosticLastRun')}
-                  <span className={registrationProbe.live ? 'text-emerald-400' : 'text-amber-400'}>
+                  <span
+                    className={
+                      registrationProbe.live
+                        ? 'text-emerald-700 dark:text-emerald-500'
+                        : 'text-amber-400'
+                    }
+                  >
                     {registrationProbe.live ? t('live') : t('notLive')}
                   </span>
                 </p>
@@ -570,7 +583,7 @@ export function WhatsAppConfig() {
                   {Object.entries(registrationProbe.checks).map(([k, v]) => (
                     <li key={k} className="flex items-center gap-1.5">
                       {v === true ? (
-                        <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="size-3 shrink-0 text-emerald-700 dark:text-emerald-500" />
                       ) : v === false ? (
                         <XCircle className="size-3 text-red-400 shrink-0" />
                       ) : (
@@ -726,30 +739,6 @@ export function WhatsAppConfig() {
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t('saving')}
-              </>
-            ) : (
-              t('saveConfig')
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={testing || !config}
-            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            {testing ? (
-              <>
         {/* Meta app credentials — sits directly under the webhook card
             because that's what they're for: the App Secret is the key
             Meta signs every webhook delivery with, so an inbound event
