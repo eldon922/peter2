@@ -22,15 +22,21 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png']
 export async function ensureImageHeaderHandle(
   payload: TemplatePayload,
   accessToken: string,
+  /**
+   * The account's Meta App ID from `whatsapp_config` (migration 041).
+   * Falls back to the `META_APP_ID` env var when not supplied, so
+   * deployments configured before that migration keep working.
+   */
+  configuredAppId?: string | null,
 ): Promise<void> {
   if (payload.header_type !== 'image') return
   if (payload.header_handle) return // already have one
   if (!payload.header_media_url) return // validator already requires url-or-handle
 
-  const appId = process.env.META_APP_ID
+  const appId = configuredAppId || process.env.META_APP_ID
   if (!appId) {
     throw new Error(
-      'Image-header templates need META_APP_ID set (used for Meta’s Resumable Upload). Add it to your environment, or remove the image header.',
+      'Image-header templates need a Meta App ID (used for Meta’s Resumable Upload). Add it in Settings → WhatsApp, below the webhook configuration — or set the META_APP_ID environment variable — or remove the image header.',
     )
   }
 
