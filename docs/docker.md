@@ -53,6 +53,29 @@ docker build \
 docker run -d --env-file .env.local -e PORT=3000 -p 3000:3000 wacrm
 ```
 
+## Logs
+
+```bash
+docker compose logs -f app
+```
+
+The app writes one line per operational event to stdout, which is what
+the default `json-file` driver captures:
+
+```
+2026-08-14T09:12:33.041Z  INFO  [webhook] inbound message stored {"conversation":"…","type":"text"}
+2026-08-14T09:12:34.900Z  INFO  [send-message] outbound message sent {"wamid":"wamid.…"}
+2026-08-14T09:15:02.113Z  INFO  [broadcast] fan-out finished {"sent":42,"of":42,"ms":18402}
+```
+
+Verbosity is `LOG_LEVEL` (`debug` | `info` | `warn` | `error`, default
+`info`). Errors and warnings go to stderr, everything else to stdout —
+both land in `docker logs`.
+
+If the only output you ever see is the Next.js startup banner, check
+`LOG_LEVEL` isn't pinned to `warn`/`error`: at those levels a healthy
+deployment is genuinely silent, because nothing is going wrong.
+
 ## Notes
 
 - Database migrations under `supabase/` are **not** run by the
