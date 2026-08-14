@@ -50,6 +50,7 @@ import type {
 import { templateStatusConfig } from '@/lib/template-status';
 import {
   extractVariableIndices,
+  normalizeTemplateName,
   TEMPLATE_LIMITS,
 } from '@/lib/whatsapp/template-validators';
 
@@ -663,7 +664,13 @@ export function TemplateManager() {
               <Input
                 placeholder={t('namePlaceholder')}
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                // Normalised on every keystroke, the way Meta's own
+                // field behaves — spaces become underscores, capitals
+                // fold down, unsupported characters never land. Stops
+                // the form from accepting a name Meta will reject.
+                onChange={(e) =>
+                  setForm({ ...form, name: normalizeTemplateName(e.target.value) })
+                }
                 disabled={editingId !== null}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground disabled:opacity-60 disabled:cursor-not-allowed"
               />

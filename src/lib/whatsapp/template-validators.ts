@@ -32,6 +32,7 @@ export const TEMPLATE_LIMITS = {
   maxCopyCodeButtons: 1,
   /** Meta: lowercase a-z, digits, underscore. Up to 512 chars. */
   nameRegex: /^[a-z0-9_]{1,512}$/,
+  nameMaxLength: 512,
 } as const;
 
 export interface TemplatePayload {
@@ -55,6 +56,30 @@ export function validateTemplateName(name: string): void {
       'Template name must use only lowercase letters, digits, and underscores (1-512 chars).',
     );
   }
+}
+
+/**
+ * Coerce free typing into a name Meta will accept, the way Meta's own
+ * template-name field behaves: fold to lowercase, turn spaces and
+ * hyphens into underscores, and drop anything still outside
+ * `[a-z0-9_]`.
+ *
+ * Applied as the user types so the field can only ever hold a valid
+ * name — previously you could type "Order Update" and only find out it
+ * was rejected after submitting to Meta. `validateTemplateName` stays
+ * the authority server-side; this is the input affordance in front of
+ * it.
+ *
+ * Runs of separators collapse to a single underscore, but underscores
+ * the user types deliberately are preserved, so "order__update" is
+ * left alone.
+ */
+export function normalizeTemplateName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .slice(0, TEMPLATE_LIMITS.nameMaxLength);
 }
 
 /**
