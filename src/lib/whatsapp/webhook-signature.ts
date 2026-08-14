@@ -12,22 +12,29 @@ import crypto from 'node:crypto'
  *   https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verify-payloads
  *
  * Contract:
- *   `META_APP_SECRET` is **required**. If it's missing we fail closed —
- *   every request is rejected until the operator configures the
- *   secret. A previous version fell open with a warning log, which is
- *   unsafe for a public template: anyone who forgets the env var would
- *   be running a fully spoofable webhook.
+ *   An App Secret is **required**. If none is available we fail closed —
+ *   every request is rejected until the operator configures one. A
+ *   previous version fell open with a warning log, which is unsafe for a
+ *   public template: anyone who forgets to configure it would be running
+ *   a fully spoofable webhook.
+ *
+ *   `secret` is the account's own App Secret (from `whatsapp_config`,
+ *   migration 041) when the caller could resolve one. Passing nothing
+ *   falls back to the `META_APP_SECRET` env var, which is how
+ *   single-tenant deployments configured before that migration keep
+ *   working.
  */
 export function verifyMetaWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
+  secret?: string | null,
 ): boolean {
-  const secret = process.env.META_APP_SECRET
-  if (!secret) {
+  const appSecret = secret || process.env.META_APP_SECRET
+  if (!appSecret) {
     console.error(
-      '[webhook] META_APP_SECRET is not set — rejecting request. ' +
-        'Configure the env var (Meta → App Settings → Basic → App Secret) ' +
-        'to enable signature verification.',
+      '[webhook] no Meta App Secret available — rejecting request. ' +
+        'Add it in Settings → WhatsApp (below the webhook configuration), ' +
+        'or set the META_APP_SECRET env var, to enable signature verification.',
     )
     return false
   }
@@ -37,7 +44,7 @@ export function verifyMetaWebhookSignature(
 
   const expected =
     'sha256=' +
-    crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+    crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')
 
   const a = Buffer.from(signatureHeader)
   const b = Buffer.from(expected)

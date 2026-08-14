@@ -66,4 +66,45 @@ describe("verifyMetaWebhookSignature", () => {
       expect(verifyMetaWebhookSignature(body, header)).toBe(false);
     });
   });
+
+  // Per-account App Secret (migration 041): the caller resolves the
+  // secret from whatsapp_config and passes it in. The env var stays as
+  // the fallback so deployments predating the column keep working.
+  describe("per-account secret", () => {
+    const ACCOUNT_SECRET = "account-scoped-secret";
+
+    it("accepts a signature made with the passed-in secret", () => {
+      const body = '{"entry":[]}';
+      const header = signedHeader(body, ACCOUNT_SECRET);
+      expect(verifyMetaWebhookSignature(body, header, ACCOUNT_SECRET)).toBe(
+        true,
+      );
+    });
+
+    it("takes precedence over the env var", () => {
+      const body = '{"entry":[]}';
+      // Signed with the env secret, but this account is configured with a
+      // different one — it must NOT be accepted, or one tenant could sign
+      // deliveries for another.
+      const header = signedHeader(body, SECRET);
+      expect(verifyMetaWebhookSignature(body, header, ACCOUNT_SECRET)).toBe(
+        false,
+      );
+    });
+
+    it("falls back to the env var when none is passed", () => {
+      const body = '{"entry":[]}';
+      const header = signedHeader(body, SECRET);
+      expect(verifyMetaWebhookSignature(body, header, null)).toBe(true);
+      expect(verifyMetaWebhookSignature(body, header, undefined)).toBe(true);
+    });
+
+    it("falls back to the env var when the stored secret is an empty string", () => {
+      // A row with app_secret set to '' should behave like "not
+      // configured", not like a secret of zero length.
+      const body = '{"entry":[]}';
+      const header = signedHeader(body, SECRET);
+      expect(verifyMetaWebhookSignature(body, header, "")).toBe(true);
+    });
+  });
 });

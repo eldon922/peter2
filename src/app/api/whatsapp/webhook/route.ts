@@ -178,6 +178,64 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * Find the App Secret to verify this delivery against.
+ *
+ * Meta identifies the destination differently per event family:
+ * messaging events carry `value.metadata.phone_number_id`, while
+ * template-lifecycle events only carry the WABA id on `entry[].id`. Try
+ * both, in that order.
+ *
+ * Returns null when no configured secret is found, which leaves
+ * `verifyMetaWebhookSignature` to fall back to `META_APP_SECRET` — the
+ * pre-migration-041 arrangement, and still the right answer for a
+ * single-tenant deployment that never fills the field in.
+ */
+async function resolveAppSecret(body: {
+  entry?: WhatsAppWebhookEntry[]
+}): Promise<string | null> {
+  const phoneNumberIds = new Set<string>()
+  const wabaIds = new Set<string>()
+
+  for (const entry of body.entry ?? []) {
+    if (entry.id) wabaIds.add(entry.id)
+    for (const change of entry.changes ?? []) {
+      const id = change.value?.metadata?.phone_number_id
+      if (id) phoneNumberIds.add(id)
+    }
+  }
+
+  const lookups: Array<[column: string, values: string[]]> = [
+    ['phone_number_id', [...phoneNumberIds]],
+    ['waba_id', [...wabaIds]],
+  ]
+
+  for (const [column, values] of lookups) {
+    if (values.length === 0) continue
+    const { data } = await supabaseAdmin()
+      .from('whatsapp_config')
+      .select('app_secret')
+      .in(column, values)
+      .not('app_secret', 'is', null)
+      .limit(1)
+
+    const stored = data?.[0]?.app_secret
+    if (!stored) continue
+    try {
+      return decrypt(stored)
+    } catch {
+      // A row encrypted under a different ENCRYPTION_KEY. Don't let it
+      // mask the env fallback — the operator sees the reset banner in
+      // Settings for this same reason.
+      console.error(
+        '[webhook] stored app_secret could not be decrypted; falling back',
+      )
+    }
+  }
+
+  return null
+}
+
 // POST - Receive messages
 export async function POST(request: Request) {
   // Read raw body first so we can HMAC-verify the exact bytes Meta
@@ -185,19 +243,29 @@ export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256')
 
-  if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    // 401 (not 200) — we want Meta's delivery dashboard to show failures
-    // loudly if a misconfiguration causes signatures to stop matching,
-    // rather than silently eating events.
-    console.warn('[webhook] rejected request with invalid signature')
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-  }
-
   let body: { entry?: WhatsAppWebhookEntry[] }
   try {
     body = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  // Parsing before verifying looks backwards, but it is the only way to
+  // support a per-account App Secret: the payload has to be read to learn
+  // *which* account this delivery is for, and therefore which key to
+  // check the signature against. Nothing from the parsed body is trusted
+  // or persisted here — it is used solely to select a candidate secret,
+  // and the HMAC below still has to match the raw bytes before any of it
+  // is acted on. An attacker naming someone else's phone number just
+  // gets their signature checked against that account's key, and fails.
+  const appSecret = await resolveAppSecret(body)
+
+  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
+    // 401 (not 200) — we want Meta's delivery dashboard to show failures
+    // loudly if a misconfiguration causes signatures to stop matching,
+    // rather than silently eating events.
+    console.warn('[webhook] rejected request with invalid signature')
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   // Process AFTER the response so we ack Meta within their ~20s timeout
@@ -207,13 +275,6 @@ export async function POST(request: Request) {
   // This MUST use `after()` rather than a detached `processWebhook(body)`
   // promise: on serverless platforms (we run on Vercel) the function can
   // be frozen or terminated the moment the response is sent, so a floating
-  // promise's DB writes are not guaranteed to finish. That dropped a
-  // non-deterministic *subset* of inbound messages — contacts/conversations
-  // were created but the message insert never landed, leaving conversations
-  // that show in the inbox with an empty thread, and no logs to explain it
-  // (see issue #301). `after()` hands the callback to the runtime, which
-  // keeps the function alive until it resolves (within the route's
-  // maxDuration).
   after(async () => {
     try {
       await processWebhook(body)
@@ -221,6 +282,13 @@ export async function POST(request: Request) {
       console.error('Error processing webhook:', error)
     }
   })
+  // promise's DB writes are not guaranteed to finish. That dropped a
+  // non-deterministic *subset* of inbound messages — contacts/conversations
+  // were created but the message insert never landed, leaving conversations
+  // that show in the inbox with an empty thread, and no logs to explain it
+  // (see issue #301). `after()` hands the callback to the runtime, which
+  // keeps the function alive until it resolves (within the route's
+  // maxDuration).
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
 }
