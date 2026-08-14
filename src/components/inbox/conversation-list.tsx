@@ -489,13 +489,21 @@ function ConversationItem({
                 {conversation.unread_count}
               </span>
             )}
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                STATUS_COLORS[conversation.status]
-              )}
-              title={conversation.status}
-            />
+            {/* Only statuses that need attention get a dot. `open` is the
+                resting state of almost every row, so painting a dot there
+                made one appear against every conversation regardless of
+                whether anything had happened — which reads as an unread
+                marker that never clears. The unread badge beside it is
+                what actually tracks new messages. */}
+            {conversation.status !== "open" && (
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  STATUS_COLORS[conversation.status]
+                )}
+                title={conversation.status}
+              />
+            )}
           </div>
         </div>
       </div>
