@@ -122,6 +122,14 @@ interface MessageThreadProps {
    */
   contactPanelOpen?: boolean;
   onToggleContactPanel?: () => void;
+  /**
+   * Clicking the contact's name in the header opens their detail. Below
+   * xl that's a sheet (`onOpenContactSheet`) because the docked panel
+   * isn't rendered at those widths; at xl+ it reveals the panel
+   * (`onShowContactPanel`) rather than stacking a sheet on top of it.
+   */
+  onOpenContactSheet?: () => void;
+  onShowContactPanel?: () => void;
 }
 
 function formatDateSeparator(dateStr: string, t: ReturnType<typeof useTranslations>): string {
@@ -180,6 +188,8 @@ export function MessageThread({
   onRefresh,
   contactPanelOpen,
   onToggleContactPanel,
+  onOpenContactSheet,
+  onShowContactPanel,
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
   const tTimer = useTranslations("Inbox.sessionTimer");
@@ -880,6 +890,18 @@ export function MessageThread({
   }
 
   const displayName = contact.name || contact.phone;
+  // Rendered inside two differently-gated buttons in the header, so it
+  // lives here rather than being written out twice.
+  const contactIdentity = (
+    <>
+      <span className="block truncate text-sm font-semibold text-foreground">
+        {displayName}
+      </span>
+      <span className="block truncate text-xs text-muted-foreground">
+        {contact.phone}
+      </span>
+    </>
+  );
   const messageGroups = groupMessagesByDate(messages);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
@@ -982,7 +1004,10 @@ export function MessageThread({
               title={contactPanelOpen ? t("hideContact") : t("showContact")}
               aria-pressed={contactPanelOpen}
               className={cn(
-                "hidden h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted hover:text-foreground lg:inline-flex",
+                // xl, matching where the sidebar itself renders — below
+                // that it's collapsed automatically and a toggle would be
+                // a button that does nothing.
+                "hidden h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted hover:text-foreground xl:inline-flex",
                 contactPanelOpen ? "text-primary" : "text-muted-foreground",
               )}
             >

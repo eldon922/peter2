@@ -13,6 +13,7 @@ import { useRealtime } from "@/hooks/use-realtime";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
 import { ContactSidebar } from "@/components/inbox/contact-sidebar";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,27 @@ function InboxPageInner() {
       }
       return next;
     });
+  }, []);
+
+  /**
+   * Reveal the docked panel (xl+). Deliberately not a toggle: this is
+   * reached by clicking the contact's name, which reads as "show me this
+   * contact" — having it close the panel when it's already open would be
+   * a surprise. The header's own button is still the way to collapse it.
+   */
+  const handleShowContactPanel = useCallback(() => {
+    setContactPanelOpen(true);
+    try {
+      localStorage.setItem(CONTACT_PANEL_STORAGE_KEY, "true");
+    } catch {
+      // Persistence is best-effort; ignore storage failures.
+    }
+  }, []);
+
+  /** Below xl the panel isn't rendered, so the detail opens as a sheet. */
+  const [contactSheetOpen, setContactSheetOpen] = useState(false);
+  const handleOpenContactSheet = useCallback(() => {
+    setContactSheetOpen(true);
   }, []);
 
   // Fire the deep-link auto-select exactly once per URL — subsequent
@@ -580,7 +602,13 @@ function InboxPageInner() {
             thread can occupy the full width. Always visible on lg+. */}
         <div
           className={cn(
-            "flex h-full flex-1 lg:flex-none",
+            // `min-w-0` for the same reason the thread panel below needs
+            // it (#165): without it this flex item keeps the default
+            // `min-width: auto`, so a long contact name or message
+            // preview sets the panel's width from its own content and
+            // pushes the list wider than the screen instead of letting
+            // the rows' `truncate` do its job.
+            "flex h-full min-w-0 flex-1 lg:flex-none",
             hasActiveConv ? "hidden lg:flex" : "flex",
           )}
         >
@@ -623,19 +651,49 @@ function InboxPageInner() {
             onRefresh={handleManualRefresh}
             contactPanelOpen={contactPanelOpen}
             onToggleContactPanel={handleToggleContactPanel}
+            onOpenContactSheet={handleOpenContactSheet}
+            onShowContactPanel={handleShowContactPanel}
           />
         </div>
 
         {/* Right panel: Contact sidebar — desktop only, and only when the
             agent hasn't collapsed it via the thread-header toggle (#258).
-            On mobile it's always hidden (the `lg:block` below), so the
-            toggle — which is itself desktop-only — never affects it. */}
+            Below xl it never renders; the sheet after this block is how
+            the same detail is reached at those widths. */}
         {contactPanelOpen && (
-          <div className="hidden lg:block">
+          // Auto-collapses below xl. The list is 320px and this panel is
+          // 280px, so at lg the thread is left with ~424px — narrower
+          // than a large phone, for a panel that's reference material
+          // rather than the thing you came to do. Above xl there's ~680px
+          // to go around and it earns its place again. `contactPanelOpen`
+          // is untouched by this, so the manual toggle's setting is still
+          // there when the window is widened back out.
+          <div className="hidden xl:block">
             <ContactSidebar contact={activeContact} />
           </div>
         )}
       </div>
+
+      {/* Same contact detail, presented as a sheet — this is what the
+          name in the thread header opens below xl, where there's no room
+          to dock the panel. Rendered regardless of width but only ever
+          opened by that button, which is itself `xl:hidden`. */}
+      <Sheet open={contactSheetOpen} onOpenChange={setContactSheetOpen}>
+        <SheetContent
+          side="right"
+          className="w-full border-border bg-card p-0 sm:max-w-sm"
+        >
+          {/* The panel renders its own name + avatar, so the accessible
+              title is here for screen readers only. */}
+          <SheetTitle className="sr-only">
+            {activeContact?.name || activeContact?.phone || t("contactDetails")}
+          </SheetTitle>
+          <ContactSidebar
+            contact={activeContact}
+            className="w-full border-l-0"
+          />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
