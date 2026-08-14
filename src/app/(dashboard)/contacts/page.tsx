@@ -50,12 +50,12 @@ import {
   SlidersHorizontal,
   Filter,
   X,
-} from 'lucide-react';
   ArrowUp,
   ArrowDown,
   ChevronsUpDown,
-import { ContactForm } from '@/components/contacts/contact-form';
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
@@ -69,7 +69,6 @@ interface ContactWithTags extends Contact {
   tags?: Tag[];
 }
 
-export default function ContactsPage() {
 /**
  * Columns the table can sort by. Kept as a closed list because the value
  * is passed straight through to PostgREST's `.order()` and to the
@@ -134,6 +133,7 @@ function SortableHead({
   );
 }
 
+export default function ContactsPage() {
   const t = useTranslations('Contacts.page');
   const supabase = createClient();
   const canEdit = useCan('send-messages');
@@ -146,12 +146,12 @@ function SortableHead({
   const [totalCount, setTotalCount] = useState(0);
   // Tag filter — contacts shown must have ANY of these tags (OR).
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-
   // Sort is resolved server-side on both the plain query and the
   // tag-filter RPC, so it orders the whole result set rather than
   // shuffling whichever 25 rows the default ordering happened to pick.
   const [sortColumn, setSortColumn] = useState<SortColumn>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
   // Modals
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
@@ -226,6 +226,8 @@ function SortableHead({
         p_search: term || null,
         p_limit: PAGE_SIZE,
         p_offset: from,
+        p_sort_column: sortColumn,
+        p_sort_dir: sortDirection,
       });
       if (seq !== fetchSeq.current) return; // superseded by a newer fetch
       if (error) {
@@ -236,8 +238,6 @@ function SortableHead({
       const rows = (data ?? []) as { contact: Contact; total_count: number }[];
       contactRows = rows.map((r) => r.contact);
       count = rows.length > 0 ? Number(rows[0].total_count) : 0;
-        p_sort_column: sortColumn,
-        p_sort_dir: sortDirection,
     } else {
       let query = supabase
         .from('contacts')
@@ -492,6 +492,22 @@ function SortableHead({
     setPage(0);
   }
 
+  /**
+   * Click a header: first click sorts by that column, subsequent clicks
+   * flip the direction. New columns start descending for dates (newest
+   * first is what you want from a timestamp) and ascending for text.
+   */
+  function toggleSort(column: SortColumn) {
+    if (column === sortColumn) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === 'created_at' ? 'desc' : 'asc');
+    }
+    setPage(0);
+  }
+
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -502,7 +518,10 @@ function SortableHead({
             {totalCount > 0 ? t('subtitle', { count: totalCount }) : t('subtitleZero')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Four buttons in a nowrap row ran off the side of a phone.
+            Wrapping them keeps every action reachable; `justify-end`
+            keeps the wrapped rows aligned with the primary action. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {canEditSettings && (
             <Button
               variant="outline"
@@ -550,7 +569,10 @@ function SortableHead({
       {/* Search + tag filter */}
       <div className="space-y-2">
         <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative w-full max-w-sm">
+          {/* `max-w-sm` pinned the box to 384px and left the rest of the
+              row empty once the filters sat beside it. Let it take the
+              slack instead. */}
+          <div className="relative w-full sm:flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
               value={search}
@@ -569,22 +591,6 @@ function SortableHead({
             <PopoverTrigger
               render={
                 <Button
-  /**
-   * Click a header: first click sorts by that column, subsequent clicks
-   * flip the direction. New columns start descending for dates (newest
-   * first is what you want from a timestamp) and ascending for text.
-   */
-  function toggleSort(column: SortColumn) {
-    if (column === sortColumn) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection(column === 'created_at' ? 'desc' : 'asc');
-    }
-    setPage(0);
-  }
-
-
                   variant="outline"
                   className="border-border text-muted-foreground hover:bg-muted shrink-0"
                 />
