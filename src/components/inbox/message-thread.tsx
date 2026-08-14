@@ -239,6 +239,15 @@ export function MessageThread({
     };
   }, []);
 
+  // Viewers are read-only account-wide (`canSendMessages` is agent+), so
+  // they can't reply to, resolve, or otherwise act on a thread. Offering
+  // them in the assign picker only produces threads that look owned but
+  // that nobody is able to work — so keep them out of the list.
+  const assignableProfiles = useMemo(
+    () => profiles.filter((p) => p.account_role !== "viewer"),
+    [profiles],
+  );
+
   // 24-hour session timer
   const sessionInfo = useMemo(() => {
     if (!messages.length) return { expired: false, remaining: "" };
@@ -1007,24 +1016,28 @@ export function MessageThread({
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
-                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
+                "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted",
                 assignedAgentId ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <UserPlus className="h-3 w-3" />
-              <span className="hidden sm:inline">{assignLabel}</span>
-              <ChevronDown className="h-3 w-3" />
+              <UserPlus className="h-3 w-3 shrink-0" />
+              {/* Same reasoning as the session badge: the label only
+                  appears where the header has the width to spare. */}
+              <span className="hidden max-w-24 truncate sm:inline lg:hidden xl:inline">
+                {assignLabel}
+              </span>
+              <ChevronDown className="h-3 w-3 shrink-0" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
               className="border-border bg-popover"
             >
-              {profiles.length === 0 ? (
+              {assignableProfiles.length === 0 ? (
                 <DropdownMenuItem disabled className="text-sm text-muted-foreground">
                   {t("noTeammates")}
                 </DropdownMenuItem>
               ) : (
-                profiles.map((p) => {
+                assignableProfiles.map((p) => {
                   const isSelected = p.user_id === assignedAgentId;
                   const presence = getPresence(p.user_id);
                   return (
