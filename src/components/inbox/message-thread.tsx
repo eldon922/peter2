@@ -919,16 +919,41 @@ export function MessageThread({
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
             {displayName.charAt(0).toUpperCase()}
           </div>
+          {/* Name + number double as the way into the contact detail.
+              Which surface that opens depends on width, and the two are
+              split by CSS rather than a JS media query so there's no
+              hydration guess: below xl the panel isn't rendered at all,
+              so the click opens the sheet; at xl+ it reveals the docked
+              panel (a no-op when it's already showing). */}
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
-            <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
+            <button
+              type="button"
+              onClick={onOpenContactSheet}
+              title={t("showContact")}
+              className="block w-full min-w-0 rounded-md text-left transition-colors hover:text-primary xl:hidden"
+            >
+              {contactIdentity}
+            </button>
+            <button
+              type="button"
+              onClick={onShowContactPanel}
+              title={t("showContact")}
+              className="hidden w-full min-w-0 rounded-md text-left transition-colors hover:text-primary xl:block"
+            >
+              {contactIdentity}
+            </button>
           </div>
-          {/* Session timer badge — hidden on the narrowest phones so
-              the name + back arrow keep their room. */}
+          {/* Session timer badge. Shown only where the header actually
+              has room for it, which is not a straight "bigger screen"
+              rule: below sm there isn't any, and between lg and xl the
+              thread is sharing the viewport with the conversation list
+              and the contact sidebar, so it's narrower there than it is
+              on a plain tablet. `shrink-0` + `whitespace-nowrap` stop it
+              collapsing into two lines and doubling the header height. */}
           <Badge
             variant="outline"
             className={cn(
-              "ml-1 hidden gap-1 border-border text-[10px] sm:inline-flex sm:ml-2",
+              "ml-1 hidden shrink-0 gap-1 border-border text-[10px] whitespace-nowrap sm:ml-2 sm:inline-flex lg:hidden xl:inline-flex",
               sessionInfo.expired ? "text-red-400" : "text-primary"
             )}
           >
@@ -937,7 +962,11 @@ export function MessageThread({
           </Badge>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* `shrink-0`: without it the actions get squeezed before the
+            contact name does, and the dropdown labels wrap mid-word or
+            spill past the edge. The name is the thing that should give
+            way — it truncates cleanly, these don't. */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* Contact-panel toggle — desktop only. The contact sidebar
               eats a chunk of horizontal width that crowds the thread on
               smaller laptops; this lets agents reclaim it when they just
@@ -990,11 +1019,11 @@ export function MessageThread({
           {/* Status dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className={cn(
-                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
+                  "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted",
                   currentStatus?.color ?? "text-muted-foreground"
                 )}>
                 {currentStatus ? t(`status${currentStatus.label}`) : t("status")}
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3 shrink-0" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
