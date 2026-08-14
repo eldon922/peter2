@@ -92,26 +92,6 @@ const emptyForm: TemplateFormData = {
   buttons: [],
 };
 
-const COMMON_LANGUAGE_CODES = [
-  'en_US',
-  'en_GB',
-  'en',
-  'es',
-  'es_ES',
-  'es_MX',
-  'fr',
-  'fr_FR',
-  'de',
-  'it',
-  'pt_BR',
-  'pt_PT',
-  'nl',
-  'pl',
-  'ru',
-  'tr',
-  'lt',
-];
-
 function emptyButton(type: TemplateButton['type']): TemplateButton {
   switch (type) {
     case 'QUICK_REPLY':
@@ -524,8 +504,15 @@ export function TemplateManager() {
               <Card key={template.id}>
                 <CardContent className="flex items-start justify-between pt-4">
                   <div className="space-y-2 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-foreground">{template.name}</h3>
+                    {/* Name on its own line, chips underneath. Inline,
+                        a long template name pushed the badges into a
+                        ragged second column and they read as unrelated
+                        to it. */}
+                    <div className="space-y-1.5">
+                      <h3 className="break-words font-medium text-foreground">
+                        {template.name}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         className={`text-xs border ${categoryColors[template.category] || ''}`}
                       >
