@@ -186,6 +186,7 @@
       "typeMessagePlaceholder": "메시지를 입력하세요... (줄바꿈은 Shift+Enter)",
       "readOnlyTitle": "읽기 전용 — 현재 역할로는 메시지를 보낼 수 없습니다",
       "recording": "녹음 중… {current} / {max}",
+
       "cancel": "취소",
       "stopAndAttach": "중지하고 첨부",
       "attachMedia": "미디어 첨부",
@@ -1429,7 +1430,6 @@
       "urlSamplePlaceholder": "'{{1}}'의 예시 값 (URL에 변수가 있을 때 필요)",
       "phonePlaceholder": "+15551234567",
       "codePlaceholder": "예시 코드 (예: SUMMER20)",
-
       "cancel": "취소",
       "saving": "저장 중…",
       "submitting": "제출 중…",
