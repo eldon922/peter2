@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, Eye, ImageIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCheck, Eye, ImageIcon, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { bodyPlaceholderKeys, isValidHttpUrl } from '@/lib/broadcasts/variables';
 
@@ -407,11 +408,24 @@ export function Step3Personalize({
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           )}
         </div>
-        <div className="rounded-lg bg-[#0e1a12] p-3">
-          <div className="ml-auto max-w-[85%] rounded-lg bg-primary/30 px-3 py-2 shadow-sm">
-            <p className="whitespace-pre-wrap text-sm text-primary">
+        {/* WhatsApp's own surface colours rather than app tokens: the
+            point of this panel is to show what the recipient sees, and
+            the previous primary-tinted bubble on a near-black panel
+            matched neither of WhatsApp's themes. Hard-coded hexes are
+            deliberate — these track WhatsApp, not our palette.
+              light  chat #EFEAE2 · outgoing bubble #D9FDD3 · text #111B21
+              dark   chat #0B141A · outgoing bubble #005C4B · text #E9EDEF */}
+        <div className="rounded-lg bg-[#EFEAE2] p-3 dark:bg-[#0B141A]">
+          <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-sm bg-[#D9FDD3] px-3 py-2 shadow-sm dark:bg-[#005C4B]">
+            <p className="whitespace-pre-wrap break-words text-sm text-[#111B21] dark:text-[#E9EDEF]">
               {previewText}
             </p>
+            <div className="mt-1 flex items-center justify-end gap-1">
+              <span className="text-[10px] text-[#667781] dark:text-[#E9EDEF]/60">
+                {format(new Date(), 'HH:mm')}
+              </span>
+              <CheckCheck className="h-3 w-3 text-[#53BDEB]" />
+            </div>
           </div>
         </div>
       </div>
