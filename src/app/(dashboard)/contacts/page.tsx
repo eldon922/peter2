@@ -50,7 +50,11 @@ import {
   Filter,
   X,
 } from 'lucide-react';
+  ArrowUp,
+  ArrowDown,
+  ChevronsUpDown,
 import { ContactForm } from '@/components/contacts/contact-form';
+import { cn } from '@/lib/utils';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
@@ -65,6 +69,70 @@ interface ContactWithTags extends Contact {
 }
 
 export default function ContactsPage() {
+/**
+ * Columns the table can sort by. Kept as a closed list because the value
+ * is passed straight through to PostgREST's `.order()` and to the
+ * `filter_contacts_by_tags` RPC, whose own whitelist (migration 038)
+ * mirrors these names.
+ */
+type SortColumn = 'name' | 'phone' | 'email' | 'company' | 'created_at';
+type SortDirection = 'asc' | 'desc';
+
+/**
+ * Header cell that toggles the table's sort. Declared at module scope
+ * rather than inside the page: a component defined during render is a
+ * fresh type on every pass, so React unmounts and remounts the whole
+ * subtree each time state changes.
+ */
+function SortableHead({
+  column,
+  label,
+  sortColumn,
+  sortDirection,
+  onToggle,
+  className,
+}: {
+  column: SortColumn;
+  label: string;
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  onToggle: (column: SortColumn) => void;
+  className?: string;
+}) {
+  const active = sortColumn === column;
+  return (
+    // `aria-sort` belongs on the column header itself, not the button
+    // inside it — it is only defined for role="columnheader".
+    <TableHead
+      className={cn('text-muted-foreground', className)}
+      aria-sort={
+        active
+          ? sortDirection === 'asc'
+            ? 'ascending'
+            : 'descending'
+          : 'none'
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(column)}
+        className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+      >
+        {label}
+        {active ? (
+          sortDirection === 'asc' ? (
+            <ArrowUp className="size-3" />
+          ) : (
+            <ArrowDown className="size-3" />
+          )
+        ) : (
+          <ChevronsUpDown className="size-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
   const t = useTranslations('Contacts.page');
   const supabase = createClient();
   const canEdit = useCan('send-messages');
@@ -78,6 +146,11 @@ export default function ContactsPage() {
   // Tag filter — contacts shown must have ANY of these tags (OR).
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
+  // Sort is resolved server-side on both the plain query and the
+  // tag-filter RPC, so it orders the whole result set rather than
+  // shuffling whichever 25 rows the default ordering happened to pick.
+  const [sortColumn, setSortColumn] = useState<SortColumn>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   // Modals
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
@@ -153,11 +226,17 @@ export default function ContactsPage() {
       const rows = (data ?? []) as { contact: Contact; total_count: number }[];
       contactRows = rows.map((r) => r.contact);
       count = rows.length > 0 ? Number(rows[0].total_count) : 0;
+        p_sort_column: sortColumn,
+        p_sort_dir: sortDirection,
     } else {
       let query = supabase
         .from('contacts')
         .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
+        // `id` breaks ties so paging stays stable when the sort key
+        // repeats — without it, two contacts at the same company can
+        // swap places between page loads and one gets skipped.
+        .order(sortColumn, { ascending: sortDirection === 'asc', nullsFirst: false })
+        .order('id', { ascending: true })
         .range(from, to);
 
       if (term) {
@@ -207,7 +286,16 @@ export default function ContactsPage() {
 
     setContacts(enriched);
     setLoading(false);
-  }, [supabase, page, search, selectedTagIds, tagsMap, t]);
+  }, [
+    supabase,
+    page,
+    search,
+    selectedTagIds,
+    sortColumn,
+    sortDirection,
+    tagsMap,
+    t,
+  ]);
 
   // Load-once-on-mount-ish data fetches. Each setter inside runs
   // inside an async promise completion (Supabase await), not
@@ -404,6 +492,22 @@ export default function ContactsPage() {
             <PopoverTrigger
               render={
                 <Button
+  /**
+   * Click a header: first click sorts by that column, subsequent clicks
+   * flip the direction. New columns start descending for dates (newest
+   * first is what you want from a timestamp) and ascending for text.
+   */
+  function toggleSort(column: SortColumn) {
+    if (column === sortColumn) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(column);
+      setSortDirection(column === 'created_at' ? 'desc' : 'asc');
+    }
+    setPage(0);
+  }
+
+
                   variant="outline"
                   className="border-border text-muted-foreground hover:bg-muted shrink-0"
                 />
@@ -541,12 +645,45 @@ export default function ContactsPage() {
                   aria-label="Select all contacts on this page"
                 />
               </TableHead>
-              <TableHead className="text-muted-foreground">{t('tableColumns.name')}</TableHead>
-              <TableHead className="text-muted-foreground">{t('tableColumns.phone')}</TableHead>
-              <TableHead className="text-muted-foreground hidden md:table-cell">{t('tableColumns.email')}</TableHead>
-              <TableHead className="text-muted-foreground hidden lg:table-cell">{t('tableColumns.company')}</TableHead>
+              <SortableHead
+                column="name"
+                label={t('tableColumns.name')}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggle={toggleSort}
+              />
+              <SortableHead
+                column="phone"
+                label={t('tableColumns.phone')}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggle={toggleSort}
+              />
+              <SortableHead
+                column="email"
+                label={t('tableColumns.email')}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggle={toggleSort}
+                className="hidden md:table-cell"
+              />
+              <SortableHead
+                column="company"
+                label={t('tableColumns.company')}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggle={toggleSort}
+                className="hidden lg:table-cell"
+              />
               <TableHead className="text-muted-foreground hidden md:table-cell">{t('tableColumns.tags')}</TableHead>
-              <TableHead className="text-muted-foreground hidden lg:table-cell">{t('tableColumns.createdAt')}</TableHead>
+              <SortableHead
+                column="created_at"
+                label={t('tableColumns.createdAt')}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggle={toggleSort}
+                className="hidden lg:table-cell"
+              />
               <TableHead className="text-muted-foreground w-12" />
             </TableRow>
           </TableHeader>
