@@ -162,8 +162,16 @@ function downloadBlob(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Matches the broadcasts list page, which polls on the same signal. */
+/** Cadence while a fan-out is live. Matches the broadcasts list page. */
 const POLL_INTERVAL_MS = 5000;
+
+/**
+ * Cadence once the fan-out is done. The page keeps polling either way —
+ * see the effect below — but at a sixth the rate, because the recipients
+ * query joins every row of the broadcast and a tab left open on a
+ * 10k-recipient send shouldn't re-pull all of it every five seconds.
+ */
+const IDLE_POLL_INTERVAL_MS = 30000;
 
 export default function BroadcastDetailPage() {
   const params = useParams();
@@ -269,14 +277,25 @@ export default function BroadcastDetailPage() {
     refresh();
   }, [broadcastId]);
 
-  // Poll while a send or retry is fanning out so the funnel and the
-  // recipient rows advance live. Same pattern (and interval) as the
-  // list page, including pausing while the tab is hidden.
+  // Poll for as long as this page is open, not just while the fan-out is
+  // running. The send is only the first half of a broadcast's life:
+  // delivered / read / replied all land later, by webhook, long after
+  // `status` has flipped off 'sending'. Gating the timer on `isSending`
+  // froze the funnel and the recipient rows the moment the last message
+  // went out, so every number after "Sent" sat stale until a manual
+  // reload — the page looked finished while the data behind it was still
+  // moving.
+  //
+  // `isSending` now selects the cadence rather than switching polling on
+  // and off, and the timer still pauses while the tab is hidden, so a
+  // backgrounded tab costs nothing.
   const isSending = broadcast?.status === 'sending';
   useEffect(() => {
+    const intervalMs = isSending ? POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
+
     function startPolling() {
       if (pollTimer.current) return;
-      pollTimer.current = setInterval(refresh, POLL_INTERVAL_MS);
+      pollTimer.current = setInterval(refresh, intervalMs);
     }
     function stopPolling() {
       if (!pollTimer.current) return;
