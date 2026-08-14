@@ -1350,7 +1350,8 @@
         "blue": "파랑",
         "violet": "보라",
         "pink": "분홍"
-      }
+      },
+      "readOnly": "관리자와 계정 소유자만 태그를 추가하거나 삭제할 수 있습니다."
     },
     "templates": {
       "title": "메시지 템플릿",
@@ -1533,6 +1534,7 @@
       "step4_4": "여기서 설정한 것과 동일한 <strong>인증 토큰</strong>을 입력",
       "step4_5": "\"messages\" 웹훅 필드를 구독",
       "metaDocs": "Meta WhatsApp API 문서",
+      "readOnly": "관리자와 계정 소유자만 WhatsApp 연결을 변경할 수 있습니다.",
       "metaAppTitle": "Meta 앱 자격 증명",
       "metaAppDesc": "Meta for Developers → App Settings → Basic에서 확인할 수 있습니다. App Secret은 모든 수신 웹훅에 서명하며, 없으면 수신이 거부됩니다.",
       "appId": "App ID",

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Loader2, Plus, Tag as TagIcon, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useCan } from '@/hooks/use-can';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -46,6 +47,11 @@ export function TagManager() {
   const t = useTranslations('Settings.tagsAndFields');
   const supabase = createClient();
   const { user, accountId, loading: authLoading } = useAuth();
+  // Tags are settings-class data: `tags_insert` / `tags_update` /
+  // `tags_delete` all require admin+, so agents and viewers can only read
+  // them. Without this gate the create row and the per-tag delete button
+  // rendered for everyone and failed against RLS on click.
+  const canEdit = useCan('edit-settings');
 
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -185,14 +191,16 @@ export function TagManager() {
                       style={{ backgroundColor: tag.color }}
                     />
                     {tag.name}
-                    <button
-                      type="button"
-                      onClick={() => confirmDelete(tag)}
-                      aria-label={t('deleteAria', { name: tag.name })}
-                      className="ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
-                    >
-                      <X className="size-3" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => confirmDelete(tag)}
+                        aria-label={t('deleteAria', { name: tag.name })}
+                        className="ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:bg-black/10 hover:opacity-100 dark:hover:bg-white/10"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -202,7 +210,12 @@ export function TagManager() {
               </p>
             )}
 
-            {/* Inline create row */}
+            {/* Inline create row — admin+ only, matching `tags_insert`. */}
+            {!canEdit ? (
+              <p className="text-xs text-muted-foreground">
+                {t('readOnly')}
+              </p>
+            ) : (
             <div className="flex flex-wrap items-center gap-2.5">
               <Input
                 placeholder={t('placeholder')}
@@ -247,6 +260,7 @@ export function TagManager() {
                 {t('addTag')}
               </Button>
             </div>
+            )}
           </>
         )}
       </CardContent>

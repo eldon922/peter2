@@ -475,11 +475,15 @@ export function AiConfig() {
                   <SelectItem value={HANDOFF_QUEUE}>
                     {t('handoffQueue')}
                   </SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.user_id} value={m.user_id}>
-                      {memberLabel(m)}
-                    </SelectItem>
-                  ))}
+                  {/* Viewers are read-only, so handing a thread to one
+                      would strand it — keep them out of the picker. */}
+                  {members
+                    .filter((m) => m.role !== 'viewer')
+                    .map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        {memberLabel(m)}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

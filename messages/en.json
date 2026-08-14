@@ -1334,6 +1334,7 @@
       "failedToDeleteTag": "Failed to delete tag",
       "deleteAria": "Delete {name}",
       "noTags": "No tags yet — create your first one below.",
+      "readOnly": "Only admins and the account owner can add or remove tags.",
       "placeholder": "e.g. Newsletter",
       "useColor": "Use {color}",
       "addTag": "Add tag",
@@ -1471,6 +1472,7 @@
     "whatsapp": {
       "title": "WhatsApp connection",
       "description": "Connect your Meta WhatsApp Business API. Credentials, webhook, and setup steps all live here.",
+      "readOnly": "Only admins and the account owner can change the WhatsApp connection.",
       "tokenCorrupted": "Stored token can't be decrypted",
       "resetting": "Resetting...",
       "resetConfig": "Reset Configuration",

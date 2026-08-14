@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useCan } from '@/hooks/use-can';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +65,11 @@ export function WhatsAppConfig() {
   // joined an account sees the inviter's saved config without
   // having to re-enter anything.
   const { user, accountId, loading: authLoading, profileLoading } = useAuth();
+  // `whatsapp_config` insert/update/delete are all admin+ at the RLS
+  // layer, and the /api/whatsapp/config route enforces the same. Agents
+  // and viewers get the panel read-only rather than a form whose every
+  // button 403s.
+  const canEdit = useCan('edit-settings');
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -601,6 +607,7 @@ export function WhatsAppConfig() {
                 placeholder="e.g. 100234567890123"
                 value={phoneNumberId}
                 onChange={(e) => setPhoneNumberId(e.target.value)}
+                disabled={!canEdit}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -611,6 +618,7 @@ export function WhatsAppConfig() {
                 placeholder="e.g. 100234567890456"
                 value={wabaId}
                 onChange={(e) => setWabaId(e.target.value)}
+                disabled={!canEdit}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -632,6 +640,7 @@ export function WhatsAppConfig() {
                       setTokenEdited(true);
                     }
                   }}
+                  disabled={!canEdit}
                   className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
                 />
                 <button
@@ -655,6 +664,7 @@ export function WhatsAppConfig() {
                 placeholder={t('webhookVerifyTokenPlaceholder')}
                 value={verifyToken}
                 onChange={(e) => setVerifyToken(e.target.value)}
+                disabled={!canEdit}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
               />
               <p className="text-xs text-muted-foreground">
@@ -676,6 +686,7 @@ export function WhatsAppConfig() {
                 onChange={(e) =>
                   setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
                 }
+                disabled={!canEdit}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
               />
               <p className="text-xs text-muted-foreground leading-relaxed">
@@ -799,6 +810,32 @@ export function WhatsAppConfig() {
           </CardContent>
         </Card>
 
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3">
+          {canEdit && (
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {t('saving')}
+              </>
+            ) : (
+              t('saveConfig')
+            )}
+          </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={handleTestConnection}
+            disabled={testing || !config}
+            className="border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+          >
+            {testing ? (
+              <>
                 <Loader2 className="size-4 animate-spin" />
                 {t('testing')}
               </>
@@ -809,7 +846,7 @@ export function WhatsAppConfig() {
               </>
             )}
           </Button>
-          {config && (
+          {config && canEdit && (
             <Button
               variant="outline"
               onClick={handleReset}
@@ -830,6 +867,12 @@ export function WhatsAppConfig() {
             </Button>
           )}
         </div>
+
+        {!canEdit && (
+          <p className="text-xs text-muted-foreground">
+            {t('readOnly')}
+          </p>
+        )}
       </div>
 
       {/* Setup Instructions Sidebar */}

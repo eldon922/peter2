@@ -412,7 +412,10 @@ function AgentSelect({
   onChange: (v: string) => void
   t: ReturnType<typeof useTranslations>
 }) {
-  const { members } = useResources()
+  const { members: allMembers } = useResources()
+  // Viewers are read-only account-wide, so a thread assigned to one can
+  // never be worked. Keep them out of every assignee picker.
+  const members = allMembers.filter((m) => m.role !== "viewer")
   if (members.length === 0) {
     return (
       <Input
