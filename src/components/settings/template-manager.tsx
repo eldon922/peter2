@@ -53,6 +53,7 @@ import {
   normalizeTemplateName,
   TEMPLATE_LIMITS,
 } from '@/lib/whatsapp/template-validators';
+import { TEMPLATE_LANGUAGES } from '@/lib/whatsapp/template-languages';
 
 const CATEGORIES = ['Marketing', 'Utility', 'Authentication'] as const;
 type HeaderFormat = 'none' | 'text' | 'image' | 'video' | 'document';
@@ -540,6 +541,7 @@ export function TemplateManager() {
                           {template.quality_score}
                         </span>
                       )}
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-2">
                       {template.body_text}
@@ -710,8 +712,10 @@ export function TemplateManager() {
                   className="bg-muted border-border text-foreground placeholder:text-muted-foreground disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <datalist id="template-language-codes">
-                  {COMMON_LANGUAGE_CODES.map((code) => (
-                    <option key={code} value={code} />
+                  {TEMPLATE_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.label}
+                    </option>
                   ))}
                 </datalist>
                 <p className="text-[11px] text-muted-foreground">
