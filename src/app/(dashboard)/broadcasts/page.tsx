@@ -29,11 +29,6 @@ import { useTranslations } from 'next-intl';
  */
 const POLL_INTERVAL_MS = 5_000;
 
-function percent(numerator: number, denominator: number): number {
-  if (!denominator) return 0;
-  return Math.round((numerator / denominator) * 100);
-}
-
 function RateCell({
   value,
   total,
@@ -223,14 +218,19 @@ export default function BroadcastsPage() {
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">{t('table.name')}</TableHead>
+                {/* `w-full` hands this column all the space the others
+                    don't claim. It matters most below sm, where Name and
+                    Status are the only two columns left and the name
+                    would otherwise sit in a narrow strip with the rest of
+                    the row empty. */}
+                <TableHead className="w-full text-muted-foreground">{t('table.name')}</TableHead>
                 <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.template')}</TableHead>
                 <TableHead className="hidden text-right text-muted-foreground sm:table-cell">
                   {t('table.recipients')}
                 </TableHead>
                 <TableHead className="hidden text-muted-foreground lg:table-cell">{t('table.delivery')}</TableHead>
                 <TableHead className="hidden text-muted-foreground lg:table-cell">{t('table.read')}</TableHead>
-                <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
+                <TableHead className="text-right text-muted-foreground sm:text-left">{t('table.status')}</TableHead>
                 <TableHead className="hidden text-muted-foreground sm:table-cell">{t('table.date')}</TableHead>
               </TableRow>
             </TableHeader>
@@ -243,10 +243,19 @@ export default function BroadcastsPage() {
                     className="cursor-pointer border-border hover:bg-muted/50"
                     onClick={() => router.push(`/broadcasts/${broadcast.id}`)}
                   >
-                    <TableCell className="font-medium text-foreground">
+                    {/* Names are free text and routinely long enough to
+                        set the table's width by themselves, which pushed
+                        the whole row off a phone screen. Cap and ellipse
+                        them; the full name is the page you land on. */}
+                    {/* `w-full max-w-0` is the table-layout idiom for a
+                        cell that takes the leftover width *and* still
+                        truncates: without `max-w-0` the auto layout sizes
+                        the column to the longest name and `truncate`
+                        never engages. */}
+                    <TableCell className="w-full max-w-0 truncate font-medium text-foreground">
                       {broadcast.name}
                     </TableCell>
-                    <TableCell className="hidden text-muted-foreground md:table-cell">
+                    <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
                       {broadcast.template_name}
                     </TableCell>
                     <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
@@ -266,7 +275,7 @@ export default function BroadcastsPage() {
                         color="bg-blue-500"
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right sm:text-left">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`}
                       >

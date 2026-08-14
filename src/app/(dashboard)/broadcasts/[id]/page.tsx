@@ -352,25 +352,27 @@ export default function BroadcastDetailPage() {
       pollTimer.current = null;
     }
     function handleVisibilityChange() {
-      if (!isSending) return;
       if (document.visibilityState === 'hidden') {
         stopPolling();
       } else {
+        // Catch up immediately on the way back, then resume the timer —
+        // otherwise a tab hidden for an hour shows an hour-old funnel
+        // for up to another full interval.
         refresh();
         startPolling();
       }
     }
 
-    if (isSending && document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible') {
       startPolling();
-    } else {
-      stopPolling();
     }
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // Re-runs when the send finishes: the cleanup tears down the 5s timer
+    // and the next pass starts a 30s one.
   }, [isSending]);
 
   const filteredRecipients = useMemo(
@@ -530,6 +532,7 @@ export default function BroadcastDetailPage() {
   }
 
   const status = getBroadcastStatus(broadcast.status);
+  const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
 
   // Same 0–100 shape as the wizard's Step4ScheduleSend "Processing"
   // overlay, driven by polling instead of a client-tracked counter
@@ -679,6 +682,7 @@ export default function BroadcastDetailPage() {
             {t('delete')}
           </Button>
         )}
+        </div>
         </div>
       </div>
 
@@ -918,20 +922,27 @@ export default function BroadcastDetailPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
+                  {/* Seven columns do not fit a phone. Rather than leave
+                      it all to horizontal scroll, secondary columns drop
+                      out on the same breakpoint ladder the broadcasts
+                      list uses — and the two that carry information you
+                      can't act without, the number dialled and the
+                      failure reason, reappear stacked inside the cells
+                      that stay. */}
                   <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.phone')}</TableHead>
+                  <TableHead className="hidden text-muted-foreground sm:table-cell">{t('table.phone')}</TableHead>
                   <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
                   {/* Cells here only ever hold "×2", so the word
                       "Attempts" was setting this column's width by
                       itself. Icon + tooltip keeps it narrow. */}
-                  <TableHead className="text-muted-foreground">
+                  <TableHead className="hidden text-muted-foreground lg:table-cell">
                     <span className="inline-flex" title={t('table.attempts')}>
                       <RotateCw className="h-3.5 w-3.5" aria-hidden />
                       <span className="sr-only">{t('table.attempts')}</span>
                     </span>
                   </TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.timestamps')}</TableHead>
-                  <TableHead className="text-muted-foreground">{t('table.error')}</TableHead>
+                  <TableHead className="hidden text-muted-foreground lg:table-cell">{t('table.timestamps')}</TableHead>
+                  <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.error')}</TableHead>
                   <TableHead className="text-muted-foreground" />
                 </TableRow>
               </TableHeader>
@@ -1009,11 +1020,36 @@ export default function BroadcastDetailPage() {
                         >
                           {tStatus(rStatus.label)}
                         </span>
+                        {/* The error column is hidden below md, and
+                            "Failed" with no reason is not actionable. */}
+                        {errorText && (
+                          <span className="mt-1 block max-w-[14rem] whitespace-normal break-words text-xs text-red-400 md:hidden">
+                            {errorText}
+                          </span>
+                        )}
+                        {/* Timestamps get their own column only at lg, so
+                            restate them here below that. Failed rows are
+                            excluded: the row never reached a step worth
+                            timing, and the error above is what you act
+                            on — so the two never stack up together. */}
+                        {recipient.status !== 'failed' && stamps.length > 0 && (
+                          <span className="mt-1 block lg:hidden">
+                            {stamps.map(({ label, value, tint }) => (
+                              <span
+                                key={label}
+                                className={`block whitespace-nowrap text-xs ${tint}`}
+                              >
+                                <span className="opacity-60">{label}</span>{' '}
+                                {value}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
                         {attempts > 1 ? `×${attempts}` : '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
                         {stamps.length === 0
                           ? '-'
                           : stamps.map(({ label, value, tint }) => (
@@ -1032,11 +1068,11 @@ export default function BroadcastDetailPage() {
                           error is unactionable, and `break-words` handles
                           the long unspaced codes Meta returns. Overrides
                           TableCell's default `whitespace-nowrap`. */}
-                      <TableCell className="max-w-xs whitespace-normal break-words text-xs text-red-400">
+                      <TableCell className="hidden max-w-xs whitespace-normal break-words text-xs text-red-400 md:table-cell">
                         {/* `|| '-'`, not `?? '-'`: an empty-string
                             error_message is as unhelpful as a null one
                             and used to render as a blank cell. */}
-                        {recipient.error_message?.trim() || '-'}
+                        {errorText || '-'}
                       </TableCell>
                       <TableCell>
                         {recipient.status === 'failed' && (
