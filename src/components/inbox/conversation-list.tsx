@@ -187,7 +187,21 @@ export function ConversationList({
       });
     }
 
-    return result;
+    // Anything waiting on a reply floats to the top; within each group the
+    // most recent message wins. The query already returns rows in
+    // `last_message_at DESC`, but that alone buries an unread thread the
+    // moment a busier conversation gets a newer message. Sort a copy —
+    // `result` can still be the `conversations` array itself when no
+    // filter narrowed it, and sorting in place would mutate the parent's
+    // state.
+    return [...result].sort((a, b) => {
+      const unreadDelta =
+        (b.unread_count > 0 ? 1 : 0) - (a.unread_count > 0 ? 1 : 0);
+      if (unreadDelta !== 0) return unreadDelta;
+      const at = a.last_message_at ? Date.parse(a.last_message_at) : 0;
+      const bt = b.last_message_at ? Date.parse(b.last_message_at) : 0;
+      return bt - at;
+    });
   }, [conversations, filter, search, selectedTagIds, selectedCompany]);
 
   const toggleTag = useCallback((id: string) => {
