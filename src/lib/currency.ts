@@ -23,26 +23,90 @@ export interface CurrencyOption {
 }
 
 /**
- * The currencies offered in pickers. Codes must be valid ISO-4217 so
- * `Intl.NumberFormat` renders the right symbol/grouping. Extend this
- * list to offer more — nothing else needs to change.
+ * The currencies offered in pickers — Meta's supported set, ordered by
+ * code so the native `<select>`s stay scannable.
+ *
+ * Source: developers.facebook.com/docs/marketing-api/currencies, which
+ * is the list Meta accepts across its business surfaces. Five entries
+ * from that page are deliberately NOT here, because they would be
+ * offered to someone choosing what to denominate a deal in:
+ *
+ *   FBZ           Facebook Credits — a retired virtual currency, not
+ *                 ISO-4217 at all.
+ *   LVL, LTL,     Withdrawn when Latvia, Lithuania and Slovakia
+ *   SKK           adopted the euro.
+ *   VEF           Superseded by VES, which is on the list.
+ *
+ * Everything kept is a code the runtime recognises
+ * (`Intl.supportedValuesOf("currency")`), so `Intl.NumberFormat` renders
+ * a real symbol and the right grouping — asserted by currency.test.ts.
+ *
+ * `symbol` is used only by {@link formatCurrencyShort}. Where a currency
+ * has no distinct short symbol, it is the code plus a space ("CHF 1.2k"),
+ * matching the unknown-currency fallback.
  */
 export const CURRENCIES: CurrencyOption[] = [
-  { code: "USD", label: "US Dollar", symbol: "$" },
+  { code: "AED", label: "UAE Dirham", symbol: "د.إ" },
+  { code: "ARS", label: "Argentine Peso", symbol: "$" },
+  { code: "AUD", label: "Australian Dollar", symbol: "A$" },
+  { code: "BDT", label: "Bangladeshi Taka", symbol: "৳" },
+  { code: "BGN", label: "Bulgarian Lev", symbol: "BGN " },
+  { code: "BHD", label: "Bahraini Dinar", symbol: "BHD " },
+  { code: "BOB", label: "Bolivian Boliviano", symbol: "Bs" },
+  { code: "BRL", label: "Brazilian Real", symbol: "R$" },
+  { code: "CAD", label: "Canadian Dollar", symbol: "C$" },
+  { code: "CHF", label: "Swiss Franc", symbol: "CHF " },
+  { code: "CLP", label: "Chilean Peso", symbol: "$" },
+  { code: "CNY", label: "Chinese Yuan", symbol: "¥" },
+  { code: "COP", label: "Colombian Peso", symbol: "$" },
+  { code: "CRC", label: "Costa Rican Colón", symbol: "₡" },
+  { code: "CZK", label: "Czech Koruna", symbol: "Kč" },
+  { code: "DKK", label: "Danish Krone", symbol: "kr" },
+  { code: "DZD", label: "Algerian Dinar", symbol: "DZD " },
+  { code: "EGP", label: "Egyptian Pound", symbol: "E£" },
   { code: "EUR", label: "Euro", symbol: "€" },
   { code: "GBP", label: "British Pound", symbol: "£" },
+  { code: "GTQ", label: "Guatemalan Quetzal", symbol: "Q" },
+  { code: "HKD", label: "Hong Kong Dollar", symbol: "$" },
+  { code: "HNL", label: "Honduran Lempira", symbol: "L" },
+  { code: "HRK", label: "Croatian Kuna", symbol: "kn" },
+  { code: "HUF", label: "Hungarian Forint", symbol: "Ft" },
+  { code: "IDR", label: "Indonesian Rupiah", symbol: "Rp" },
+  { code: "ILS", label: "Israeli New Shekel", symbol: "₪" },
   { code: "INR", label: "Indian Rupee", symbol: "₹" },
-  { code: "AUD", label: "Australian Dollar", symbol: "A$" },
-  { code: "CAD", label: "Canadian Dollar", symbol: "C$" },
-  { code: "BRL", label: "Brazilian Real", symbol: "R$" },
+  { code: "ISK", label: "Icelandic Króna", symbol: "kr" },
+  { code: "JOD", label: "Jordanian Dinar", symbol: "JOD " },
   { code: "JPY", label: "Japanese Yen", symbol: "¥" },
-  { code: "CNY", label: "Chinese Yuan", symbol: "¥" },
-  { code: "AED", label: "UAE Dirham", symbol: "د.إ" },
-  { code: "ZAR", label: "South African Rand", symbol: "R" },
-  { code: "NGN", label: "Nigerian Naira", symbol: "₦" },
-  { code: "SGD", label: "Singapore Dollar", symbol: "S$" },
+  { code: "KES", label: "Kenyan Shilling", symbol: "KES " },
+  { code: "KRW", label: "South Korean Won", symbol: "₩" },
+  { code: "MOP", label: "Macanese Pataca", symbol: "MOP " },
   { code: "MXN", label: "Mexican Peso", symbol: "$" },
-  { code: "COP", label: "Colombian Peso", symbol: "$" },
+  { code: "MYR", label: "Malaysian Ringgit", symbol: "RM" },
+  { code: "NGN", label: "Nigerian Naira", symbol: "₦" },
+  { code: "NIO", label: "Nicaraguan Córdoba", symbol: "C$" },
+  { code: "NOK", label: "Norwegian Krone", symbol: "kr" },
+  { code: "NZD", label: "New Zealand Dollar", symbol: "$" },
+  { code: "PEN", label: "Peruvian Sol", symbol: "PEN " },
+  { code: "PHP", label: "Philippine Peso", symbol: "₱" },
+  { code: "PKR", label: "Pakistani Rupee", symbol: "Rs" },
+  { code: "PLN", label: "Polish Zloty", symbol: "zł" },
+  { code: "PYG", label: "Paraguayan Guarani", symbol: "₲" },
+  { code: "QAR", label: "Qatari Riyal", symbol: "QAR " },
+  { code: "RON", label: "Romanian Leu", symbol: "lei" },
+  { code: "RSD", label: "Serbian Dinar", symbol: "RSD " },
+  { code: "RUB", label: "Russian Ruble", symbol: "₽" },
+  { code: "SAR", label: "Saudi Riyal", symbol: "SAR " },
+  { code: "SEK", label: "Swedish Krona", symbol: "kr" },
+  { code: "SGD", label: "Singapore Dollar", symbol: "S$" },
+  { code: "THB", label: "Thai Baht", symbol: "฿" },
+  { code: "TRY", label: "Turkish Lira", symbol: "₺" },
+  { code: "TWD", label: "New Taiwan Dollar", symbol: "$" },
+  { code: "UAH", label: "Ukrainian Hryvnia", symbol: "₴" },
+  { code: "USD", label: "US Dollar", symbol: "$" },
+  { code: "UYU", label: "Uruguayan Peso", symbol: "$" },
+  { code: "VES", label: "Venezuelan Bolívar", symbol: "VES " },
+  { code: "VND", label: "Vietnamese Dong", symbol: "₫" },
+  { code: "ZAR", label: "South African Rand", symbol: "R" },
 ];
 
 /**

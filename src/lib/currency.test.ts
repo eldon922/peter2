@@ -63,3 +63,42 @@ describe("formatCurrencyShort", () => {
     expect(formatCurrencyShort(1_000, "ZZZ")).toBe("ZZZ 1.0k");
   });
 });
+
+describe("CURRENCIES catalogue", () => {
+  it("has no duplicate codes", () => {
+    const seen = new Set<string>();
+    const dupes = CURRENCIES.filter((c) => !seen.add(c.code)).map((c) => c.code);
+    expect(dupes).toEqual([]);
+  });
+
+  it("offers only codes the runtime recognises as ISO-4217", () => {
+    // Intl.NumberFormat accepts ANY three ASCII letters — it never
+    // throws on a retired or invented code, it just prints it verbatim.
+    // So a bad entry would reach the picker looking legitimate and
+    // render as "FBZ 1,234" instead of money. This is the check that
+    // actually catches it. Meta's own currency page still lists
+    // Facebook Credits and three pre-euro currencies; they are excluded
+    // in currency.ts for exactly this reason.
+    const known = new Set(Intl.supportedValuesOf("currency"));
+    const unknown = CURRENCIES.filter((c) => !known.has(c.code)).map(
+      (c) => c.code,
+    );
+    expect(unknown).toEqual([]);
+  });
+
+  it("is ordered by code", () => {
+    const codes = CURRENCIES.map((c) => c.code);
+    expect(codes).toEqual([...codes].sort());
+  });
+
+  it("includes the app-wide default", () => {
+    expect(CURRENCIES.map((c) => c.code)).toContain(DEFAULT_CURRENCY);
+  });
+
+  it("gives every entry a label and a symbol", () => {
+    const incomplete = CURRENCIES.filter(
+      (c) => !c.label.trim() || !c.symbol.trim(),
+    ).map((c) => c.code);
+    expect(incomplete).toEqual([]);
+  });
+});
