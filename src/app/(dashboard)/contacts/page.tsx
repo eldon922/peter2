@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -166,6 +167,15 @@ function SortableHead({
   // Bulk selection (page-scoped — only the loaded rows are selectable)
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Delete-by-tag. Unlike the selection above this is account-wide, so
+  // it deliberately costs more to trigger: pick the tag, then re-type
+  // its name. `deleteByTagCount` is fetched when the tag is chosen so
+  // the confirmation states a real number rather than "all of them".
+  const [deleteByTagOpen, setDeleteByTagOpen] = useState(false);
+  const [deleteByTagId, setDeleteByTagId] = useState<string | null>(null);
+  const [deleteByTagCount, setDeleteByTagCount] = useState<number | null>(null);
+  const [deleteByTagConfirm, setDeleteByTagConfirm] = useState('');
 
   // All tags for display
   const [tagsMap, setTagsMap] = useState<Record<string, Tag>>({});
@@ -402,6 +412,56 @@ function SortableHead({
     setBulkDeleteOpen(false);
   }
 
+  function openDeleteByTag() {
+    setDeleteByTagId(null);
+    setDeleteByTagCount(null);
+    setDeleteByTagConfirm('');
+    setDeleteByTagOpen(true);
+  }
+
+  /**
+   * Count the contacts a tag would take with it. Head-only request —
+   * we want the number, not the rows.
+   */
+  async function selectDeleteByTag(tagId: string) {
+    setDeleteByTagId(tagId);
+    setDeleteByTagConfirm('');
+    setDeleteByTagCount(null);
+
+    const { count, error } = await supabase
+      .from('contact_tags')
+      .select('contact_id', { count: 'exact', head: true })
+      .eq('tag_id', tagId);
+
+    setDeleteByTagCount(error ? 0 : (count ?? 0));
+  }
+
+  async function handleDeleteByTag() {
+    if (!deleteByTagId) return;
+    setDeleting(true);
+
+    // One transactional statement server-side — see migration 040. Doing
+    // it here would mean reading every matching id and deleting in
+    // chunks, which can half-succeed.
+    const { data, error } = await supabase.rpc('delete_contacts_by_tag', {
+      p_tag_id: deleteByTagId,
+    });
+
+    if (error) {
+      toast.error(t('toastBulkFailedDelete'));
+    } else {
+      toast.success(t('toastBulkDeleted', { count: Number(data ?? 0) }));
+      setSelected(new Set());
+      // A tag that just lost every contact is still a tag — but the
+      // filter may now match nothing, so reset to the first page.
+      setPage(0);
+      fetchContacts();
+    }
+
+    setDeleting(false);
+    setDeleteByTagOpen(false);
+  }
+
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   const hasNext = page < totalPages - 1;
   const hasPrev = page > 0;
@@ -458,6 +518,18 @@ function SortableHead({
             <Upload className="size-4" />
             {t('importBtn')}
           </GatedButton>
+          {allTags.length > 0 && (
+            <GatedButton
+              variant="outline"
+              canAct={canEdit}
+              gateReason="delete contacts"
+              onClick={openDeleteByTag}
+              className="border-border text-muted-foreground hover:bg-muted"
+            >
+              <Trash2 className="size-4" />
+              {t('deleteByTagBtn')}
+            </GatedButton>
+          )}
           <GatedButton
             canAct={canEdit}
             gateReason="add or import contacts"
@@ -966,6 +1038,98 @@ function SortableHead({
               variant="destructive"
               onClick={handleBulkDelete}
               disabled={deleting}
+            >
+              {deleting && <Loader2 className="size-4 animate-spin" />}
+              {t('deleteBtn')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete every contact carrying a tag. Account-wide and
+          irreversible, so it asks for the tag name to be typed back
+          rather than relying on a single click. */}
+      <Dialog open={deleteByTagOpen} onOpenChange={setDeleteByTagOpen}>
+        <DialogContent className="bg-popover border-border text-popover-foreground sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-popover-foreground">
+              {t('deleteByTagTitle')}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {t('deleteByTagDesc')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map((tag) => {
+                const isPicked = deleteByTagId === tag.id;
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => selectDeleteByTag(tag.id)}
+                    className={cn(
+                      'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all',
+                      isPicked
+                        ? 'ring-2 ring-destructive ring-offset-1 ring-offset-popover'
+                        : 'opacity-60 hover:opacity-100'
+                    )}
+                    style={{
+                      backgroundColor: tag.color + '20',
+                      color: tag.color,
+                    }}
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {deleteByTagId && (
+              <>
+                <p className="text-sm text-foreground">
+                  {deleteByTagCount === null
+                    ? t('deleteByTagCounting')
+                    : t('deleteByTagCount', { count: deleteByTagCount })}
+                </p>
+                {deleteByTagCount !== null && deleteByTagCount > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      {t('deleteByTagConfirmLabel', {
+                        name: tagsMap[deleteByTagId]?.name ?? '',
+                      })}
+                    </Label>
+                    <Input
+                      value={deleteByTagConfirm}
+                      onChange={(e) => setDeleteByTagConfirm(e.target.value)}
+                      className="bg-muted border-border text-foreground"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="bg-popover border-border">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteByTagOpen(false)}
+              className="border-border text-muted-foreground hover:bg-muted"
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteByTag}
+              disabled={
+                deleting ||
+                !deleteByTagId ||
+                deleteByTagCount === null ||
+                deleteByTagCount === 0 ||
+                deleteByTagConfirm.trim() !==
+                  (tagsMap[deleteByTagId]?.name ?? '')
+              }
             >
               {deleting && <Loader2 className="size-4 animate-spin" />}
               {t('deleteBtn')}
