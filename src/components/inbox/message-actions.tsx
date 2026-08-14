@@ -93,7 +93,10 @@ export function MessageActions({
        *  an unbroken URL) push past the cap and shove the row past
        *  100%, which used to bleed across into the contact-sidebar
        *  area. See issue #165. */}
-      <div className="group/actions relative min-w-0 max-w-[75%]">
+      {/* 75% of a phone leaves bubbles cramped and wraps short messages
+          that would otherwise fit on one line, so mobile gets 85% —
+          roughly what the WhatsApp app itself allows. */}
+      <div className="group/actions relative min-w-0 max-w-[85%] sm:max-w-[75%]">
         {children}
       <div
         data-touch-open={touchOpen || pickerOpen ? "true" : undefined}
