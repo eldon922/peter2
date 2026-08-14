@@ -146,7 +146,16 @@ export default function NewBroadcastPage() {
           const isCompleted = index < currentStep;
 
           return (
-            <div key={step.key} className="flex flex-1 items-center">
+            // Only steps that still have a connector after them stretch.
+            // The last one used to take an equal share of the row with
+            // nothing but its circle to fill it, so it sat hard left of
+            // a quarter-width gap and threw the whole row off-centre.
+            <div
+              key={step.key}
+              className={`flex items-center ${
+                index < steps.length - 1 ? 'flex-1' : ''
+              }`}
+            >
               <div className="flex items-center gap-2">
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-all ${
