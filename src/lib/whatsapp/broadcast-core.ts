@@ -43,6 +43,9 @@ import {
   resolveVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
+import { createLogger } from '@/lib/log';
+
+const log = createLogger('broadcast');
 
 /** Thrown by createBroadcast on a caller-visible failure; route maps it. */
 export class BroadcastError extends Error {
@@ -778,6 +781,13 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
+  log.info('fan-out started', {
+    broadcast: plan.broadcastId,
+    recipients: plan.planned.length,
+    template: plan.templateName,
+    retry: Boolean(plan.isRetry),
+  });
+
 
   for (const [index, recipient] of plan.planned.entries()) {
     // Deadline guard — stop while there is still time to write the

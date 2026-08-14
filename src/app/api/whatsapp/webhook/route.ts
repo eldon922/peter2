@@ -17,6 +17,9 @@ import {
   formatStatusError,
   type WhatsAppStatusError,
 } from '@/lib/whatsapp/status-error'
+import { createLogger } from '@/lib/log'
+
+const log = createLogger('webhook')
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -275,13 +278,6 @@ export async function POST(request: Request) {
   // This MUST use `after()` rather than a detached `processWebhook(body)`
   // promise: on serverless platforms (we run on Vercel) the function can
   // be frozen or terminated the moment the response is sent, so a floating
-  after(async () => {
-    try {
-      await processWebhook(body)
-    } catch (error) {
-      console.error('Error processing webhook:', error)
-    }
-  })
   // promise's DB writes are not guaranteed to finish. That dropped a
   // non-deterministic *subset* of inbound messages — contacts/conversations
   // were created but the message insert never landed, leaving conversations
@@ -289,6 +285,18 @@ export async function POST(request: Request) {
   // (see issue #301). `after()` hands the callback to the runtime, which
   // keeps the function alive until it resolves (within the route's
   // maxDuration).
+  after(async () => {
+    const startedAt = Date.now()
+    try {
+      await processWebhook(body)
+      log.info('processed', {
+        entries: body.entry?.length ?? 0,
+        ms: Date.now() - startedAt,
+      })
+    } catch (error) {
+      console.error('Error processing webhook:', error)
+    }
+  })
 
   return NextResponse.json({ status: 'received' }, { status: 200 })
 }
@@ -298,6 +306,12 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
 
   for (const entry of body.entry) {
     for (const change of entry.changes) {
+      log.info('change received', {
+        field: change.field,
+        messages: change.value?.messages?.length ?? 0,
+        statuses: change.value?.statuses?.length ?? 0,
+      })
+
       // Template-lifecycle events (status / quality / components
       // updates from Meta) come in on a different change.field and
       // have a different value shape — route them through the

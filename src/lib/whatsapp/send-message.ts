@@ -44,6 +44,9 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import { createLogger } from '@/lib/log';
+
+const log = createLogger('send-message');
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -431,9 +434,10 @@ export async function sendMessageToConversation(
   }
 
   if (workingPhone !== sanitizedPhone) {
-    console.log(
-      `[send-message] Auto-corrected contact phone: ${sanitizedPhone} → ${workingPhone}`
-    );
+    log.info('auto-corrected contact phone', {
+      from: sanitizedPhone,
+      to: workingPhone,
+    });
     await db
       .from('contacts')
       .update({ phone: workingPhone })
@@ -511,6 +515,12 @@ export async function sendMessageToConversation(
       err instanceof Error ? err.message : err
     );
   }
+
+  log.info('outbound message sent', {
+    message: messageRecord.id,
+    wamid: waMessageId,
+    contact: contact.id,
+  });
 
   return { messageId: messageRecord.id, whatsappMessageId: waMessageId };
 }
