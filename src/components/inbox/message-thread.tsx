@@ -65,6 +65,19 @@ function renderTemplateBody(body: string, params: string[]): string {
   });
 }
 
+/**
+ * Label for a teammate in the assign dropdown / trigger. `full_name` is
+ * optional on a profile (it stays empty until someone fills it in on the
+ * Settings → Your profile form), which used to render an empty row you
+ * couldn't tell apart from the next one. Fall back to the derived
+ * `username` (email local part) the same way the members roster and the
+ * deal-assignee picker already do.
+ */
+function profileLabel(profile: Profile | undefined): string | null {
+  if (!profile) return null;
+  return profile.full_name?.trim() || profile.username?.trim() || null;
+}
+
 interface MessageThreadProps {
   conversation: Conversation | null;
   contact: Contact | null;
@@ -1033,7 +1046,7 @@ export function MessageThread({
                         className="mr-2"
                       />
                       <span className="flex-1">
-                        {p.full_name}
+                        {profileLabel(p) ?? t("unnamedTeammate")}
                         {p.user_id === user?.id ? t("me") : ""}
                       </span>
                       {isSelected && <Check className="ml-2 h-3 w-3" />}
