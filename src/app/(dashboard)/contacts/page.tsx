@@ -604,7 +604,16 @@ export default function ContactsPage() {
                 </span>
               )}
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-0">
+            {/* Sized to the tag names rather than a fixed 256px: the
+                names are user-created and were being truncated to fit a
+                width that had nothing to do with them. `w-max` takes the
+                widest row, with a floor so a short list still looks like
+                a panel and a ceiling so one long tag can't run off the
+                screen. */}
+            <PopoverContent
+              align="start"
+              className="w-max min-w-64 max-w-[min(28rem,calc(100vw-2rem))] p-0"
+            >
               <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                 <span className="text-sm font-medium text-popover-foreground">
                   {t('filterByTags')}
@@ -638,7 +647,7 @@ export default function ContactsPage() {
                         className="size-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
-                      <span className="text-sm text-popover-foreground truncate">
+                      <span className="truncate text-sm whitespace-nowrap text-popover-foreground">
                         {tag.name}
                       </span>
                     </label>

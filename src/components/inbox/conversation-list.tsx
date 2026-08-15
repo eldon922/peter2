@@ -297,7 +297,7 @@ export function ConversationList({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="max-h-64 w-56 border-border bg-popover"
+                className="max-h-64 w-max min-w-56 max-w-[min(28rem,calc(100vw-2rem))] border-border bg-popover"
               >
                 {tags.map((t) => (
                   <DropdownMenuCheckboxItem
@@ -311,7 +311,7 @@ export function ConversationList({
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: t.color }}
                       />
-                      <span className="truncate">{t.name}</span>
+                      <span className="truncate whitespace-nowrap">{t.name}</span>
                     </span>
                   </DropdownMenuCheckboxItem>
                 ))}
