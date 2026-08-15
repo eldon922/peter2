@@ -13,7 +13,7 @@ import {
 } from "@/lib/inbox/session-window";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
-import { Search, ChevronDown, X } from "lucide-react";
+import { Search, ChevronDown, X, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
@@ -586,7 +586,7 @@ function ConversationItem({
               // free-form before only a template will reach them.
               <span
                 className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium tabular-nums",
+                  "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium tabular-nums",
                   windowLabel.expired
                     ? "bg-muted text-muted-foreground"
                     : windowLabel.urgent
@@ -595,6 +595,9 @@ function ConversationItem({
                 )}
                 title={windowLabel.title}
               >
+                {/* Same clock as the thread header's session badge, so
+                    the two read as the same fact in two places. */}
+                <Clock className="h-3 w-3 shrink-0" aria-hidden />
                 {windowLabel.text}
               </span>
             ) : (
