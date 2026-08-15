@@ -132,6 +132,11 @@
       "contactDetails": "Contact details"
     },
     "conversationList": {
+      "sessionExpired": "Expired",
+      "sessionExpiredTitle": "Reply window closed — only a template will reach them",
+      "sessionHoursShort": "{hours}h",
+      "sessionMinutesShort": "{minutes}m",
+      "sessionRemainingTitle": "{time} left to reply free-form",
       "searchPlaceholder": "Search conversations...",
       "filterAll": "All",
       "filterUnread": "Unread",

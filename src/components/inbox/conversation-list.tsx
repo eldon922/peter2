@@ -7,6 +7,10 @@ import {
   matchesContactFilters,
   normalizeConversations,
 } from "@/lib/inbox/conversations";
+import {
+  sessionWindow,
+  SESSION_WINDOW_HOURS,
+} from "@/lib/inbox/session-window";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { Search, ChevronDown, X } from "lucide-react";
@@ -63,6 +67,10 @@ export function ConversationList({
     { label: t("filterClosed"), value: "closed" },
   ], [t]);
 
+  /** conversation id → latest inbound message time inside the window. */
+  const [lastInboundAt, setLastInboundAt] = useState<Map<string, string>>(
+    new Map()
+  );
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [loading, setLoading] = useState(true);
@@ -114,8 +122,40 @@ export function ConversationList({
         return;
       }
 
-      onConversationsLoadedRef.current(normalizeConversations(data ?? []));
+      const rows = normalizeConversations(data ?? []);
+      onConversationsLoadedRef.current(rows);
       setLoading(false);
+
+      // Second pass for the session-window badges. The 24h clock runs
+      // from the customer's last inbound message, which `conversations`
+      // does not carry — `last_message_at` moves on outbound sends too,
+      // so it would show a fresh window on a thread that had actually
+      // closed. Only messages inside the window can affect the answer, so
+      // the query is bounded to them: a conversation absent from the
+      // result simply has no open window.
+      const since = new Date(
+        Date.now() - SESSION_WINDOW_HOURS * 3600_000
+      ).toISOString();
+      const { data: inbound } = await supabase
+        .from("messages")
+        .select("conversation_id, created_at")
+        .eq("sender_type", "customer")
+        .gte("created_at", since)
+        .in(
+          "conversation_id",
+          rows.map((c) => c.id)
+        );
+      if (cancelled) return;
+
+      const latest = new Map<string, string>();
+      for (const m of (inbound ?? []) as {
+        conversation_id: string;
+        created_at: string;
+      }[]) {
+        const seen = latest.get(m.conversation_id);
+        if (!seen || m.created_at > seen) latest.set(m.conversation_id, m.created_at);
+      }
+      setLastInboundAt(latest);
     })();
 
     return () => {
@@ -427,6 +467,7 @@ export function ConversationList({
                 conversation={conv}
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
+                lastInboundAt={lastInboundAt.get(conv.id) ?? null}
                 t={t}
               />
             ))}
@@ -441,6 +482,8 @@ interface ConversationItemProps {
   conversation: Conversation;
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
+  /** Customer's last inbound message, or null if none inside the window. */
+  lastInboundAt: string | null;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -448,6 +491,7 @@ function ConversationItem({
   conversation,
   isActive,
   onSelect,
+  lastInboundAt,
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
@@ -457,6 +501,33 @@ function ConversationItem({
   const handleClick = useCallback(() => {
     onSelect(conversation);
   }, [onSelect, conversation]);
+
+  // Compact by design: this sits in a 320px row beside the unread badge,
+  // so it reads "23h", not "23h remaining" — the column is the context.
+  // The full phrasing stays on the tooltip and in the thread header.
+  const windowLabel = useMemo(() => {
+    const w = sessionWindow(lastInboundAt);
+    if (w.expired) {
+      return {
+        expired: true,
+        urgent: false,
+        text: t("sessionExpired"),
+        title: t("sessionExpiredTitle"),
+      };
+    }
+    const text =
+      w.hoursLeft >= 1
+        ? t("sessionHoursShort", { hours: w.hoursLeft })
+        : t("sessionMinutesShort", { minutes: w.minutesLeft });
+    return {
+      expired: false,
+      // Under three hours the window is close enough to closing that it
+      // should stop looking like every other row.
+      urgent: w.hoursLeft < 3,
+      text,
+      title: t("sessionRemainingTitle", { time: text }),
+    };
+  }, [lastInboundAt, t]);
 
   const timeAgo = conversation.last_message_at
     ? formatDistanceToNow(new Date(conversation.last_message_at), {
@@ -509,7 +580,24 @@ function ConversationItem({
                 whether anything had happened — which reads as an unread
                 marker that never clears. The unread badge beside it is
                 what actually tracks new messages. */}
-            {conversation.status !== "open" && (
+            {conversation.status === "open" ? (
+              // An open thread's useful fact is not that it is open —
+              // almost all of them are — but how long is left to reply
+              // free-form before only a template will reach them.
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] leading-none font-medium tabular-nums",
+                  windowLabel.expired
+                    ? "bg-muted text-muted-foreground"
+                    : windowLabel.urgent
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      : "bg-primary/15 text-primary"
+                )}
+                title={windowLabel.title}
+              >
+                {windowLabel.text}
+              </span>
+            ) : (
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",

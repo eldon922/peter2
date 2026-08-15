@@ -132,6 +132,11 @@
       "contactDetails": "Detail kontak"
     },
     "conversationList": {
+      "sessionExpired": "Kedaluwarsa",
+      "sessionExpiredTitle": "Jendela balasan tertutup — hanya template yang bisa menjangkau mereka",
+      "sessionHoursShort": "{hours}j",
+      "sessionMinutesShort": "{minutes}mnt",
+      "sessionRemainingTitle": "{time} tersisa untuk membalas bebas",
       "searchPlaceholder": "Cari percakapan...",
       "filterAll": "Semua",
       "filterUnread": "Belum dibaca",

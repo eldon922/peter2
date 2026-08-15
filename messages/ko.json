@@ -132,6 +132,11 @@
       "contactDetails": "연락처 정보"
     },
     "conversationList": {
+      "sessionExpired": "만료됨",
+      "sessionExpiredTitle": "답장 가능 시간이 지났습니다 — 템플릿으로만 연락할 수 있습니다",
+      "sessionHoursShort": "{hours}시간",
+      "sessionMinutesShort": "{minutes}분",
+      "sessionRemainingTitle": "자유 형식으로 답장할 수 있는 시간 {time} 남음",
       "searchPlaceholder": "대화 검색...",
       "filterAll": "전체",
       "filterUnread": "읽지 않음",
