@@ -17,6 +17,8 @@ import {
   resolveImportTagIds,
   type ContactTagAssignment,
 } from '@/lib/contacts/resolve-import-tags';
+import { planContactImport } from '@/lib/contacts/import-merge';
+import { chunkIds } from '@/lib/supabase/batching';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -150,6 +152,8 @@ export function ImportModal({
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{
     imported: number;
+    /** Existing contacts the file added tags to and/or renamed. */
+    updated: number;
     skipped: number;
     failed: number;
     tagsAssigned: number;
@@ -237,35 +241,59 @@ export function ImportModal({
       // In-file duplicates were already collapsed at parse time; they
       // still count as skipped in the summary.
       let skipped = inFileDuplicates;
+      let updated = 0;
       let failed = 0;
 
       const unique = parsedRows;
 
-      // 1) Skip numbers already in this account. One read of the
-      //    generated `phone_normalized` column (migration 022) → Set.
-      const { data: existingRows } = await supabase
-        .from('contacts')
-        .select('phone_normalized')
-        .eq('account_id', accountId);
-      const existing = new Set(
-        (existingRows ?? [])
-          .map(
-            (r) => (r as { phone_normalized: string | null }).phone_normalized
-          )
-          .filter((p): p is string => !!p)
-      );
-
-      const toInsert = unique.filter((row) => {
-        if (existing.has(normalizeKey(row.phone))) {
-          skipped++;
-          return false;
+      // 1) Find which of these numbers this account already has, matched
+      //    on the generated `phone_normalized` column (migration 022).
+      //
+      //    Looked up by the imported phones rather than by reading the
+      //    whole contacts table: that read was unbounded and PostgREST
+      //    caps a response at 1000 rows, so on a larger account it
+      //    silently reported existing contacts as new. The cost is now
+      //    proportional to the file, not to the account.
+      const importedKeys = [
+        ...new Set(unique.map((row) => normalizeKey(row.phone)).filter(Boolean)),
+      ];
+      const existingByPhone = new Map<
+        string,
+        { id: string; name: string | null }
+      >();
+      for (const slice of chunkIds(importedKeys)) {
+        const { data: existingRows } = await supabase
+          .from('contacts')
+          .select('id, phone_normalized, name')
+          .eq('account_id', accountId)
+          .in('phone_normalized', slice);
+        for (const r of (existingRows ?? []) as {
+          id: string;
+          phone_normalized: string | null;
+          name: string | null;
+        }[]) {
+          if (r.phone_normalized) {
+            existingByPhone.set(r.phone_normalized, { id: r.id, name: r.name });
+          }
         }
-        return true;
-      });
+      }
+
+      // A number already on file is no longer dropped on the floor. The
+      // row is treated as newer information about a contact we already
+      // have — see planContactImport for the rules.
+      const { toInsert, toMerge, duplicates } = planContactImport(
+        unique,
+        existingByPhone
+      );
+      skipped += duplicates;
 
       // 2) Resolve tag names → ids (admin+ may auto-create missing tags).
       //    Skip the round-trip when the import carries no tag names.
-      const allTagNames = toInsert.flatMap((row) => row.tagNames);
+      //    Merge rows count here too: their tags are the whole point.
+      const allTagNames = [
+        ...toInsert.flatMap((row) => row.tagNames),
+        ...toMerge.flatMap((m) => m.row.tagNames),
+      ];
       let tagIdByKey = new Map<string, string>();
       let skippedNames: string[] = [];
       if (allTagNames.length > 0) {
@@ -343,6 +371,51 @@ export function ImportModal({
         }
       }
 
+      // 3b) Apply the merge rows. Tags go through the same assignment
+      //     path as new contacts — it upserts with ignoreDuplicates, so a
+      //     tag the contact already carries is a no-op rather than an
+      //     error. Only the rename needs a write of its own.
+      //
+      //     Renames run a few at a time rather than all at once: this is
+      //     one UPDATE per contact (PostgREST has no bulk update by id
+      //     with differing values), and firing hundreds in parallel from
+      //     the browser just queues them behind the connection limit.
+      const RENAME_CONCURRENCY = 10;
+      const renames = toMerge.filter((m) => m.rename !== null);
+      const renameFailures = new Set<string>();
+
+      for (let i = 0; i < renames.length; i += RENAME_CONCURRENCY) {
+        const batch = renames.slice(i, i + RENAME_CONCURRENCY);
+        const results = await Promise.all(
+          batch.map((m) =>
+            supabase
+              .from('contacts')
+              .update({ name: m.rename })
+              .eq('id', m.id)
+              .eq('account_id', accountId)
+          )
+        );
+        for (let k = 0; k < results.length; k++) {
+          if (results[k].error) {
+            failed++;
+            renameFailures.add(batch[k].id);
+          }
+        }
+      }
+
+      for (const m of toMerge) {
+        if (m.row.tagNames.length > 0) {
+          tagAssignments.push({ contactId: m.id, tagNames: m.row.tagNames });
+        }
+      }
+      // Counted once per row touched, whether it was renamed, re-tagged
+      // or both — the summary reports rows, not writes. A row whose only
+      // contribution was a rename that failed is reported as failed, not
+      // updated, so the two counts never describe the same row.
+      updated = toMerge.filter(
+        (m) => !(renameFailures.has(m.id) && m.row.tagNames.length === 0)
+      ).length;
+
       // 4) Wire tags onto the contacts we just created. Failure here must
       //    not mask a successful contact import.
       let tagsAssigned = 0;
@@ -356,9 +429,17 @@ export function ImportModal({
         toast.warning(t('toastTagsWarning'));
       }
 
-      setResult({ imported, skipped, failed, tagsAssigned });
+      setResult({ imported, updated, skipped, failed, tagsAssigned });
       if (imported > 0) {
         toast.success(t('toastImported', { count: imported }));
+      }
+      if (updated > 0) {
+        toast.success(t('toastUpdated', { count: updated }));
+      }
+      // Either path changed contacts the list is showing, so refresh on
+      // an update-only import too — otherwise merged tags and renames
+      // stay invisible until a reload.
+      if (imported > 0 || updated > 0) {
         onImported();
       }
       if (tagsAssigned > 0) {
@@ -424,6 +505,11 @@ export function ImportModal({
                 })
               }}
             />
+            {/* Says what happens to numbers already on file, because the
+                answer changed: they used to be skipped. */}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t('mergeHint')}
+            </p>
           </DialogHeader>
 
           <div
@@ -593,6 +679,12 @@ export function ImportModal({
                   <div className="text-primary flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
                     {t('resultImported', { count: result.imported })}
+                  </div>
+                )}
+                {result.updated > 0 && (
+                  <div className="text-primary flex items-center gap-1.5 text-sm">
+                    <CheckCircle className="size-4 shrink-0" />
+                    {t('resultUpdated', { count: result.updated })}
                   </div>
                 )}
                 {result.tagsAssigned > 0 && (
