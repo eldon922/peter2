@@ -1,7 +1,7 @@
 # Privacy policy
 
-wacrm is a **self-hosted template**. The project maintainers never
-receive your data: a wacrm install talks to your own Supabase project,
+Peter2 is a **self-hosted template**. The project maintainers never
+receive your data: a Peter2 install talks to your own Supabase project,
 to Meta's WhatsApp Cloud API, and — only if you enable the AI features
 — to your chosen AI provider. There is no telemetry, no phone-home, no
 analytics endpoint in this codebase.
@@ -212,7 +212,7 @@ WhatsApp's own rules, which we follow, mean:
 - Meta processes every message as part of delivering WhatsApp. See
   Meta's [WhatsApp Business Data Processing Terms](https://www.whatsapp.com/legal/business-data-processing-terms).
 
-> **Operator note — delete before publishing.** wacrm does not handle
+> **Operator note — delete before publishing.** Peter2 does not handle
 > STOP for you. Before you promise it, build it: a keyword automation
 > that catches STOP / UNSUBSCRIBE and applies an `opted-out` tag, and a
 > habit of excluding that tag from every broadcast audience. Test it
@@ -295,7 +295,7 @@ Deals and broadcast records survive with the link to the contact
 removed, so aggregate history stays intact but no longer identifies
 anyone.
 
-> **Operator note — delete before publishing.** wacrm applies no
+> **Operator note — delete before publishing.** Peter2 applies no
 > automatic retention schedule. The rows above are promises *you* have
 > to keep, whether by a scheduled job, a documented manual review, or
 > a Postgres policy. Do not publish a retention period you have no
@@ -322,7 +322,7 @@ anyone.
 - **Hardened HTTP headers** — HSTS, `X-Content-Type-Options`,
   `X-Frame-Options`, `Referrer-Policy`, a restrictive
   `Permissions-Policy`, and a Content-Security-Policy
-  [wacrm ships the CSP in report-only mode so violations surface
+  [Peter2 ships the CSP in report-only mode so violations surface
   without breaking a page. Flip it to enforcing in `next.config.ts`
   before you claim it here.]
 
@@ -398,7 +398,7 @@ write to us at [REGISTERED ADDRESS].
 
 # Appendix A — Data inventory
 
-For the operator, not for publication. Every table wacrm creates that
+For the operator, not for publication. Every table Peter2 creates that
 holds personal data, and what happens on deletion. Keep it current as
 you add migrations.
 
