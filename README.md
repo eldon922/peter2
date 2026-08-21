@@ -155,6 +155,19 @@ Key pages:
 - [Architecture](https://wacrm.tech/docs/architecture)
 - [Troubleshooting](https://wacrm.tech/docs/troubleshooting)
 
+## Privacy
+
+Running this CRM makes you the data controller for every contact and
+message in it, and Meta requires a public privacy policy URL for a
+WhatsApp Business app. [`PRIVACY.md`](./PRIVACY.md) is a fill-in-the-
+blanks policy drafted against what this code actually does — the data
+it stores, the third parties it calls, the security controls it
+applies — plus a data inventory and a go-live checklist for operators.
+
+The software itself has no telemetry: your data goes to your Supabase
+project, to Meta, and (only if you enable the AI features) to your own
+AI provider. Never to us.
+
 ## Stack
 
 - **App** — Next.js 16 (App Router), React 19, TypeScript, Tailwind v4.
