@@ -42,8 +42,21 @@ const SITE_URL =
 const TITLE = "Peter2";
 const DESCRIPTION = "Self-hostable CRM template for WhatsApp.";
 
+// Facebook's sharing debugger reports `fb:app_id` as a required
+// property. It is a per-deployment value — the numeric id of the
+// operator's own Facebook app — so a self-hostable template cannot
+// ship one; hardcoding an id here would attribute every fork's shares
+// to somebody else's app.
+//
+// Operators who care about the warning (or who want Facebook domain
+// insights / Social Plugin moderation) set NEXT_PUBLIC_FACEBOOK_APP_ID
+// at build time. When it is unset we omit `facebook` entirely rather
+// than emit an empty tag, which Facebook treats as malformed.
+const FACEBOOK_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID?.trim();
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  ...(FACEBOOK_APP_ID ? { facebook: { appId: FACEBOOK_APP_ID } } : {}),
   title: {
     default: TITLE,
     template: `%s — ${TITLE}`,
