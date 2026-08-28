@@ -463,5 +463,5 @@ function getBaseUrl(request: Request): string {
   console.warn(
     '[POST /api/account/members/create-and-invite] could not derive base URL from request; falling back to marketing domain'
   );
-  return 'https://wacrm.tech';
+  return 'https://wa.griibandung.org';
 }

@@ -20,19 +20,77 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Base URL that every URL-bearing metadata field (og:image, og:url,
+// canonical) is resolved against. Next resolves relative metadata
+// URLs against this at BUILD time — most pages here are statically
+// prerendered, so there is no request to read a Host header from the
+// way `/api/account/invitations` does.
+//
+// Without it Next falls back to `http://localhost:3000`, which is
+// what shipped before: the `og:image` tag was present but pointed at
+// localhost, so scrapers couldn't fetch it and fell back to inferring
+// an image from the icon tags.
+//
+// `NEXT_PUBLIC_SITE_URL` is the same knob operators already set for
+// invite links; `VERCEL_URL` covers preview/production deploys that
+// haven't set it. The localhost fallback keeps `next dev` working.
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "") ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+  "http://localhost:3000";
+
+const TITLE = "Peter2";
+const DESCRIPTION = "Self-hostable CRM template for WhatsApp.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Peter2",
-    template: "%s — Peter2",
+    default: TITLE,
+    template: `%s — ${TITLE}`,
   },
-  description: "Self-hostable CRM template for WhatsApp.",
+  description: DESCRIPTION,
+  // og:image is also emitted by `app/opengraph-image.tsx` (Next's file
+  // convention). It is repeated here explicitly so the property is
+  // stated outright rather than left to be inferred, and so the URL is
+  // an absolute one resolved from `metadataBase`.
+  openGraph: {
+    type: "website",
+    siteName: TITLE,
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: TITLE,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: TITLE,
+      },
+    ],
+  },
   robots: {
     index: false,
     follow: false,
   },
-  icons: {
-    icon: [{ url: "/icon" }],
-  },
+  // No `icons` entry: `app/favicon.ico` is picked up by Next's file
+  // convention and emits its own <link rel="icon">. A hand-written
+  // `{ icon: [{ url: "/icon" }] }` used to sit here, but there is no
+  // `app/icon.*` route backing it, so it emitted a <link rel="icon">
+  // pointing at a 404.
   formatDetection: {
     email: false,
     address: false,
