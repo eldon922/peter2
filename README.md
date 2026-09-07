@@ -47,6 +47,12 @@ clone or fork it to run your own CRM.
   is account-scoped, so one shared inbox can be staffed by a whole
   team. Solo use stays single-user with zero setup.
 - **Account management** — email, password, avatar, global sign-out.
+- **Embedded Signup & coexistence** *(optional)* — if you're an approved
+  Meta Tech Provider, customers connect in a Facebook pop-up instead of
+  pasting tokens, including numbers they already use in the WhatsApp
+  Business app: they keep replying from their phone, and those messages
+  land in the shared inbox. See
+  [docs/embedded-signup.md](./docs/embedded-signup.md).
 - **Public REST API** (`/api/v1`) with scoped, revocable API keys —
   build your own automations on top of your CRM. See
   [docs/public-api.md](./docs/public-api.md).

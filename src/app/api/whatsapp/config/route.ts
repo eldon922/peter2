@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
 import {
   registerPhoneNumber,
   subscribeWabaToApp,
   verifyPhoneNumber,
 } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+import {
+  findConflictingAccount,
+  PHONE_NUMBER_CLAIMED_MESSAGE,
+} from '@/lib/whatsapp/config-store'
 
 /**
  * Resolve the caller's account_id from their profile. Inlined here
@@ -29,22 +32,6 @@ async function resolveAccountId(
     .maybeSingle()
   if (error || !data?.account_id) return null
   return data.account_id as string
-}
-
-// Lazy-initialised service-role client. We need it to detect a
-// phone_number_id already claimed by a *different* user — under RLS,
-// the user's own session can't see other users' rows, so the conflict
-// would be invisible without the service role.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _adminClient: any = null
-function supabaseAdmin() {
-  if (!_adminClient) {
-    _adminClient = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _adminClient
 }
 
 /**
@@ -211,34 +198,26 @@ export async function POST(request: Request) {
       }
     }
 
-    // Reject if another account has already claimed this phone_number_id.
-    // wacrm is single-tenant-per-WhatsApp-number — letting two accounts
-    // bind the same number causes the webhook's `.single()` lookup to
-    // throw PGRST116 ("multiple rows"), silently dropping every
-    // inbound message. See issue #136. Post-multi-user we key on
-    // account_id (not user_id) since teammates inside the same account
-    // all share one config; the conflict is between accounts.
-    const { data: claimed, error: claimedError } = await supabaseAdmin()
-      .from('whatsapp_config')
-      .select('account_id')
-      .eq('phone_number_id', phone_number_id)
-      .neq('account_id', accountId)
-      .maybeSingle()
-
-    if (claimedError) {
-      console.error('Error checking phone_number_id ownership:', claimedError)
+    // Reject if another account has already claimed this phone_number_id
+    // (issue #136 — see findConflictingAccount for the full story).
+    // Shared with the Embedded Signup route so both entry points enforce
+    // the same one-number-per-account rule.
+    let claimedBy: string | null
+    try {
+      claimedBy = await findConflictingAccount({
+        phoneNumberId: phone_number_id,
+        accountId,
+      })
+    } catch {
       return NextResponse.json(
         { error: 'Failed to validate configuration' },
         { status: 500 }
       )
     }
 
-    if (claimed) {
+    if (claimedBy) {
       return NextResponse.json(
-        {
-          error:
-            'This WhatsApp phone number is already linked to another account on this instance. Each phone number can only be connected to one wacrm user.',
-        },
+        { error: PHONE_NUMBER_CLAIMED_MESSAGE },
         { status: 409 }
       )
     }
@@ -384,6 +363,11 @@ export async function POST(request: Request) {
       registered_at: registrationError ? null : registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,
       last_registration_error: registrationError,
+      // Credentials pasted into Settings — 'manual' even when this
+      // overwrites a row that originally arrived through Embedded
+      // Signup, because the /register + PIN path below is the manual
+      // one and the UI must stop claiming otherwise.
+      connection_type: 'manual' as const,
       updated_at: new Date().toISOString(),
     }
 

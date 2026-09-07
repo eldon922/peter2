@@ -1544,7 +1544,25 @@
       "step4_3": "Tempel <strong>URL Callback Webhook</strong> dari atas",
       "step4_4": "Masukkan <strong>Token Verifikasi</strong> yang sama seperti yang Anda atur di sini",
       "step4_5": "Berlangganan bidang webhook \"messages\"",
-      "metaDocs": "Dokumentasi Meta WhatsApp API"
+      "metaDocs": "Dokumentasi Meta WhatsApp API",
+
+      "embeddedSignup": {
+        "title": "Hubungkan dengan Facebook",
+        "description": "Onboarding lewat pop-up, tanpa menyalin kredensial satu per satu. Bisa dipakai untuk nomor yang sudah Anda gunakan di aplikasi WhatsApp Business.",
+        "connectButton": "Hubungkan WhatsApp",
+        "connecting": "Menghubungkan…",
+        "coexistenceHint": "Sudah memakai aplikasi WhatsApp Business di ponsel? Pilih nomor Anda yang ada di pop-up — Anda tetap bisa memakai aplikasinya, dan percakapannya juga muncul di sini.",
+        "connected": "WhatsApp terhubung.",
+        "connectedCoexistence": "WhatsApp terhubung. Pesan yang Anda kirim dari aplikasi Business juga akan muncul di sini.",
+        "connectFailed": "Tidak dapat menyelesaikan koneksi. Silakan coba lagi.",
+        "cancelled": "Pendaftaran dibatalkan.",
+        "popupError": "Meta melaporkan kesalahan saat pendaftaran.",
+        "sdkFailed": "Tidak dapat memuat Facebook SDK. Periksa koneksi Anda lalu muat ulang.",
+        "manualFallback": "Hubungkan secara manual",
+        "badgeEmbeddedSignup": "Terhubung via Embedded Signup",
+        "badgeCoexistence": "Terhubung via aplikasi WhatsApp Business",
+        "badgeHint": "Meta mendaftarkan nomor ini saat pendaftaran, jadi tidak ada PIN dua langkah yang perlu dimasukkan."
+      }
     },
     "sections": {
       "overview": "Ringkasan",

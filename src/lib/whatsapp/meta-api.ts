@@ -9,8 +9,14 @@
  * instead of a runtime rejection from Meta.
  */
 
-const META_API_VERSION = 'v21.0'
-const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
+/**
+ * Exported (rather than module-private) so the Embedded Signup helpers
+ * in `./embedded-signup.ts` pin the same Graph version as every other
+ * call in this file. A second hard-coded version string is exactly the
+ * kind of drift that leaves one endpoint on a deprecated version.
+ */
+export const META_API_VERSION = 'v21.0'
+export const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 export interface MetaSendResult {
   messageId: string
@@ -47,7 +53,7 @@ interface MetaErrorResponse {
   }
 }
 
-async function throwMetaError(response: Response, fallback: string): Promise<never> {
+export async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
   try {
     const data = (await response.json()) as MetaErrorResponse

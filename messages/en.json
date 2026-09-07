@@ -1554,7 +1554,25 @@
       "step4_3": "Paste the <strong>Webhook Callback URL</strong> from above",
       "step4_4": "Enter the same <strong>Verify Token</strong> you set here",
       "step4_5": "Subscribe to \"messages\" webhook field",
-      "metaDocs": "Meta WhatsApp API Documentation"
+      "metaDocs": "Meta WhatsApp API Documentation",
+
+      "embeddedSignup": {
+        "title": "Connect with Facebook",
+        "description": "Onboard in a pop-up instead of copying credentials by hand. Works with a number you already use in the WhatsApp Business app.",
+        "connectButton": "Connect WhatsApp",
+        "connecting": "Connecting…",
+        "coexistenceHint": "Already using the WhatsApp Business app on your phone? Choose your existing number in the pop-up — you keep using the app, and its chats appear here too.",
+        "connected": "WhatsApp connected.",
+        "connectedCoexistence": "WhatsApp connected. Messages you send from the Business app will appear here too.",
+        "connectFailed": "Could not finish connecting. Please try again.",
+        "cancelled": "Signup was cancelled.",
+        "popupError": "Meta reported an error during signup.",
+        "sdkFailed": "Could not load the Facebook SDK. Check your connection and reload.",
+        "manualFallback": "Connect manually instead",
+        "badgeEmbeddedSignup": "Connected via Embedded Signup",
+        "badgeCoexistence": "Connected via the WhatsApp Business app",
+        "badgeHint": "Meta registered this number during signup, so there is no two-step PIN to enter."
+      }
     },
     "sections": {
       "overview": "Overview",

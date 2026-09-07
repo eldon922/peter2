@@ -22,6 +22,7 @@ import {
   type BroadcastSentMessage,
 } from '@/lib/whatsapp/broadcast-message'
 import { createLogger } from '@/lib/log'
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 const log = createLogger('webhook')
 
@@ -104,6 +105,19 @@ interface WhatsAppWebhookEntry {
 }
 
 // GET - Webhook verification
+/**
+ * Constant-time string comparison for secrets.
+ *
+ * `timingSafeEqual` throws on length mismatch, which would itself leak
+ * the length — hash both sides to a fixed width first so every
+ * comparison takes the same shape regardless of input.
+ */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest()
+  const hb = createHash('sha256').update(b).digest()
+  return timingSafeEqual(ha, hb)
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -116,6 +130,22 @@ export async function GET(request: Request) {
         { error: 'Missing verification parameters' },
         { status: 400 }
       )
+    }
+
+    // Instance-level verify token, checked before the per-account rows.
+    //
+    // Under Embedded Signup the webhook is configured once on the Tech
+    // Provider's Meta app, not per customer, so there is no
+    // `whatsapp_config.verify_token` to match against — an ES-only
+    // instance would fail this handshake outright and the callback URL
+    // could never be saved. Constant-time compare so the token can't be
+    // recovered a byte at a time.
+    const envVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN
+    if (envVerifyToken && timingSafeEqualStrings(envVerifyToken, verifyToken)) {
+      return new Response(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      })
     }
 
     // Fetch all whatsapp configs to check verify tokens
@@ -305,6 +335,71 @@ export async function POST(request: Request) {
   return NextResponse.json({ status: 'received' }, { status: 200 })
 }
 
+/**
+ * Find the account whose config owns a business phone number.
+ *
+ * Shared by the inbound-message path and the coexistence echo handler —
+ * both are handed only a `phone_number_id` and both need the same
+ * diagnostics when the mapping is broken.
+ *
+ * `.single()` is deliberately avoided: it returns PGRST116 for both 0
+ * rows AND ≥2 rows, and the two mean very different things to an
+ * operator. ≥2 shouldn't happen post-migration 013 (UNIQUE constraint),
+ * but a row created before the constraint, or a race, would still land
+ * here. Returns null in every failure case; the caller skips the event.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveConfigByPhoneNumberId(phoneNumberId: string): Promise<any | null> {
+  const { data: configRows, error } = await supabaseAdmin()
+    .from('whatsapp_config')
+    .select('*')
+    .eq('phone_number_id', phoneNumberId)
+
+  if (error) {
+    console.error(
+      'Error fetching whatsapp_config for phone_number_id:',
+      phoneNumberId,
+      error
+    )
+    return null
+  }
+
+  if (!configRows || configRows.length === 0) {
+    console.error('No config found for phone_number_id:', phoneNumberId)
+    return null
+  }
+
+  if (configRows.length > 1) {
+    console.error(
+      `Multiple configs (${configRows.length}) found for phone_number_id:`,
+      phoneNumberId,
+      '— event dropped. Resolve duplicates so each number maps to a single account.',
+      'Account owners:',
+      configRows.map((r: { account_id: string; user_id: string }) => `${r.account_id} (admin ${r.user_id})`)
+    )
+    return null
+  }
+
+  return configRows[0]
+}
+
+/**
+ * Map a WhatsApp message type onto the `messages.content_type` CHECK
+ * constraint, which (widened in migration 010 to add 'interactive')
+ * allows: text, image, document, audio, video, location, template,
+ * interactive. Anything outside that list has to be folded onto the
+ * closest allowed value or the INSERT fails.
+ */
+function toContentType(type: string): string {
+  const ALLOWED_CONTENT_TYPES = new Set([
+    'text', 'image', 'document', 'audio', 'video',
+    'location', 'template', 'interactive',
+  ])
+  if (ALLOWED_CONTENT_TYPES.has(type)) return type
+  if (type === 'sticker') return 'image'  // stickers are images
+  return 'text'                            // reaction, unknown → text fallback
+}
+
 async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
   if (!body.entry) return
 
@@ -329,6 +424,16 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
         continue
       }
 
+      // Coexistence echoes: messages the business owner sent from the
+      // WhatsApp Business app on their own phone. Different field, and
+      // a `message_echoes` array instead of `messages`, so route it
+      // before the messaging branches below read message-shaped fields
+      // off a payload that doesn't have them.
+      if (change.field === 'smb_message_echoes') {
+        await handleMessageEchoes(change.value as unknown as SmbMessageEchoValue)
+        continue
+      }
+
       const value = change.value
 
       // Handle status updates
@@ -341,44 +446,10 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       // Handle incoming messages
       if (!value.messages || !value.contacts) continue
 
-      const phoneNumberId = value.metadata.phone_number_id
-
-      // Find user's config by phone_number_id. `.single()` returns
-      // PGRST116 for both 0 rows AND ≥2 rows — distinguish them so
-      // operators see the real cause in logs. ≥2 rows shouldn't happen
-      // post-migration 013 (UNIQUE constraint), but a row created
-      // before the constraint, or a race, would still surface here.
-      const { data: configRows, error: configError } = await supabaseAdmin()
-        .from('whatsapp_config')
-        .select('*')
-        .eq('phone_number_id', phoneNumberId)
-
-      if (configError) {
-        console.error(
-          'Error fetching whatsapp_config for phone_number_id:',
-          phoneNumberId,
-          configError
-        )
-        continue
-      }
-
-      if (!configRows || configRows.length === 0) {
-        console.error('No config found for phone_number_id:', phoneNumberId)
-        continue
-      }
-
-      if (configRows.length > 1) {
-        console.error(
-          `Multiple configs (${configRows.length}) found for phone_number_id:`,
-          phoneNumberId,
-          '— inbound message dropped. Resolve duplicates so each number maps to a single account.',
-          'Account owners:',
-          configRows.map((r: { account_id: string; user_id: string }) => `${r.account_id} (admin ${r.user_id})`)
-        )
-        continue
-      }
-
-      const config = configRows[0]
+      const config = await resolveConfigByPhoneNumberId(
+        value.metadata.phone_number_id
+      )
+      if (!config) continue
 
       const decryptedAccessToken = decrypt(config.access_token)
 
@@ -841,6 +912,127 @@ async function handleInboundReaction(
   await applyReaction(reaction, targetId, conversationId, contact.id)
 }
 
+/**
+ * Shape of an `smb_message_echoes` webhook payload.
+ *
+ * Meta reuses the ordinary message object for each echo and adds `to`
+ * (the customer) alongside the usual `from` (the business number), so
+ * the parts we care about mirror `WhatsAppMessage`.
+ */
+interface SmbMessageEchoValue {
+  metadata: { phone_number_id: string }
+  message_echoes?: (WhatsAppMessage & { to?: string })[]
+}
+
+/**
+ * Coexistence: mirror messages the owner sent from the WhatsApp
+ * Business app into the shared inbox.
+ *
+ * Without this, a coexistence account sees a one-sided thread — the
+ * customer's messages arrive over the normal `messages` field, but every
+ * reply typed on the owner's phone is invisible to their team.
+ *
+ * Three things this deliberately does NOT do:
+ *
+ *   - It does not bump `unread_count`. The business sent these; there is
+ *     nothing for the team to catch up on.
+ *   - It does not run the flow / automation / AI-reply dispatch that
+ *     `processMessage` does. Those trigger on *inbound* messages, and
+ *     firing them on our own outbound traffic would loop.
+ *   - It does not re-insert messages wacrm itself sent. Meta echoes
+ *     those back too, and `send-message.ts` already stored them under
+ *     the same Meta message_id.
+ */
+async function handleMessageEchoes(value: SmbMessageEchoValue) {
+  const echoes = value?.message_echoes
+  if (!echoes?.length) return
+
+  const config = await resolveConfigByPhoneNumberId(value.metadata.phone_number_id)
+  if (!config) return
+
+  const accessToken = decrypt(config.access_token)
+
+  for (const echo of echoes) {
+    // `to` is the customer's wa_id. Without it we have no thread to file
+    // the echo under — skip rather than guess.
+    if (!echo.to) {
+      log.warn('echo without a recipient, skipped', { id: echo.id })
+      continue
+    }
+
+    const contactOutcome = await findOrCreateContact(
+      config.account_id,
+      config.user_id,
+      normalizePhone(echo.to),
+      // Echoes carry no contact profile — the customer names the CRM
+      // knows come from their own inbound messages. Fall back to the
+      // number so a contact created here is still identifiable.
+      echo.to,
+    )
+    if (!contactOutcome) continue
+
+    const convResult = await findOrCreateConversation(
+      config.account_id,
+      config.user_id,
+      contactOutcome.contact.id,
+    )
+    if (!convResult) continue
+    const conversation = convResult.conversation
+
+    // De-duplicate against our own sends. `send-message.ts` stores
+    // Meta's message_id on every outbound row, so a hit here means this
+    // echo is wacrm's own message coming back to us.
+    const alreadyStored = await lookupInternalIdByMetaId(echo.id, conversation.id)
+    if (alreadyStored) continue
+
+    const { contentText, mediaUrl } = await parseMessageContent(echo, accessToken)
+
+    const { error: msgError } = await supabaseAdmin().from('messages').insert({
+      conversation_id: conversation.id,
+      // The owner typed this on their phone, so it is an agent message
+      // even though no wacrm user pressed send. `sender_id` is the
+      // config owner, matching how every other webhook-side insert
+      // attributes rows that have no interactive author.
+      sender_type: 'agent',
+      sender_id: config.user_id,
+      content_type: toContentType(echo.type),
+      content_text: contentText,
+      media_url: mediaUrl,
+      message_id: echo.id,
+      // Meta only echoes messages it accepted, so 'sent' is the
+      // truthful floor. Delivery / read updates arrive separately on
+      // the normal statuses field and advance it from there.
+      status: 'sent',
+      created_at: new Date(parseInt(echo.timestamp) * 1000).toISOString(),
+    })
+
+    if (msgError) {
+      console.error('Error inserting echoed message:', msgError)
+      continue
+    }
+
+    log.info('business-app echo stored', {
+      conversation: conversation.id,
+      type: echo.type,
+      contact: contactOutcome.contact.id,
+    })
+
+    const { error: convError } = await supabaseAdmin()
+      .from('conversations')
+      .update({
+        last_message_text: contentText || `[${echo.type}]`,
+        last_message_at: new Date().toISOString(),
+        // unread_count deliberately untouched — see the note above.
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id)
+
+    if (convError) {
+      console.error('Error updating conversation after echo:', convError)
+    }
+  }
+}
+
 async function processMessage(
   message: WhatsAppMessage,
   contact: { profile: { name: string }; wa_id: string },
@@ -929,20 +1121,7 @@ async function processMessage(
   // parseMessageContent. Silence the unused-var warning:
   void mediaType
 
-  // The messages.content_type CHECK constraint (widened in migration 010
-  // to add 'interactive' for button/list taps) allows:
-  //   text, image, document, audio, video, location, template, interactive
-  // Map incoming WhatsApp types that aren't in that list to the closest
-  // allowed value so the INSERT doesn't fail with a constraint error.
-  const ALLOWED_CONTENT_TYPES = new Set([
-    'text', 'image', 'document', 'audio', 'video',
-    'location', 'template', 'interactive',
-  ])
-  const contentType = ALLOWED_CONTENT_TYPES.has(message.type)
-    ? message.type
-    : message.type === 'sticker'
-      ? 'image'   // stickers are images
-      : 'text'    // reaction, unknown → text fallback
+  const contentType = toContentType(message.type)
 
   // Determine whether this is the contact's very first inbound message
   // BEFORE we insert, so the count is accurate. Covers the case where

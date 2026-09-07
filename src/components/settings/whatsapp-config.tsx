@@ -25,6 +25,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
+  EmbeddedSignupButton,
+  isEmbeddedSignupConfigured,
+} from './embedded-signup-button';
+import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
@@ -108,6 +112,17 @@ export function WhatsAppConfig() {
   // multi-number bug that prompted this work.
   const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
+
+  // Rows that came through Embedded Signup (migration 042) were
+  // registered by Meta inside the flow, and a coexistence number has no
+  // two-step PIN at all — so the PIN field and its hint are not just
+  // unnecessary there, they'd be asking for something that doesn't
+  // exist. `manual` covers every row that predates this.
+  const connectionType = config?.connection_type ?? 'manual';
+  const isManualConnection = connectionType === 'manual';
+  // When Embedded Signup is available, the manual credentials collapse
+  // out of the way — still reachable, just no longer the front door.
+  const embeddedSignupAvailable = isEmbeddedSignupConfigured();
 
   const [verifyingRegistration, setVerifyingRegistration] = useState(false);
   type RegistrationProbe = {
@@ -436,6 +451,35 @@ export function WhatsAppConfig() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       {/* Main config form */}
       <div className="space-y-6">
+        {/* Embedded Signup — renders itself as null unless the instance
+            has NEXT_PUBLIC_FACEBOOK_APP_ID + NEXT_PUBLIC_META_ES_CONFIG_ID,
+            so a self-hoster without Tech Provider approval sees exactly
+            the panel they saw before. */}
+        <EmbeddedSignupButton
+          canEdit={canEdit}
+          onConnected={() => {
+            if (accountId) void fetchConfig(accountId);
+          }}
+        />
+
+        {/* How this number got connected. Only worth saying when it
+            wasn't the form directly below it. */}
+        {config && !isManualConnection && (
+          <Alert className="bg-transparent border-emerald-600/50">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-emerald-700 dark:text-emerald-500" />
+              <AlertTitle className="mb-0 text-emerald-700 dark:text-emerald-500">
+                {connectionType === 'coexistence'
+                  ? t('embeddedSignup.badgeCoexistence')
+                  : t('embeddedSignup.badgeEmbeddedSignup')}
+              </AlertTitle>
+            </div>
+            <AlertDescription className="text-muted-foreground mt-2 text-xs leading-relaxed">
+              {t('embeddedSignup.badgeHint')}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Corrupted-token reset banner */}
         {showResetBanner && (
           <Alert className="bg-amber-950/40 border-amber-600/40">
@@ -605,6 +649,222 @@ export function WhatsAppConfig() {
           </Alert>
         )}
 
+        {/* Manual credentials.
+
+            When Embedded Signup is configured these collapse behind a
+            disclosure: still the full escape hatch (a Meta test number,
+            a number the popup won't offer, re-pasting a rotated token),
+            just no longer the first thing a customer is asked to do.
+            Without Embedded Signup they render exactly as before. */}
+        {embeddedSignupAvailable ? (
+          <Accordion>
+            <AccordionItem className="border-border">
+              <AccordionTrigger className="text-muted-foreground hover:text-foreground hover:no-underline">
+                {t('embeddedSignup.manualFallback')}
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-6 pt-2">
+            {/* API Credentials */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-foreground">{t('apiCredentialsTitle')}</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {t('apiCredentialsDesc')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('phoneNumberId')}</Label>
+                  <Input
+                    placeholder="e.g. 100234567890123"
+                    value={phoneNumberId}
+                    onChange={(e) => setPhoneNumberId(e.target.value)}
+                    disabled={!canEdit}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('wabaId')}</Label>
+                  <Input
+                    placeholder="e.g. 100234567890456"
+                    value={wabaId}
+                    onChange={(e) => setWabaId(e.target.value)}
+                    disabled={!canEdit}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('accessToken')}</Label>
+                  <div className="relative">
+                    <Input
+                      type={showToken ? 'text' : 'password'}
+                      placeholder={t('accessTokenPlaceholder')}
+                      value={accessToken}
+                      onChange={(e) => {
+                        setAccessToken(e.target.value);
+                        setTokenEdited(true);
+                      }}
+                      onFocus={() => {
+                        if (accessToken === MASKED_TOKEN) {
+                          setAccessToken('');
+                          setTokenEdited(true);
+                        }
+                      }}
+                      disabled={!canEdit}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showToken ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                  {config && !tokenEdited && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('tokenHidden')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('webhookVerifyToken')}</Label>
+                  <Input
+                    placeholder={t('webhookVerifyTokenPlaceholder')}
+                    value={verifyToken}
+                    onChange={(e) => setVerifyToken(e.target.value)}
+                    disabled={!canEdit}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('webhookVerifyTokenHint')}
+                  </p>
+                </div>
+
+                {isManualConnection && (
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('twoStepPin')}
+                      <span className="ml-1 text-muted-foreground">{t('optional')}</span>
+                    </Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder={t('pinPlaceholder')}
+                      value={pin}
+                      onChange={(e) =>
+                        setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                      }
+                      disabled={!canEdit}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
+                    />
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <span>{t('pinHint')}</span>
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Webhook URL */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-foreground">{t('webhookTitle')}</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {t('webhookDesc')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('webhookUrl')}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={webhookUrl}
+                      className="bg-muted border-border text-muted-foreground font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyWebhookUrl}
+                      className="shrink-0 border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Meta app credentials — sits directly under the webhook card
+                because that's what they're for: the App Secret is the key
+                Meta signs every webhook delivery with, so an inbound event
+                can't be trusted (or accepted) without it. Previously these
+                were env vars only, which meant no self-hoster could finish
+                setup from the UI. See migration 041. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-foreground">{t('metaAppTitle')}</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  {t('metaAppDesc')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('appId')}</Label>
+                  <Input
+                    placeholder="e.g. 123456789012345"
+                    value={appId}
+                    onChange={(e) => setAppId(e.target.value)}
+                    disabled={!canEdit}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">{t('appIdHint')}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">{t('appSecret')}</Label>
+                  <div className="relative">
+                    <Input
+                      type={showAppSecret ? 'text' : 'password'}
+                      placeholder={
+                        hasStoredAppSecret
+                          ? t('appSecretStoredPlaceholder')
+                          : t('appSecretPlaceholder')
+                      }
+                      value={appSecret}
+                      onChange={(e) => setAppSecret(e.target.value)}
+                      disabled={!canEdit}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAppSecret(!showAppSecret)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showAppSecret ? (
+                        <EyeOff className="size-4" />
+                      ) : (
+                        <Eye className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {hasStoredAppSecret ? t('appSecretStoredHint') : t('appSecretHint')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        ) : (
+          <>
         {/* API Credentials */}
         <Card>
           <CardHeader>
@@ -685,27 +945,29 @@ export function WhatsAppConfig() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">
-                {t('twoStepPin')}
-                <span className="ml-1 text-muted-foreground">{t('optional')}</span>
-              </Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder={t('pinPlaceholder')}
-                value={pin}
-                onChange={(e) =>
-                  setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
-                }
-                disabled={!canEdit}
-                className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
-              />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                <span>{t('pinHint')}</span>
-              </p>
-            </div>
+            {isManualConnection && (
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">
+                  {t('twoStepPin')}
+                  <span className="ml-1 text-muted-foreground">{t('optional')}</span>
+                </Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder={t('pinPlaceholder')}
+                  value={pin}
+                  onChange={(e) =>
+                    setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                  }
+                  disabled={!canEdit}
+                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
+                />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <span>{t('pinHint')}</span>
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -798,6 +1060,8 @@ export function WhatsAppConfig() {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3">

@@ -273,6 +273,13 @@ export interface MessageReaction {
   created_at: string;
 }
 
+/**
+ * Origin of a `whatsapp_config` row — see migration 042. Drives whether
+ * the save path calls /register and how Settings describes the
+ * connection back to the operator.
+ */
+export type WhatsAppConnectionType = 'manual' | 'embedded_signup' | 'coexistence';
+
 export interface WhatsAppConfig {
   id: string;
   user_id: string;
@@ -305,6 +312,15 @@ export interface WhatsAppConfig {
    * `META_APP_SECRET` env var when unset.
    */
   app_secret?: string | null;
+  /**
+   * How this number was connected (migration 042). 'manual' is every
+   * row that predates Embedded Signup and every credentials-pasted
+   * save since. 'embedded_signup' and 'coexistence' both skip
+   * POST /{phone_number_id}/register — Meta registers those numbers
+   * itself, and a coexistence number (already live in the WhatsApp
+   * Business app) has no two-step PIN to supply in the first place.
+   */
+  connection_type: WhatsAppConnectionType;
 }
 
 // Raw Meta status enum. We persist this verbatim from Meta (sync + webhook)

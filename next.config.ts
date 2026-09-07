@@ -42,7 +42,10 @@ const SECURITY_HEADERS = [
       // Next.js needs 'unsafe-inline' for its inline hydration script
       // and 'unsafe-eval' in dev + some production optimisations.
       // Nonce-based CSP is a later project.
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // connect.facebook.net serves the Facebook JS SDK, loaded only by
+      // the Embedded Signup button and only on instances configured for
+      // it (src/components/settings/embedded-signup-button.tsx).
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
       // Tailwind + inline style attributes on lots of components.
       "style-src 'self' 'unsafe-inline'",
       // Supabase public-bucket avatars, contact avatars (arbitrary
@@ -53,9 +56,18 @@ const SECURITY_HEADERS = [
       // and Supabase public-bucket audio/video the inbox renders.
       "media-src 'self' blob: https://*.supabase.co",
       "font-src 'self' data:",
-      // Supabase REST + realtime (WSS). All Meta API calls happen
-      // server-side, so graph.facebook.com does not belong here.
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+      // Supabase REST + realtime (WSS), plus the two Meta hosts the
+      // Facebook JS SDK talks to during Embedded Signup. Every *other*
+      // Meta API call still happens server-side — these are here for the
+      // signup popup alone, which is why graph.facebook.com is listed
+      // but nothing else about the Cloud API is.
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://www.facebook.com",
+      // The Embedded Signup popup/iframe. There was no frame-src before,
+      // so it fell through to default-src 'self' — which would block the
+      // signup flow outright the moment CSP stops being report-only.
+      "frame-src 'self' https://www.facebook.com https://web.facebook.com",
+      // Unrelated to frame-src above: this is about *this* app being
+      // framed by someone else, and stays denied.
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
