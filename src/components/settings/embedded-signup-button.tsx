@@ -80,6 +80,12 @@ interface FacebookSdk {
 declare global {
   interface Window {
     FB?: FacebookSdk;
+    /**
+     * The SDK calls this once it has finished setting itself up. This is
+     * the documented hook — `window.FB` is not reliably populated at the
+     * script tag's own load event, so initialising from there can no-op.
+     */
+    fbAsyncInit?: () => void;
   }
 }
 
@@ -108,6 +114,50 @@ export function EmbeddedSignupButton({
   const sessionInfoRef = useRef<SessionInfo>({});
   /** Set when the customer closed or errored out of the popup. */
   const abortedRef = useRef<string | null>(null);
+  /** FB.init is per page load, not per mount — don't run it twice. */
+  const initialisedRef = useRef(false);
+
+  /**
+   * Initialise the SDK, once, and only once it is genuinely there.
+   *
+   * Returns false when `window.FB` is still absent, so callers can tell
+   * "not ready yet" from "ready" instead of silently doing nothing — a
+   * button that enables on a failed init is a button that looks broken.
+   */
+  const initSdk = useCallback((): boolean => {
+    if (!window.FB) return false;
+    if (!initialisedRef.current) {
+      window.FB.init({
+        appId: FB_APP_ID,
+        autoLogAppEvents: true,
+        xfbml: false,
+        version: FB_SDK_VERSION,
+      });
+      initialisedRef.current = true;
+    }
+    setSdkReady(true);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    // Two orderings to cover, because the SDK script and this component
+    // race each other:
+    //
+    //   - Script still loading → the SDK calls fbAsyncInit when ready.
+    //   - Script already loaded (a remount, or a warm cache) →
+    //     fbAsyncInit has already fired and will not fire again, so the
+    //     Script's own onReady below does the honours instead. It runs
+    //     on every mount, cached or not.
+    window.fbAsyncInit = () => {
+      initSdk();
+    };
+
+    return () => {
+      // Leave FB itself alone — other mounts may still need it — but
+      // don't leave a callback pointing at an unmounted component.
+      window.fbAsyncInit = undefined;
+    };
+  }, [initSdk]);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -148,7 +198,13 @@ export function EmbeddedSignupButton({
   }, [t]);
 
   const handleLogin = useCallback(() => {
-    if (!window.FB || !ES_CONFIG_ID) return;
+    // Reachable if the SDK was blocked between render and click (an ad
+    // blocker, a dropped connection). Previously this returned silently
+    // and the button just appeared dead.
+    if (!window.FB || !ES_CONFIG_ID) {
+      toast.error(t('sdkFailed'));
+      return;
+    }
 
     sessionInfoRef.current = {};
     abortedRef.current = null;
@@ -228,14 +284,11 @@ export function EmbeddedSignupButton({
         <Script
           src="https://connect.facebook.net/en_US/sdk.js"
           strategy="afterInteractive"
+          // Initialisation lives in the effect above, driven by
+          // fbAsyncInit. onReady only nudges it for the cached-script
+          // case, and does nothing when FB isn't actually there.
           onReady={() => {
-            window.FB?.init({
-              appId: FB_APP_ID,
-              autoLogAppEvents: true,
-              xfbml: false,
-              version: FB_SDK_VERSION,
-            });
-            setSdkReady(true);
+            initSdk();
           }}
           onError={() => toast.error(t('sdkFailed'))}
         />
