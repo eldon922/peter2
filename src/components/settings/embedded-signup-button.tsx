@@ -197,6 +197,49 @@ export function EmbeddedSignupButton({
     return () => window.removeEventListener('message', onMessage);
   }, [t]);
 
+  /**
+   * Finish the signup server-side once the popup has handed back a code.
+   *
+   * Split out of the FB.login callback deliberately — see the note there.
+   * Never rejects: every path resolves, so `void`-ing the call is safe.
+   */
+  const completeSignup = useCallback(
+    async (code: string) => {
+      try {
+        const res = await fetch('/api/whatsapp/embedded-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            // Both optional — the server re-derives anything the popup
+            // didn't send.
+            waba_id: sessionInfoRef.current.waba_id,
+            phone_number_id: sessionInfoRef.current.phone_number_id,
+          }),
+        });
+        const payload = await res.json();
+
+        if (!res.ok) {
+          toast.error(payload?.error ?? t('connectFailed'));
+          return;
+        }
+
+        toast.success(
+          payload.connection_type === 'coexistence'
+            ? t('connectedCoexistence')
+            : t('connected'),
+        );
+        onConnected();
+      } catch (err) {
+        console.error('[embedded-signup] connect failed:', err);
+        toast.error(t('connectFailed'));
+      } finally {
+        setConnecting(false);
+      }
+    },
+    [onConnected, t],
+  );
+
   const handleLogin = useCallback(() => {
     // Reachable if the SDK was blocked between render and click (an ad
     // blocker, a dropped connection). Previously this returned silently
@@ -211,7 +254,11 @@ export function EmbeddedSignupButton({
     setConnecting(true);
 
     window.FB.login(
-      async (response) => {
+      // MUST stay a plain function. The SDK type-checks this argument and
+      // throws "Expression is of type asyncfunction, not function" on an
+      // `async` one — the popup then completes but the callback never
+      // runs, so nothing is ever saved. Hand the async work off instead.
+      (response) => {
         const code = response?.authResponse?.code;
 
         if (!code) {
@@ -222,37 +269,7 @@ export function EmbeddedSignupButton({
           return;
         }
 
-        try {
-          const res = await fetch('/api/whatsapp/embedded-signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              // Both optional — the server re-derives anything the
-              // popup didn't send.
-              waba_id: sessionInfoRef.current.waba_id,
-              phone_number_id: sessionInfoRef.current.phone_number_id,
-            }),
-          });
-          const payload = await res.json();
-
-          if (!res.ok) {
-            toast.error(payload?.error ?? t('connectFailed'));
-            return;
-          }
-
-          toast.success(
-            payload.connection_type === 'coexistence'
-              ? t('connectedCoexistence')
-              : t('connected'),
-          );
-          onConnected();
-        } catch (err) {
-          console.error('[embedded-signup] connect failed:', err);
-          toast.error(t('connectFailed'));
-        } finally {
-          setConnecting(false);
-        }
+        void completeSignup(code);
       },
       {
         config_id: ES_CONFIG_ID,
@@ -268,7 +285,7 @@ export function EmbeddedSignupButton({
         },
       },
     );
-  }, [onConnected, t]);
+  }, [completeSignup, t]);
 
   if (!isEmbeddedSignupConfigured()) return null;
 

@@ -61,7 +61,7 @@ const SECURITY_HEADERS = [
       // Meta API call still happens server-side — these are here for the
       // signup popup alone, which is why graph.facebook.com is listed
       // but nothing else about the Cloud API is.
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://www.facebook.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://www.facebook.com https://web.facebook.com https://connect.facebook.net",
       // The Embedded Signup popup/iframe. There was no frame-src before,
       // so it fell through to default-src 'self' — which would block the
       // signup flow outright the moment CSP stops being report-only.
