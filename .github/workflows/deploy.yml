@@ -34,6 +34,7 @@ jobs:
             --build-arg NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }} \
             --build-arg NEXT_PUBLIC_SUPPORT_WHATSAPP=${{ secrets.NEXT_PUBLIC_SUPPORT_WHATSAPP }} \
             --build-arg NEXT_PUBLIC_FACEBOOK_APP_ID=${{ secrets.NEXT_PUBLIC_FACEBOOK_APP_ID }} \
+            --build-arg NEXT_PUBLIC_META_ES_CONFIG_ID=${{ secrets.NEXT_PUBLIC_META_ES_CONFIG_ID }} \
             -t ${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             --output type=docker,dest=- . | \
           ssh -p ${{ secrets.SERVER_PORT || 22 }} -i ~/.ssh/id_ed25519 \

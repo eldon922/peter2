@@ -70,9 +70,16 @@ NEXT_PUBLIC_META_ES_CONFIG_ID=your-embedded-signup-configuration-id
 ```
 
 `NEXT_PUBLIC_*` variables are baked into the bundle at build time, so a
-Docker deploy must pass them as **build args**, not just runtime env —
-`docker-compose.yml` already forwards both. Changing either one requires
-`docker compose up --build`.
+Docker deploy must pass them as **build args**, not just runtime env.
+Putting them in `.env.local` alone does nothing: that file is loaded at
+container *run* time, long after the bundle was compiled.
+
+Both are already forwarded by `docker-compose.yml` (rebuild with
+`docker compose up --build`) and by `.github/workflows/deploy.yml`, which
+reads them from **GitHub Actions repository secrets** — so a CI deploy
+needs `NEXT_PUBLIC_META_ES_CONFIG_ID` added there, not just on the
+server. A missing secret builds silently: the arg expands to an empty
+string and the button simply never renders.
 
 The button appears only when `NEXT_PUBLIC_FACEBOOK_APP_ID` **and**
 `NEXT_PUBLIC_META_ES_CONFIG_ID` are both set. `META_APP_ID` /
@@ -113,7 +120,17 @@ on Meta's message ID and skipped rather than duplicated.
 ## Troubleshooting
 
 **The button does not appear.** Both `NEXT_PUBLIC_*` variables must be
-present *at build time*. Rebuild after setting them.
+present *at build time*, so this is nearly always a build-arg problem
+rather than a code one. Check, in order:
+
+1. `NEXT_PUBLIC_META_ES_CONFIG_ID` and `NEXT_PUBLIC_FACEBOOK_APP_ID`
+   exist as **GitHub Actions secrets** if you deploy through
+   `.github/workflows/deploy.yml`. An unset secret expands to an empty
+   string and the build succeeds with the button gated off.
+2. You rebuilt the image after setting them — restarting the container
+   is not enough.
+3. Confirm what actually shipped by grepping the served bundle for your
+   configuration ID; if it isn't in the JS, it wasn't in the build.
 
 **"Could not determine which WhatsApp Business Account was connected."**
 The pop-up's session message never arrived — usually a pop-up blocker.
