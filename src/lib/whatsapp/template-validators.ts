@@ -25,7 +25,7 @@ export const TEMPLATE_LIMITS = {
   bodyMaxLength: 1024,
   footerMaxLength: 60,
   headerTextMaxLength: 60,
-  buttonTextMaxLength: 25,
+  buttonTextMaxLength: 40,
   maxButtonsTotal: 10,
   maxUrlButtons: 2,
   maxPhoneButtons: 1,
