@@ -300,6 +300,16 @@ export interface WhatsAppConfig {
   /** Last error from /register; cleared on success. */
   last_registration_error?: string;
   /**
+   * Structured reason for the last /register failure, when Meta's
+   * error maps to one we give special UI treatment. Currently only
+   * 'pin_mismatch' — the number already has 2FA enabled with a PIN
+   * we don't know, so retrying with another generated one can never
+   * work; the settings panel prompts for the number's real PIN
+   * instead of a generic "try again". NULL for every other failure
+   * (or no failure) — `last_registration_error`'s text still applies.
+   */
+  last_registration_error_code?: 'pin_mismatch' | null;
+  /**
    * Meta App ID (migration 041). Not a secret. Used for the Resumable
    * Upload API when submitting image-header templates. Falls back to
    * the `META_APP_ID` env var when unset.

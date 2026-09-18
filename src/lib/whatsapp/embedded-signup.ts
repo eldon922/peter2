@@ -21,6 +21,8 @@
  * the top of that file for why positional args are banned here.
  */
 
+import crypto from 'node:crypto'
+
 import { META_API_BASE, throwMetaError } from './meta-api'
 
 /**
@@ -168,4 +170,21 @@ export async function listWabaPhoneNumbers(
   }
   const data = (await response.json()) as { data?: WabaPhoneNumber[] }
   return data.data ?? []
+}
+
+/**
+ * Generate a 6-digit PIN for `POST /{phone_number_id}/register`.
+ *
+ * The Embedded Signup popup never hands this server a two-step
+ * verification PIN — for a freshly provisioned Cloud API number none
+ * exists yet. `/register` both sets that PIN and completes
+ * registration in the same call, so the number just needs *a* PIN,
+ * not one the self-hoster ever has to see, enter, or recall — unlike
+ * the manual-connect form, where the customer supplies their own.
+ *
+ * `crypto.randomInt` rather than `Math.random`: this ends up as a
+ * live 2FA credential on the WABA, not a UI-only value.
+ */
+export function generateRegistrationPin(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
 }

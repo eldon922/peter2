@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   exchangeCodeForToken,
+  generateRegistrationPin,
   getEmbeddedSignupEnv,
   listWabaPhoneNumbers,
   resolveWabaIdFromToken,
@@ -177,6 +178,20 @@ describe('listWabaPhoneNumbers', () => {
     await expect(
       listWabaPhoneNumbers({ wabaId: 'W', accessToken: 't' }),
     ).rejects.toThrow(/Insufficient permission/);
+  });
+});
+
+describe('generateRegistrationPin', () => {
+  it('always returns a 6-digit numeric string, even below 100000', () => {
+    for (let i = 0; i < 200; i++) {
+      const pin = generateRegistrationPin();
+      expect(pin).toMatch(/^\d{6}$/);
+    }
+  });
+
+  it('does not always return the same PIN', () => {
+    const pins = new Set(Array.from({ length: 50 }, () => generateRegistrationPin()));
+    expect(pins.size).toBeGreaterThan(1);
   });
 });
 

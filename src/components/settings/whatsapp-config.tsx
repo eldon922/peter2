@@ -112,6 +112,7 @@ export function WhatsAppConfig() {
   // multi-number bug that prompted this work.
   const isRegistered = Boolean(config?.registered_at);
   const lastRegistrationError = config?.last_registration_error ?? null;
+  const lastRegistrationErrorCode = config?.last_registration_error_code ?? null;
 
   // Rows that came through Embedded Signup (migration 042) were
   // registered by Meta inside the flow, and a coexistence number has no
@@ -125,6 +126,11 @@ export function WhatsAppConfig() {
   const embeddedSignupAvailable = isEmbeddedSignupConfigured();
 
   const [verifyingRegistration, setVerifyingRegistration] = useState(false);
+  // Retry form for RegisterPinMismatchError — the number already has
+  // 2FA enabled with a PIN this app never set, so it has to come
+  // from the customer, not from another self-generated guess.
+  const [retryPin, setRetryPin] = useState('');
+  const [retryingPin, setRetryingPin] = useState(false);
   type RegistrationProbe = {
     live: boolean;
     checks: Record<string, boolean | null>;
@@ -388,6 +394,43 @@ export function WhatsAppConfig() {
     }
   }
 
+  async function handleRetryWithPin() {
+    if (!/^\d{6}$/.test(retryPin)) {
+      toast.error('PIN must be exactly 6 digits.');
+      return;
+    }
+    setRetryingPin(true);
+    try {
+      const res = await fetch('/api/whatsapp/config/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: retryPin }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data?.error ?? 'Could not retry registration.');
+        return;
+      }
+
+      if (data.registered) {
+        toast.success('Number registered — inbound messages will now arrive.');
+        setRetryPin('');
+      } else if (data.registration_error_code === 'pin_mismatch') {
+        toast.error("That PIN didn't match either. Double-check it in WhatsApp Manager → Two-step verification.");
+      } else {
+        toast.error(data.registration_error ?? 'Registration failed. See details below.');
+      }
+
+      if (accountId) await fetchConfig(accountId);
+    } catch (err) {
+      console.error('retry register error:', err);
+      toast.error('Could not reach the registration endpoint.');
+    } finally {
+      setRetryingPin(false);
+    }
+  }
+
   async function handleReset() {
     if (!confirm('This will delete the current WhatsApp config so you can re-enter it. Continue?')) {
       return;
@@ -475,7 +518,9 @@ export function WhatsAppConfig() {
               </AlertTitle>
             </div>
             <AlertDescription className="text-muted-foreground mt-2 text-xs leading-relaxed">
-              {t('embeddedSignup.badgeHint')}
+              {connectionType === 'coexistence'
+                ? t('embeddedSignup.badgeHint')
+                : t('embeddedSignup.badgeHintCloudApi')}
             </AlertDescription>
           </Alert>
         )}
@@ -608,6 +653,44 @@ export function WhatsAppConfig() {
                 <>{t('noRegistrationHint')}</>
               )}
             </AlertDescription>
+
+            {/* PIN-mismatch retry — the number already has 2FA
+                enabled with a PIN this app never set (a re-connect,
+                or a number that was registered elsewhere before). No
+                amount of retrying with another generated PIN will
+                ever work; only the customer knows the real one. */}
+            {!isRegistered && lastRegistrationErrorCode === 'pin_mismatch' && (
+              <div className="mt-3 rounded border border-amber-700/40 bg-amber-950/20 px-3 py-2.5 space-y-2">
+                <p className="text-xs text-amber-200/90 leading-relaxed">
+                  {t('pinMismatchHint')}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={retryPin}
+                    onChange={(e) =>
+                      setRetryPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    }
+                    placeholder={t('pinMismatchPlaceholder')}
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="h-8 max-w-[140px] font-mono tracking-widest"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={retryingPin || retryPin.length !== 6}
+                    onClick={handleRetryWithPin}
+                    className="h-8 border-border bg-transparent text-foreground hover:bg-muted"
+                  >
+                    {retryingPin ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : null}
+                    {t('pinMismatchSubmit')}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {registrationProbe && (
               <div className="mt-3 rounded border border-border bg-card/60 px-3 py-2 space-y-1.5 text-[11px]">

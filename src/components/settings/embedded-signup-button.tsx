@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { toast } from 'sonner';
-import { Loader2, MessageCircle } from 'lucide-react';
+import { Loader2, MessageCircle, Copy, Check, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -14,6 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 /**
  * Meta Embedded Signup — the one-click alternative to pasting Cloud API
@@ -105,6 +114,11 @@ export function EmbeddedSignupButton({
   const t = useTranslations('Settings.whatsapp.embeddedSignup');
   const [sdkReady, setSdkReady] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  /** The one-time /register PIN, shown once and never persisted. */
+  const [revealedPin, setRevealedPin] = useState<string | null>(null);
+  /** Gates the dialog's close button — see the dialog JSX below. */
+  const [pinSavedAck, setPinSavedAck] = useState(false);
+  const [pinCopied, setPinCopied] = useState(false);
 
   /**
    * Session info arrives on a `message` event that races the `FB.login`
@@ -229,6 +243,26 @@ export function EmbeddedSignupButton({
             ? t('connectedCoexistence')
             : t('connected'),
         );
+        // Credentials and subscription are valid either way — only the
+        // /register call for inbound webhooks can fail here. Surface it
+        // as a follow-up warning rather than blocking the success toast;
+        // the settings panel's own "Not Registered" banner (driven by
+        // the same registered_at / last_registration_error the manual
+        // connect form uses) gives the retry path.
+        if (payload.registration_error) {
+          toast.warning(t('registeredFailedWarning', { error: payload.registration_error }));
+        }
+        // The PIN only ever arrives on THIS response, right after a
+        // successful /register — it is never persisted server-side and
+        // there is no "view it again" screen, so a toast (which the
+        // customer can dismiss or miss entirely) is not enough. A
+        // dialog gated on an explicit acknowledgement is deliberately
+        // harder to blow past.
+        if (payload.registration_pin) {
+          setPinSavedAck(false);
+          setPinCopied(false);
+          setRevealedPin(payload.registration_pin);
+        }
         onConnected();
       } catch (err) {
         console.error('[embedded-signup] connect failed:', err);
@@ -287,9 +321,17 @@ export function EmbeddedSignupButton({
     );
   }, [completeSignup, t]);
 
+  const copyPin = useCallback(() => {
+    if (!revealedPin) return;
+    void navigator.clipboard.writeText(revealedPin).then(() => {
+      setPinCopied(true);
+    });
+  }, [revealedPin]);
+
   if (!isEmbeddedSignupConfigured()) return null;
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="text-foreground">{t('title')}</CardTitle>
@@ -326,5 +368,73 @@ export function EmbeddedSignupButton({
         </p>
       </CardContent>
     </Card>
+
+    {/* One-time PIN reveal. Not dismissible via the primary action
+        until the customer explicitly confirms they've saved it —
+        this PIN is not recoverable from anywhere in this app once
+        the dialog closes. Backdrop/Escape can still close it (base
+        behaviour), so the checkbox gate is a strong nudge, not a
+        hard trap — deliberately, since trapping a modal open is its
+        own kind of bad UX. */}
+    <Dialog
+      open={revealedPin !== null}
+      onOpenChange={(open) => {
+        if (!open) setRevealedPin(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-500">
+            <ShieldAlert className="size-5 shrink-0" />
+            {t('pinDialog.title')}
+          </DialogTitle>
+          <DialogDescription>{t('pinDialog.description')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 rounded-md border border-amber-600/40 bg-amber-950/20 px-4 py-3">
+          <span className="flex-1 text-center font-mono text-2xl tracking-[0.4em] text-foreground">
+            {revealedPin}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={copyPin}
+            className="shrink-0"
+          >
+            {pinCopied ? (
+              <Check className="size-3.5" />
+            ) : (
+              <Copy className="size-3.5" />
+            )}
+            {pinCopied ? t('pinDialog.copied') : t('pinDialog.copy')}
+          </Button>
+        </div>
+
+        <p className="text-xs text-amber-500/90 leading-relaxed">
+          {t('pinDialog.warning')}
+        </p>
+
+        <label className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Checkbox
+            checked={pinSavedAck}
+            onCheckedChange={(checked) => setPinSavedAck(checked === true)}
+            className="mt-0.5"
+          />
+          {t('pinDialog.ackLabel')}
+        </label>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            disabled={!pinSavedAck}
+            onClick={() => setRevealedPin(null)}
+          >
+            {t('pinDialog.close')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

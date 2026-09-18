@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   registerPhoneNumber,
+  RegisterPinMismatchError,
   subscribeWabaToApp,
   verifyPhoneNumber,
 } from '@/lib/whatsapp/meta-api'
@@ -285,6 +286,7 @@ export async function POST(request: Request) {
     // stale PIN would actually fail and undo the active subscription.
     let registeredAt: string | null = existing?.registered_at ?? null
     let registrationError: string | null = null
+    let registrationErrorCode: 'pin_mismatch' | null = null
     // True when registration was deliberately skipped because no PIN
     // was supplied (see below). Distinct from registrationError — this
     // is not a failure, just an incomplete-but-valid save.
@@ -312,6 +314,9 @@ export async function POST(request: Request) {
           })
           registeredAt = new Date().toISOString()
         } catch (err) {
+          if (err instanceof RegisterPinMismatchError) {
+            registrationErrorCode = 'pin_mismatch'
+          }
           registrationError =
             err instanceof Error ? err.message : 'Unknown Meta API error'
           console.error('Phone number /register failed:', registrationError)
@@ -363,6 +368,7 @@ export async function POST(request: Request) {
       registered_at: registrationError ? null : registeredAt,
       subscribed_apps_at: subscribedAppsAt ?? null,
       last_registration_error: registrationError,
+      last_registration_error_code: registrationErrorCode,
       // Credentials pasted into Settings — 'manual' even when this
       // overwrites a row that originally arrived through Embedded
       // Signup, because the /register + PIN path below is the manual
@@ -415,6 +421,7 @@ export async function POST(request: Request) {
         saved: true,
         registered: false,
         registration_error: registrationError,
+        registration_error_code: registrationErrorCode,
         phone_info: phoneInfo,
       })
     }

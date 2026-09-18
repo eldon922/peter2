@@ -1565,14 +1565,28 @@
         "connected": "WhatsApp connected.",
         "connectedCoexistence": "WhatsApp connected. Messages you send from the Business app will appear here too.",
         "connectFailed": "Could not finish connecting. Please try again.",
+        "registeredFailedWarning": "Connected, but Meta couldn't finish registering the number for inbound messages: {error}. You can retry from the registration status card below.",
         "cancelled": "Signup was cancelled.",
         "popupError": "Meta reported an error during signup.",
         "sdkFailed": "Could not load the Facebook SDK. Check your connection and reload.",
         "manualFallback": "Connect manually instead",
         "badgeEmbeddedSignup": "Connected via Embedded Signup",
         "badgeCoexistence": "Connected via the WhatsApp Business app",
-        "badgeHint": "Meta registered this number during signup, so there is no two-step PIN to enter."
-      }
+        "badgeHint": "Meta registered this number during signup, so there is no two-step PIN to enter.",
+        "badgeHintCloudApi": "This number's inbound webhook registration is handled automatically — there is no PIN for you to set or remember.",
+        "pinDialog": {
+          "title": "Save this PIN before you close this window",
+          "description": "This is the two-step verification PIN Meta just set for this number's inbound message registration.",
+          "copy": "Copy",
+          "copied": "Copied",
+          "warning": "This PIN is shown only once, right now. It is not saved anywhere in this app and there is no way to view it again later. If you ever need it — for example in Meta's WhatsApp Manager, or if you connect this number elsewhere — write it down or copy it somewhere safe before closing this dialog.",
+          "ackLabel": "I've saved this PIN somewhere safe.",
+          "close": "Close"
+        }
+      },
+      "pinMismatchHint": "This number already has two-step verification enabled with a PIN we don't know. Enter that number's existing 6-digit PIN to finish registering it — you'll find or reset it in Meta's WhatsApp Manager under Two-step verification.",
+      "pinMismatchPlaceholder": "6-digit PIN",
+      "pinMismatchSubmit": "Retry"
     },
     "sections": {
       "overview": "Overview",

@@ -156,6 +156,27 @@ export interface RegisterPhoneNumberResult {
 }
 
 /**
+ * Thrown by `registerPhoneNumber` specifically for Meta's error 133005
+ * ("Two step verification PIN Mismatch") — the number already has
+ * two-step verification enabled with a DIFFERENT PIN than the one we
+ * sent. This is not a generic failure: retrying with the same
+ * self-generated PIN will never succeed, because the number isn't
+ * ours to set a fresh PIN on anymore. The caller needs to ask whoever
+ * knows the number's actual PIN, not just try again.
+ *
+ * Kept as a distinct class (rather than string-matching the message
+ * downstream, the way the "already registered" case above does)
+ * because callers branch UI behaviour on it, not just logging.
+ */
+export class RegisterPinMismatchError extends Error {
+  readonly code = 'pin_mismatch' as const
+  constructor(message: string) {
+    super(message)
+    this.name = 'RegisterPinMismatchError'
+  }
+}
+
+/**
  * Register a phone number for inbound webhook events.
  *
  * Errors that should be surfaced verbatim to the user:
@@ -194,6 +215,14 @@ export async function registerPhoneNumber(
   const message = data.error?.message ?? `Meta API error: ${response.status}`
   if (/already.*registered/i.test(message)) {
     return { success: true, alreadyRegistered: true }
+  }
+  // Distinct from the above despite the confusingly similar code:
+  // 133005 covers BOTH "already registered" (message says so) and an
+  // actual PIN mismatch against a number's existing 2FA PIN (message
+  // doesn't). Checked after the already-registered text match so that
+  // case still wins when both are technically true.
+  if (data.error?.code === 133005) {
+    throw new RegisterPinMismatchError(message)
   }
   throw new Error(message)
 }

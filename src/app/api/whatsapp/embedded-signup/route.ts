@@ -13,10 +13,18 @@
  *               neither, so this route re-derives whatever is missing
  *               from Meta rather than trusting the browser to supply it.
  *
- * Deliberately does NOT call POST /{phone_number_id}/register. A
- * coexistence number is registered through the WhatsApp Business app and
- * has no two-step PIN to give us; an Embedded Signup Cloud API number is
- * registered by Meta inside the flow. See migration 042.
+ * Calls POST /{phone_number_id}/register for plain Cloud API numbers
+ * (issue: numbers came back from the popup "connected" but never
+ * actually subscribed for inbound webhooks — Meta error 141000 on
+ * send/receive). Meta does NOT reliably do this as part of the popup
+ * flow, despite what an earlier version of this comment claimed. A
+ * coexistence number is the one case that genuinely skips it: it's
+ * registered through the WhatsApp Business app itself and has no
+ * Cloud API PIN to give us. See migration 042.
+ *
+ * The PIN /register sets is generated here, handed back to the
+ * browser once in this response (`registration_pin`), and never
+ * stored — see the comment on that field below.
  */
 
 import { NextResponse } from 'next/server'
@@ -24,12 +32,13 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import {
   exchangeCodeForToken,
+  generateRegistrationPin,
   getEmbeddedSignupEnv,
   listWabaPhoneNumbers,
   resolveWabaIdFromToken,
   type WabaPhoneNumber,
 } from '@/lib/whatsapp/embedded-signup'
-import { subscribeWabaToApp } from '@/lib/whatsapp/meta-api'
+import { registerPhoneNumber, RegisterPinMismatchError, subscribeWabaToApp } from '@/lib/whatsapp/meta-api'
 import { encrypt } from '@/lib/whatsapp/encryption'
 import {
   findConflictingAccount,
@@ -214,6 +223,57 @@ export async function POST(request: Request) {
       )
     }
 
+    // Step 6 — register the number for inbound webhooks.
+    //
+    // Coexistence numbers register through the WhatsApp Business app
+    // itself and have no Cloud API PIN to give us, so this is skipped
+    // for them and they're treated as live from `connected_at` alone
+    // (unchanged from before). A plain Cloud API number, though, needs
+    // an explicit /register call — the popup completing does not
+    // guarantee Meta already did this, and a number that looks
+    // "connected" here but was never registered fails every send with
+    // error 141000. The PIN doesn't need to mean anything to the
+    // customer; /register both sets it and completes registration in
+    // one call, so a freshly generated one is fine.
+    let registeredAt: string | null = null
+    let registrationError: string | null = null
+    /**
+     * Set specifically for RegisterPinMismatchError. The settings
+     * panel uses this (not just `registrationError`'s text) to decide
+     * whether to show the generic failure message or the "enter this
+     * number's existing PIN" retry form — see
+     * POST /api/whatsapp/config/register.
+     */
+    let registrationErrorCode: 'pin_mismatch' | null = null
+    // Only set when /register actually succeeds this call — never
+    // persisted anywhere, and deliberately not stored on the config
+    // row (see comment on the response below for why).
+    let generatedPin: string | null = null
+    if (!isCoexistence) {
+      const pin = generateRegistrationPin()
+      try {
+        await registerPhoneNumber({
+          phoneNumberId: phoneNumber.id,
+          accessToken,
+          pin,
+        })
+        registeredAt = new Date().toISOString()
+        generatedPin = pin
+      } catch (err) {
+        if (err instanceof RegisterPinMismatchError) {
+          registrationErrorCode = 'pin_mismatch'
+        }
+        registrationError =
+          err instanceof Error ? err.message : 'Unknown Meta API error'
+        console.error('[embedded-signup] /register failed:', registrationError)
+        // Fall through and still save the row — the credentials and
+        // subscription are valid, only registration failed, and the
+        // "Not Registered" banner (driven by registered_at /
+        // last_registration_error, same fields the manual-connect path
+        // writes) gives the user a retry path without redoing signup.
+      }
+    }
+
     let encryptedAccessToken: string
     try {
       encryptedAccessToken = encrypt(accessToken)
@@ -238,13 +298,13 @@ export async function POST(request: Request) {
         : ('embedded_signup' as const),
       status: 'connected' as const,
       connected_at: now,
-      // Meta registers the number as part of the flow (coexistence
-      // numbers are registered through the Business app), so the number
-      // really is live — recording the timestamp keeps the UI's
-      // "Not registered" banner from firing on a healthy connection.
-      registered_at: now,
+      // Coexistence: registered through the Business app, so treat it
+      // as live from the moment the config is saved. Cloud API: only
+      // as live as the /register call above actually was.
+      registered_at: isCoexistence ? now : registeredAt,
       subscribed_apps_at: now,
-      last_registration_error: null,
+      last_registration_error: isCoexistence ? null : registrationError,
+      last_registration_error_code: isCoexistence ? null : registrationErrorCode,
       updated_at: now,
     }
 
@@ -277,6 +337,15 @@ export async function POST(request: Request) {
       success: true,
       connection_type: row.connection_type,
       waba_id: wabaId,
+      registered: row.registered_at != null,
+      registration_error: row.last_registration_error,
+      registration_error_code: row.last_registration_error_code,
+      // Handed to the browser exactly once, on the response to THIS
+      // request, and never written anywhere server-side (not to
+      // whatsapp_config, not to logs). If the customer loses it, it
+      // is not recoverable here — Meta's WhatsApp Manager → two-step
+      // verification is the only reset path at that point.
+      registration_pin: generatedPin,
       phone_info: {
         id: phoneNumber.id,
         display_phone_number: phoneNumber.display_phone_number,

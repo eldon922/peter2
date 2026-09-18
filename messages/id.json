@@ -1555,14 +1555,28 @@
         "connected": "WhatsApp terhubung.",
         "connectedCoexistence": "WhatsApp terhubung. Pesan yang Anda kirim dari aplikasi Business juga akan muncul di sini.",
         "connectFailed": "Tidak dapat menyelesaikan koneksi. Silakan coba lagi.",
+        "registeredFailedWarning": "Terhubung, tetapi Meta gagal menyelesaikan pendaftaran nomor untuk pesan masuk: {error}. Anda bisa mencoba lagi dari kartu status pendaftaran di bawah.",
         "cancelled": "Pendaftaran dibatalkan.",
         "popupError": "Meta melaporkan kesalahan saat pendaftaran.",
         "sdkFailed": "Tidak dapat memuat Facebook SDK. Periksa koneksi Anda lalu muat ulang.",
         "manualFallback": "Hubungkan secara manual",
         "badgeEmbeddedSignup": "Terhubung via Embedded Signup",
         "badgeCoexistence": "Terhubung via aplikasi WhatsApp Business",
-        "badgeHint": "Meta mendaftarkan nomor ini saat pendaftaran, jadi tidak ada PIN dua langkah yang perlu dimasukkan."
-      }
+        "badgeHint": "Meta mendaftarkan nomor ini saat pendaftaran, jadi tidak ada PIN dua langkah yang perlu dimasukkan.",
+        "badgeHintCloudApi": "Pendaftaran webhook pesan masuk untuk nomor ini ditangani secara otomatis — tidak ada PIN yang perlu Anda atur atau ingat.",
+        "pinDialog": {
+          "title": "Simpan PIN ini sebelum menutup jendela ini",
+          "description": "Ini adalah PIN verifikasi dua langkah yang baru saja Meta tetapkan untuk pendaftaran pesan masuk nomor ini.",
+          "copy": "Salin",
+          "copied": "Tersalin",
+          "warning": "PIN ini hanya ditampilkan sekali, saat ini. PIN tidak disimpan di mana pun dalam aplikasi ini dan tidak ada cara untuk melihatnya lagi nanti. Jika suatu saat Anda membutuhkannya — misalnya di WhatsApp Manager milik Meta, atau saat menghubungkan nomor ini di tempat lain — catat atau salin ke tempat yang aman sebelum menutup dialog ini.",
+          "ackLabel": "Saya sudah menyimpan PIN ini di tempat yang aman.",
+          "close": "Tutup"
+        }
+      },
+      "pinMismatchHint": "Nomor ini sudah mengaktifkan verifikasi dua langkah dengan PIN yang tidak kami ketahui. Masukkan PIN 6 digit nomor tersebut untuk menyelesaikan pendaftaran — Anda bisa menemukan atau mengatur ulangnya di WhatsApp Manager milik Meta pada bagian Verifikasi dua langkah.",
+      "pinMismatchPlaceholder": "PIN 6 digit",
+      "pinMismatchSubmit": "Coba lagi"
     },
     "sections": {
       "overview": "Ringkasan",

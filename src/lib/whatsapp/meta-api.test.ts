@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INTERACTIVE_LIMITS,
+  registerPhoneNumber,
+  RegisterPinMismatchError,
   sendInteractiveButtons,
   sendInteractiveList,
 } from "./meta-api";
@@ -20,6 +22,76 @@ const BASE_ARGS = {
   to: "1234567890",
   bodyText: "Body text",
 } as const;
+
+describe("registerPhoneNumber", () => {
+  function jsonResponse(status: number, body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("succeeds on a 200", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { success: true }));
+    const result = await registerPhoneNumber({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+      pin: "123456",
+    });
+    expect(result).toEqual({ success: true, alreadyRegistered: false });
+  });
+
+  it("treats 'already registered' as success, not an error", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(400, {
+        error: { code: 133005, message: "Number is already registered to this app" },
+      }),
+    );
+    const result = await registerPhoneNumber({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+      pin: "123456",
+    });
+    expect(result).toEqual({ success: true, alreadyRegistered: true });
+  });
+
+  it("throws RegisterPinMismatchError for code 133005 without the already-registered text", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(400, {
+        error: { code: 133005, message: "Two step verification PIN Mismatch" },
+      }),
+    );
+    const promise = registerPhoneNumber({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+      pin: "000000",
+    });
+    await expect(promise).rejects.toBeInstanceOf(RegisterPinMismatchError);
+    await expect(promise).rejects.toThrow(/PIN Mismatch/);
+  });
+
+  it("throws a plain Error for other failures", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(500, { error: { code: 1, message: "Server error" } }),
+    );
+    const promise = registerPhoneNumber({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+      pin: "123456",
+    });
+    await expect(promise).rejects.not.toBeInstanceOf(RegisterPinMismatchError);
+    await expect(promise).rejects.toThrow(/Server error/);
+  });
+});
 
 describe("sendInteractiveButtons — validation", () => {
   beforeEach(() => {
