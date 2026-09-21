@@ -65,6 +65,10 @@ import { useTranslations } from 'next-intl';
 
 const PAGE_SIZE = 25;
 
+// Pseudo tag id for the "Untagged" choice in the delete-by-tag dialog.
+// Real tag ids are UUIDs, so this can never collide with one.
+const UNTAGGED = '__untagged__';
+
 interface ContactWithTags extends Contact {
   tags?: Tag[];
 }
@@ -172,6 +176,8 @@ export default function ContactsPage() {
   // it deliberately costs more to trigger: pick the tag, then re-type
   // its name. `deleteByTagCount` is fetched when the tag is chosen so
   // the confirmation states a real number rather than "all of them".
+  // `deleteByTagId` may also be UNTAGGED, which targets contacts that
+  // carry no tag at all (migration 044).
   const [deleteByTagOpen, setDeleteByTagOpen] = useState(false);
   const [deleteByTagId, setDeleteByTagId] = useState<string | null>(null);
   const [deleteByTagCount, setDeleteByTagCount] = useState<number | null>(null);
@@ -433,6 +439,14 @@ export default function ContactsPage() {
     setDeleteByTagConfirm('');
     setDeleteByTagCount(null);
 
+    if (tagId === UNTAGGED) {
+      // "No tag" can't be counted with a PostgREST filter, so it has
+      // its own RPC — see migration 044.
+      const { data, error } = await supabase.rpc('count_untagged_contacts');
+      setDeleteByTagCount(error ? 0 : Number(data ?? 0));
+      return;
+    }
+
     const { count, error } = await supabase
       .from('contact_tags')
       .select('contact_id', { count: 'exact', head: true })
@@ -448,9 +462,12 @@ export default function ContactsPage() {
     // One transactional statement server-side — see migration 040. Doing
     // it here would mean reading every matching id and deleting in
     // chunks, which can half-succeed.
-    const { data, error } = await supabase.rpc('delete_contacts_by_tag', {
-      p_tag_id: deleteByTagId,
-    });
+    const { data, error } =
+      deleteByTagId === UNTAGGED
+        ? await supabase.rpc('delete_untagged_contacts')
+        : await supabase.rpc('delete_contacts_by_tag', {
+            p_tag_id: deleteByTagId,
+          });
 
     if (error) {
       toast.error(t('toastBulkFailedDelete'));
@@ -477,6 +494,14 @@ export default function ContactsPage() {
     a.name.localeCompare(b.name)
   );
   const hasActiveFilters = search.trim().length > 0 || selectedTagIds.length > 0;
+
+  // What the user must type to confirm delete-by-tag: the tag's name, or
+  // the "Untagged" label for the no-tag choice.
+  const deleteByTagName = !deleteByTagId
+    ? ''
+    : deleteByTagId === UNTAGGED
+      ? t('deleteUntaggedChip')
+      : (tagsMap[deleteByTagId]?.name ?? '');
 
   function toggleTagFilter(tagId: string) {
     setSelectedTagIds((prev) =>
@@ -542,18 +567,16 @@ export default function ContactsPage() {
             <Upload className="size-4" />
             {t('importBtn')}
           </GatedButton>
-          {allTags.length > 0 && (
-            <GatedButton
-              variant="outline"
-              canAct={canEdit}
-              gateReason="delete contacts"
-              onClick={openDeleteByTag}
-              className="border-border text-muted-foreground hover:bg-muted"
-            >
-              <Trash2 className="size-4" />
-              {t('deleteByTagBtn')}
-            </GatedButton>
-          )}
+          <GatedButton
+            variant="outline"
+            canAct={canEdit}
+            gateReason="delete contacts"
+            onClick={openDeleteByTag}
+            className="border-border text-muted-foreground hover:bg-muted"
+          >
+            <Trash2 className="size-4" />
+            {t('deleteByTagBtn')}
+          </GatedButton>
           <GatedButton
             canAct={canEdit}
             gateReason="add or import contacts"
@@ -1083,12 +1106,25 @@ export default function ContactsPage() {
               {t('deleteByTagTitle')}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              {t('deleteByTagDesc')}
+              {deleteByTagId === UNTAGGED
+                ? t('deleteUntaggedDesc')
+                : t('deleteByTagDesc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => selectDeleteByTag(UNTAGGED)}
+                className={cn(
+                  'inline-flex items-center rounded-full border border-dashed border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition-all',
+                  deleteByTagId === UNTAGGED
+                    ? 'ring-2 ring-destructive ring-offset-1 ring-offset-popover'
+                    : 'opacity-60 hover:opacity-100'
+                )}
+              >
+                {t('deleteUntaggedChip')}
+              </button>
               {allTags.map((tag) => {
                 const isPicked = deleteByTagId === tag.id;
                 return (
@@ -1117,13 +1153,18 @@ export default function ContactsPage() {
                 <p className="text-sm text-foreground">
                   {deleteByTagCount === null
                     ? t('deleteByTagCounting')
-                    : t('deleteByTagCount', { count: deleteByTagCount })}
+                    : t(
+                        deleteByTagId === UNTAGGED
+                          ? 'deleteUntaggedCount'
+                          : 'deleteByTagCount',
+                        { count: deleteByTagCount }
+                      )}
                 </p>
                 {deleteByTagCount !== null && deleteByTagCount > 0 && (
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">
                       {t('deleteByTagConfirmLabel', {
-                        name: tagsMap[deleteByTagId]?.name ?? '',
+                        name: deleteByTagName,
                       })}
                     </Label>
                     <Input
@@ -1154,8 +1195,7 @@ export default function ContactsPage() {
                 !deleteByTagId ||
                 deleteByTagCount === null ||
                 deleteByTagCount === 0 ||
-                deleteByTagConfirm.trim() !==
-                  (tagsMap[deleteByTagId]?.name ?? '')
+                deleteByTagConfirm.trim() !== deleteByTagName
               }
             >
               {deleting && <Loader2 className="size-4 animate-spin" />}
