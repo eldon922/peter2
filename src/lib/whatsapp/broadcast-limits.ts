@@ -29,8 +29,11 @@
  * to do with it (Vercel clamps it to the plan ceiling; a self-hosted
  * `next start` ignores it entirely, since no platform layer reads the
  * build output). See DELIVER_BUDGET_MS.
+ *
+ * MUST be mirrored in each route file as a literal, not an import:
+ * export const maxDuration = [ROUTE_MAX_DURATION_SECONDS]; // in each route file
  */
-export const ROUTE_MAX_DURATION_SECONDS = 300;
+export const ROUTE_MAX_DURATION_SECONDS = 600;
 
 /**
  * Tail of the duration budget reserved for DB writes rather than sends.
@@ -73,7 +76,7 @@ export const DELIVER_BUDGET_MS =
 /**
  * Recipients sent per group before pausing.
  */
-export const SEND_BATCH_SIZE = 10;
+export const SEND_BATCH_SIZE = 80;
 
 /**
  * Pause between groups. 10 per batch + 1 s keeps the average under

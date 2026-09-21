@@ -68,3 +68,84 @@ export function chunkRows<T>(rows: T[]): T[][] {
   }
   return chunks;
 }
+
+// ============================================================
+// Reading more rows than one response will carry.
+//
+// PostgREST silently truncates every response to its `max_rows`
+// setting (1,000 by default on Supabase) — no error, no warning, just
+// fewer rows than matched. A plain `.select()` over a large table, or a
+// `.limit(N)` with N above that cap, therefore returns a *prefix* that
+// looks like a complete answer. For a broadcast audience that means a
+// send quietly stops at 1,000 contacts, and an "exclude" list quietly
+// stops excluding after 1,000 rows.
+//
+// Reads that must be complete page through `.range()` instead.
+// ============================================================
+
+/**
+ * Rows requested per page by `fetchAllRows`. Matches Supabase's default
+ * `max_rows`, but correctness does not depend on it: the next page
+ * starts at the number of rows *received*, not the number requested, so
+ * a project configured with a lower cap costs extra round trips rather
+ * than lost rows.
+ */
+export const READ_PAGE_SIZE = 1000;
+
+interface PageResponse<T> {
+  data: T[] | null;
+  error: { message: string } | null;
+  count?: number | null;
+}
+
+/**
+ * Collect every row of a query, one `.range()` window at a time.
+ *
+ * `fetchPage` must build a **fresh** query on each call (supabase-js
+ * builders are mutable — reusing one across pages stacks the ranges)
+ * and must apply a **deterministic, unique** ordering, e.g.
+ * `.order('id')`. Offset paging over an unordered or tied ordering can
+ * repeat or skip rows between pages.
+ *
+ * Stops on the first empty page, so an unbounded read costs one extra
+ * round trip to confirm the end. That is deliberate: treating a short
+ * page as the end would reintroduce the silent truncation this exists
+ * to prevent whenever the server's row cap is below `pageSize`.
+ *
+ * `maxRows` bounds the result (and the last window requested), for
+ * callers that want "up to N" rather than "all". `count` is whatever
+ * the first page reported for `{ count: 'exact' }`, else null.
+ *
+ * Errors are returned rather than thrown so each caller keeps its own
+ * error handling; `rows` then holds whatever was read before the failure
+ * and must not be treated as complete.
+ */
+export async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PageResponse<T>>,
+  opts: { pageSize?: number; maxRows?: number } = {}
+): Promise<{
+  rows: T[];
+  count: number | null;
+  error: { message: string } | null;
+}> {
+  const pageSize = opts.pageSize ?? READ_PAGE_SIZE;
+  const maxRows = opts.maxRows ?? Number.POSITIVE_INFINITY;
+  const rows: T[] = [];
+  let count: number | null = null;
+
+  while (rows.length < maxRows) {
+    const from = rows.length;
+    const to = Math.min(from + pageSize, maxRows) - 1;
+    const { data, error, count: pageCount } = await fetchPage(from, to);
+    if (error) return { rows, count, error };
+    if (count === null && typeof pageCount === 'number') count = pageCount;
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+  }
+
+  return {
+    rows: rows.length > maxRows ? rows.slice(0, maxRows) : rows,
+    count,
+    error: null,
+  };
+}

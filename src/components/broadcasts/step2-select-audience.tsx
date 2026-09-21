@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
+import { fetchAllRows } from '@/lib/supabase/batching';
+import { MAX_RECIPIENTS } from '@/lib/whatsapp/broadcast-limits';
 import { Button } from '@/components/ui/button';
 import {
   Users,
@@ -142,26 +144,42 @@ export function Step2SelectAudience({
         audience.tagIds &&
         audience.tagIds.length > 0
       ) {
-        const { data } = await supabase
-          .from('contact_tags')
-          .select('contact_id')
-          .in('tag_id', audience.tagIds);
-        baseIds = new Set((data ?? []).map((r) => r.contact_id));
+        // Paged: a single select is clipped to the server's `max_rows`
+        // (1,000 by default), which capped this estimate at 1,000.
+        const tagIds = audience.tagIds;
+        const { rows, error } = await fetchAllRows<{ contact_id: string }>(
+          (from, to) =>
+            supabase
+              .from('contact_tags')
+              .select('contact_id')
+              .in('tag_id', tagIds)
+              .order('id')
+              .range(from, to),
+        );
+        if (error) throw new Error(error.message);
+        baseIds = new Set(rows.map((r) => r.contact_id));
       } else if (
         audience.type === 'custom_field' &&
         audience.customField?.fieldId &&
         audience.customField.value
       ) {
         const { fieldId, operator, value } = audience.customField;
-        let q = supabase
-          .from('contact_custom_values')
-          .select('contact_id')
-          .eq('custom_field_id', fieldId);
-        if (operator === 'is') q = q.eq('value', value);
-        else if (operator === 'is_not') q = q.neq('value', value);
-        else q = q.ilike('value', `%${value}%`);
-        const { data } = await q;
-        baseIds = new Set((data ?? []).map((r) => r.contact_id));
+        // A function so each page gets a fresh (mutable) query builder.
+        const buildQuery = () => {
+          let q = supabase
+            .from('contact_custom_values')
+            .select('contact_id')
+            .eq('custom_field_id', fieldId);
+          if (operator === 'is') q = q.eq('value', value);
+          else if (operator === 'is_not') q = q.neq('value', value);
+          else q = q.ilike('value', `%${value}%`);
+          return q;
+        };
+        const { rows, error } = await fetchAllRows<{ contact_id: string }>(
+          (from, to) => buildQuery().order('id').range(from, to),
+        );
+        if (error) throw new Error(error.message);
+        baseIds = new Set(rows.map((r) => r.contact_id));
       } else if (
         audience.type === 'csv' &&
         audience.csvContacts &&
@@ -178,11 +196,19 @@ export function Step2SelectAudience({
       // Apply exclude tags
       let excludeSet: Set<string> | null = null;
       if (audience.excludeTagIds && audience.excludeTagIds.length > 0) {
-        const { data: excludeRows } = await supabase
-          .from('contact_tags')
-          .select('contact_id')
-          .in('tag_id', audience.excludeTagIds);
-        excludeSet = new Set((excludeRows ?? []).map((r) => r.contact_id));
+        const excludeTagIds = audience.excludeTagIds;
+        const { rows: excludeRows, error } = await fetchAllRows<{
+          contact_id: string;
+        }>((from, to) =>
+          supabase
+            .from('contact_tags')
+            .select('contact_id')
+            .in('tag_id', excludeTagIds)
+            .order('id')
+            .range(from, to),
+        );
+        if (error) throw new Error(error.message);
+        excludeSet = new Set(excludeRows.map((r) => r.contact_id));
       }
 
       if (baseIds) {
@@ -198,6 +224,9 @@ export function Step2SelectAudience({
         const total = count ?? 0;
         setEstimatedCount(excludeSet ? Math.max(0, total - excludeSet.size) : total);
       }
+    } catch {
+      // A failed read must not leave a stale or misleading number up.
+      setEstimatedCount(null);
     } finally {
       setLoadingCount(false);
     }
@@ -446,6 +475,13 @@ export function Step2SelectAudience({
         ) : (
           <p className="text-xs text-muted-foreground">
             Select an audience type to see the estimate.
+          </p>
+        )}
+        {!loadingCount && estimatedCount !== null && estimatedCount > MAX_RECIPIENTS && (
+          <p className="mt-2 text-xs text-amber-500">
+            A single broadcast can reach at most {MAX_RECIPIENTS.toLocaleString()}{' '}
+            recipients. Narrow the audience (for example by tag) and send it in
+            parts.
           </p>
         )}
       </div>

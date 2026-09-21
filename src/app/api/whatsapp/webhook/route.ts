@@ -34,7 +34,7 @@ const log = createLogger('webhook')
 // MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
 // (literal required — see the note there). Enforced by
 // broadcast-limits.test.ts.
-export const maxDuration = 300
+export const maxDuration = 600
 
 // Lazy-initialized to avoid build-time crash when env vars are missing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -44,7 +44,7 @@ import {
 // MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
 // (literal required — see the note there). Enforced by
 // broadcast-limits.test.ts.
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 export async function POST(
   request: Request,

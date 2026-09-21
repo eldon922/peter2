@@ -50,7 +50,16 @@ interface Fixture {
   onUpdate?: (filters: [string, unknown][]) => Record<string, unknown>[];
 }
 
-function makeDb(fixtures: Record<string, Fixture>) {
+/**
+ * `serverMaxRows` models PostgREST's `max_rows` (1,000 by default on
+ * Supabase): whatever window a query asks for — `limit` or `range` — the
+ * response is silently clipped to it. Off by default, so existing tests
+ * keep their unbounded behaviour.
+ */
+function makeDb(
+  fixtures: Record<string, Fixture>,
+  opts: { serverMaxRows?: number } = {}
+) {
   const writes: Write[] = [];
   /** Table name per resolved SELECT — lets tests bound round trips. */
   const reads: string[] = [];
@@ -66,6 +75,7 @@ function makeDb(fixtures: Record<string, Fixture>) {
     // both is what lets tests catch a `remaining` derived from the
     // window instead of the count.
     let limitN: number | null = null;
+    let rangeWindow: [number, number] | null = null;
     let wantCount = false;
     // PostgREST `or=(a,b,c)`. Only the `phone.like.*<suffix>` shape the
     // bulk contact resolver emits is modelled.
@@ -104,7 +114,9 @@ function makeDb(fixtures: Record<string, Fixture>) {
         );
       }
       const matched = rows.length;
+      if (rangeWindow !== null) rows = rows.slice(rangeWindow[0], rangeWindow[1] + 1);
       if (limitN !== null) rows = rows.slice(0, limitN);
+      if (opts.serverMaxRows !== undefined) rows = rows.slice(0, opts.serverMaxRows);
       return rowMode === 'single'
         ? { data: rows[0] ?? null, error: null }
         : {
@@ -143,6 +155,10 @@ function makeDb(fixtures: Record<string, Fixture>) {
       order: () => chain,
       limit: (n?: number) => {
         if (typeof n === 'number') limitN = n;
+        return chain;
+      },
+      range: (from: number, to: number) => {
+        rangeWindow = [from, to];
         return chain;
       },
       maybeSingle: () => {
@@ -428,6 +444,36 @@ describe('planBroadcastRetry', () => {
 
     expect(plan.planned).toHaveLength(MAX_RECIPIENTS);
     expect(plan.remaining).toBe(overflow - MAX_RECIPIENTS);
+  });
+
+  it('claims up to the cap and reports the true remainder even when the server clips to 1,000 rows', async () => {
+    // Same clamp as planBroadcastSend: without paging, a retry could only
+    // ever claim 1,000 rows however high the cap, and `remaining` (from
+    // the exact count) would overstate what a further retry would do.
+    const overflow = MAX_RECIPIENTS + 25;
+    const { db } = makeDb(
+      {
+        broadcasts: { rows: [sentBroadcast()] },
+        broadcast_recipients: {
+          rows: Array.from({ length: overflow }, (_, i) =>
+            failedRow({
+              id: `rec-${i}`,
+              contact_id: `c-${i}`,
+              template_params: ['Jane', '#1'],
+              contact: { id: `c-${i}`, phone: '14155550123', name: 'Jane' },
+            })
+          ),
+        },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: { rows: [TEMPLATE_ROW] },
+      },
+      { serverMaxRows: 1000 }
+    );
+
+    const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(MAX_RECIPIENTS);
+    expect(plan.remaining).toBe(25);
   });
 
   it('reports remaining as 0 when every failed row is claimed', async () => {
@@ -720,6 +766,37 @@ function pendingRow(over: Record<string, unknown> = {}) {
 }
 
 describe('planBroadcastSend', () => {
+  it('plans every pending recipient even when the server clips responses to 1,000 rows', async () => {
+    // Regression: the read asked for `limit(MAX_RECIPIENTS)`, but
+    // PostgREST clamps any response to its `max_rows` (1,000 by default),
+    // so a 2,500-recipient broadcast planned only the first 1,000 and left
+    // the other 1,500 'pending' forever — a state nothing ever picks up.
+    const total = 2500;
+    const { db } = makeDb(
+      {
+        broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+        broadcast_recipients: {
+          rows: Array.from({ length: total }, (_, i) =>
+            pendingRow({
+              id: `rec-${i}`,
+              contact_id: `c-${i}`,
+              contact: { id: `c-${i}`, phone: '14155550123', name: 'Jane' },
+            })
+          ),
+        },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+      },
+      { serverMaxRows: 1000 }
+    );
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(total);
+    expect(plan.planned[0].recipientRowId).toBe('rec-0');
+    expect(plan.planned[total - 1].recipientRowId).toBe(`rec-${total - 1}`);
+  });
+
   it('errors when the broadcast does not exist (or belongs to another account)', async () => {
     const { db } = makeDb({ broadcasts: { rows: [] } });
     await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({

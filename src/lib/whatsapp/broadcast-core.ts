@@ -19,6 +19,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { sendTemplateMessage } from '@/lib/whatsapp/meta-api';
+import { fetchAllRows } from '@/lib/supabase/batching';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   DELIVER_BUDGET_MS,
@@ -423,22 +424,37 @@ export async function planBroadcastRetry(
   const templateLanguage = broadcast.template_language || 'en_US';
 
   // `count: 'exact'` reports how many failed rows match in total,
-  // independent of the row window `limit` returns — so `remaining` below
-  // is a true count rather than a "there is at least one more" flag.
+  // independent of the row window returned — so `remaining` below is a
+  // true count rather than a "there is at least one more" flag.
   // PostgREST computes it in the same round trip; no second query.
-  let query = db
-    .from('broadcast_recipients')
-    .select(
-      'id, contact_id, attempt_count, template_params, contact:contacts(*)',
-      { count: 'exact' }
-    )
-    .eq('broadcast_id', broadcastId)
-    .eq('status', 'failed')
-    .order('created_at', { ascending: true })
-    .limit(MAX_RECIPIENTS);
-  if (opts.recipientId) query = query.eq('id', opts.recipientId);
-
-  const { data: rawRows, error: rErr, count } = await query;
+  //
+  // Read in `.range()` pages, up to MAX_RECIPIENTS: a plain
+  // `.limit(MAX_RECIPIENTS)` is clipped to the server's `max_rows`
+  // (1,000 by default), which capped every retry at 1,000 rows however
+  // high the cap. `id` breaks `created_at` ties (a bulk insert stamps
+  // its whole batch with one timestamp) so paging is deterministic.
+  const {
+    rows: rawRows,
+    count,
+    error: rErr,
+  } = await fetchAllRows<Record<string, unknown>>(
+    (from, to) => {
+      let query = db
+        .from('broadcast_recipients')
+        .select(
+          'id, contact_id, attempt_count, template_params, contact:contacts(*)',
+          { count: 'exact' }
+        )
+        .eq('broadcast_id', broadcastId)
+        .eq('status', 'failed');
+      if (opts.recipientId) query = query.eq('id', opts.recipientId);
+      return query
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
+    },
+    { maxRows: MAX_RECIPIENTS }
+  );
   if (rErr) {
     console.error('[broadcast-core] retry read recipients error:', rErr);
     throw new BroadcastError('internal', 'Failed to read recipients', 500);
@@ -681,13 +697,24 @@ export async function planBroadcastSend(
 
   const templateLanguage = broadcast.template_language || 'en_US';
 
-  const { data: rawRows, error: rErr } = await db
-    .from('broadcast_recipients')
-    .select('id, contact_id, template_params, contact:contacts(*)')
-    .eq('broadcast_id', broadcastId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true })
-    .limit(MAX_RECIPIENTS);
+  // Paged for the same reason as the retry read above: `.limit()` alone
+  // is clipped to the server's `max_rows`, so a broadcast larger than
+  // that planned only its first 1,000 recipients and stranded the rest
+  // in 'pending' — a state nothing ever picks back up.
+  const { rows: rawRows, error: rErr } = await fetchAllRows<
+    Record<string, unknown>
+  >(
+    (from, to) =>
+      db
+        .from('broadcast_recipients')
+        .select('id, contact_id, template_params, contact:contacts(*)')
+        .eq('broadcast_id', broadcastId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    { maxRows: MAX_RECIPIENTS }
+  );
   if (rErr) {
     console.error('[broadcast-core] send read recipients error:', rErr);
     throw new BroadcastError('internal', 'Failed to read recipients', 500);

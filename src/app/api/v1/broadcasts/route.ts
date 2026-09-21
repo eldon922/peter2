@@ -7,7 +7,8 @@
 //     "name": "July promo",                 // optional label
 //     "template_name": "promo_july",        // required, approved template
 //     "template_language": "en_US",         // optional (default en_US)
-//     "recipients": [                        // required, 1..1000
+//     "recipients": [                        // required, 1..MAX_RECIPIENTS
+//                                            // (derived — see broadcast-limits.ts)
 //       { "to": "+14155550123", "params": ["Jane"] },
 //       { "to": "+14155550124" }
 //     ]
@@ -39,7 +40,7 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // — DELIVER_BUDGET_MS is derived from it. It cannot be imported: Next
 // statically analyzes route segment config and ignores non-literal
 // values. broadcast-limits.test.ts enforces the mirror.
-export const maxDuration = 300;
+export const maxDuration = 600;
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
 import { resolveAuditUserId, ContactError } from '@/lib/api/v1/contacts';
 import {
