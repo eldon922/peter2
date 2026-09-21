@@ -62,6 +62,16 @@ function InboxPageInner() {
   const [resyncToken, setResyncToken] = useState(0);
 
   /**
+   * Most recent customer message seen over realtime. Handed to the
+   * conversation list so its session-window badge reopens the moment a
+   * customer writes, rather than staying "Expired" until the next resync.
+   */
+  const [latestInbound, setLatestInbound] = useState<{
+    conversationId: string;
+    at: string;
+  } | null>(null);
+
+  /**
    * Whether the desktop contact sidebar (tags / deals / notes) is shown.
    * Defaults to `true` (the historical behaviour) and is restored from
    * localStorage after mount. We deliberately do NOT read localStorage in
@@ -240,6 +250,13 @@ function InboxPageInner() {
       const newMsg = event.new;
 
       if (event.eventType === "INSERT") {
+        if (newMsg.sender_type === "customer") {
+          setLatestInbound({
+            conversationId: newMsg.conversation_id,
+            at: newMsg.created_at,
+          });
+        }
+
         // Add to messages if it belongs to active conversation
         if (
           activeConversation &&
@@ -618,6 +635,7 @@ function InboxPageInner() {
             conversations={conversations}
             onConversationsLoaded={handleConversationsLoaded}
             resyncToken={resyncToken}
+            latestInbound={latestInbound}
           />
         </div>
 

@@ -38,6 +38,12 @@ interface ConversationListProps {
    * or the tab was throttled. Optional so existing callers keep working.
    */
   resyncToken?: number;
+  /**
+   * A customer message that just arrived over realtime. Merged into the
+   * last-inbound map so the badge reopens immediately instead of waiting
+   * for the next full resync.
+   */
+  latestInbound?: { conversationId: string; at: string } | null;
 }
 
 const STATUS_COLORS: Record<ConversationStatus, string> = {
@@ -56,6 +62,7 @@ export function ConversationList({
   conversations,
   onConversationsLoaded,
   resyncToken = 0,
+  latestInbound = null,
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
   
@@ -67,10 +74,22 @@ export function ConversationList({
     { label: t("filterClosed"), value: "closed" },
   ], [t]);
 
-  /** conversation id → latest inbound message time inside the window. */
-  const [lastInboundAt, setLastInboundAt] = useState<Map<string, string>>(
-    new Map()
-  );
+  /**
+   * conversation id → latest inbound message time inside the window.
+   * `null` means "not loaded (or failed to load)" — distinct from an
+   * empty map, which means "loaded, and nobody has an open window".
+   * Conflating the two is what made every row read "Expired".
+   */
+  const [lastInboundAt, setLastInboundAt] = useState<Map<
+    string,
+    string
+  > | null>(null);
+  /** Re-render tick so countdown badges move without a refetch. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [loading, setLoading] = useState(true);
@@ -130,32 +149,50 @@ export function ConversationList({
       // from the customer's last inbound message, which `conversations`
       // does not carry — `last_message_at` moves on outbound sends too,
       // so it would show a fresh window on a thread that had actually
-      // closed. Only messages inside the window can affect the answer, so
-      // the query is bounded to them: a conversation absent from the
-      // result simply has no open window.
-      const since = new Date(
-        Date.now() - SESSION_WINDOW_HOURS * 3600_000
-      ).toISOString();
-      const { data: inbound } = await supabase
-        .from("messages")
-        .select("conversation_id, created_at")
-        .eq("sender_type", "customer")
-        .gte("created_at", since)
-        .in(
-          "conversation_id",
-          rows.map((c) => c.id)
-        );
+      // closed. Aggregated in the database (migration 045): one row per
+      // conversation with an inbound message inside the window. A
+      // conversation absent from the result has no open window.
+      //
+      // Deliberately NOT a `messages ... IN (all conversation ids)`
+      // query: that id list goes in the URL and blows the length limit
+      // on a large inbox, and PostgREST truncates at 1000 rows. Both
+      // failed silently and left an empty map → every row "Expired".
+      const { data: inbound, error: inboundError } = await supabase.rpc(
+        "conversations_last_inbound",
+        { p_window_hours: SESSION_WINDOW_HOURS }
+      );
       if (cancelled) return;
 
-      const latest = new Map<string, string>();
+      if (inboundError) {
+        // Leave the map as-is (null on first load → no badge) rather
+        // than claiming every window is closed.
+        console.error("Failed to fetch last inbound times:", {
+          message: inboundError.message,
+          details: inboundError.details,
+          hint: inboundError.hint,
+          code: inboundError.code,
+        });
+        return;
+      }
+
+      const fetched = new Map<string, string>();
       for (const m of (inbound ?? []) as {
         conversation_id: string;
-        created_at: string;
+        last_inbound_at: string;
       }[]) {
-        const seen = latest.get(m.conversation_id);
-        if (!seen || m.created_at > seen) latest.set(m.conversation_id, m.created_at);
+        fetched.set(m.conversation_id, m.last_inbound_at);
       }
-      setLastInboundAt(latest);
+      // Merge rather than replace: a realtime inbound may have landed
+      // while this request was in flight and be newer than the result.
+      setLastInboundAt((prev) => {
+        if (!prev) return fetched;
+        const merged = new Map(fetched);
+        for (const [id, at] of prev) {
+          const seen = merged.get(id);
+          if (!seen || Date.parse(at) > Date.parse(seen)) merged.set(id, at);
+        }
+        return merged;
+      });
     })();
 
     return () => {
@@ -165,6 +202,19 @@ export function ConversationList({
     // the realtime channel reconnects or the tab regains focus — catches
     // up on any events sent while the WS was disconnected or throttled.
   }, [resyncToken]);
+
+  // Realtime inbound: reopen / refresh the badge immediately.
+  useEffect(() => {
+    if (!latestInbound) return;
+    setLastInboundAt((prev) => {
+      const next = new Map(prev ?? []);
+      const seen = next.get(latestInbound.conversationId);
+      if (!seen || Date.parse(latestInbound.at) > Date.parse(seen)) {
+        next.set(latestInbound.conversationId, latestInbound.at);
+      }
+      return next;
+    });
+  }, [latestInbound]);
 
   // Tag definitions for the filter picker — loaded once so labels/colours
   // stay stable regardless of which conversations happen to be loaded.
@@ -467,7 +517,14 @@ export function ConversationList({
                 conversation={conv}
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
-                lastInboundAt={lastInboundAt.get(conv.id) ?? null}
+                // undefined = still unknown (no badge); null = loaded,
+                // no inbound inside the window (expired).
+                lastInboundAt={
+                  lastInboundAt === null
+                    ? undefined
+                    : (lastInboundAt.get(conv.id) ?? null)
+                }
+                now={now}
                 t={t}
               />
             ))}
@@ -482,8 +539,13 @@ interface ConversationItemProps {
   conversation: Conversation;
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
-  /** Customer's last inbound message, or null if none inside the window. */
-  lastInboundAt: string | null;
+  /**
+   * Customer's last inbound message; null if none inside the window;
+   * undefined if that hasn't been loaded yet.
+   */
+  lastInboundAt: string | null | undefined;
+  /** Current time in ms, ticked by the list so labels stay fresh. */
+  now: number;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -492,6 +554,7 @@ function ConversationItem({
   isActive,
   onSelect,
   lastInboundAt,
+  now,
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
@@ -506,7 +569,8 @@ function ConversationItem({
   // so it reads "23h", not "23h remaining" — the column is the context.
   // The full phrasing stays on the tooltip and in the thread header.
   const windowLabel = useMemo(() => {
-    const w = sessionWindow(lastInboundAt);
+    if (lastInboundAt === undefined) return null;
+    const w = sessionWindow(lastInboundAt, new Date(now));
     if (w.expired) {
       return {
         expired: true,
@@ -527,7 +591,7 @@ function ConversationItem({
       text,
       title: t("sessionRemainingTitle", { time: text }),
     };
-  }, [lastInboundAt, t]);
+  }, [lastInboundAt, now, t]);
 
   const timeAgo = conversation.last_message_at
     ? formatDistanceToNow(new Date(conversation.last_message_at), {
@@ -581,6 +645,7 @@ function ConversationItem({
                 marker that never clears. The unread badge beside it is
                 what actually tracks new messages. */}
             {conversation.status === "open" ? (
+              windowLabel && (
               // An open thread's useful fact is not that it is open —
               // almost all of them are — but how long is left to reply
               // free-form before only a template will reach them.
@@ -600,6 +665,7 @@ function ConversationItem({
                 <Clock className="h-3 w-3 shrink-0" aria-hidden />
                 {windowLabel.text}
               </span>
+              )
             ) : (
               <span
                 className={cn(
