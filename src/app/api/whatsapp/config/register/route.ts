@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ success: true, registered: true })
+    return NextResponse.json({ success: true, registered: true, registered_pin: pin })
   } catch (err) {
     return toErrorResponse(err)
   }

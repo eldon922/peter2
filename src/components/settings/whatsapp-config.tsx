@@ -6,12 +6,14 @@ import {
   Eye,
   EyeOff,
   Copy,
+  Check,
   CheckCircle2,
   XCircle,
   Loader2,
   ExternalLink,
   Zap,
   AlertTriangle,
+  ShieldAlert,
   RotateCcw,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -21,8 +23,17 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
   EmbeddedSignupButton,
@@ -131,6 +142,15 @@ export function WhatsAppConfig() {
   // from the customer, not from another self-generated guess.
   const [retryPin, setRetryPin] = useState('');
   const [retryingPin, setRetryingPin] = useState(false);
+  // One-time confirmation dialog after ANY successful /register call
+  // — manual save, retry-with-pin, or (separately) Embedded Signup's
+  // own dialog in that component. Shown even when the PIN is one the
+  // customer just typed themselves: the point isn't "here's a secret
+  // you didn't know," it's "write this down, because nothing in this
+  // app will show it to you again after this."
+  const [revealedPin, setRevealedPin] = useState<string | null>(null);
+  const [pinSavedAck, setPinSavedAck] = useState(false);
+  const [pinCopied, setPinCopied] = useState(false);
   type RegistrationProbe = {
     live: boolean;
     checks: Record<string, boolean | null>;
@@ -239,6 +259,18 @@ export function WhatsAppConfig() {
     fetchConfig(accountId);
   }, [authLoading, profileLoading, user?.id, accountId, fetchConfig]);
 
+  /** Opens the one-time PIN confirmation dialog, resetting its state. */
+  function openPinReveal(pinValue: string) {
+    setPinSavedAck(false);
+    setPinCopied(false);
+    setRevealedPin(pinValue);
+  }
+
+  function copyRevealedPin() {
+    if (!revealedPin) return;
+    void navigator.clipboard.writeText(revealedPin).then(() => setPinCopied(true));
+  }
+
   async function handleSave() {
     if (!phoneNumberId.trim()) {
       toast.error('Phone Number ID is required');
@@ -327,6 +359,7 @@ export function WhatsAppConfig() {
         // re-register (which would void the active subscription if
         // the PIN became stale).
         setPin('');
+        if (data.registered_pin) openPinReveal(data.registered_pin);
       }
 
       if (accountId) await fetchConfig(accountId);
@@ -415,6 +448,7 @@ export function WhatsAppConfig() {
 
       if (data.registered) {
         toast.success('Number registered — inbound messages will now arrive.');
+        if (data.registered_pin) openPinReveal(data.registered_pin);
         setRetryPin('');
       } else if (data.registration_error_code === 'pin_mismatch') {
         toast.error("That PIN didn't match either. Double-check it in WhatsApp Manager → Two-step verification.");
@@ -1306,6 +1340,72 @@ export function WhatsAppConfig() {
         </Card>
       </div>
     </div>
+
+    {/* One-time PIN confirmation — shown after ANY successful
+        /register in this panel (manual save or retry-with-pin), even
+        when the customer just typed the PIN themselves. The point
+        isn't secrecy, it's that nothing in this app will show it
+        again after this dialog closes — same rationale and same
+        pattern as Embedded Signup's own reveal dialog. Backdrop/
+        Escape can still dismiss it; the checkbox only gates the
+        primary Close button. */}
+    <Dialog
+      open={revealedPin !== null}
+      onOpenChange={(open) => {
+        if (!open) setRevealedPin(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-500">
+            <ShieldAlert className="size-5 shrink-0" />
+            Save this PIN before you close this window
+          </DialogTitle>
+          <DialogDescription>
+            This is the two-step verification PIN now set for this number&apos;s inbound message registration.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 rounded-md border border-amber-600/40 bg-amber-950/20 px-4 py-3">
+          <span className="flex-1 text-center font-mono text-2xl tracking-[0.4em] text-foreground">
+            {revealedPin}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={copyRevealedPin}
+            className="shrink-0"
+          >
+            {pinCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {pinCopied ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+
+        <p className="text-xs text-amber-500/90 leading-relaxed">
+          This PIN is shown only once, right now. It is not saved anywhere in this app and there is no way to view it again later — write it down or copy it somewhere safe before closing this dialog.
+        </p>
+
+        <label className="flex items-start gap-2 text-sm text-muted-foreground">
+          <Checkbox
+            checked={pinSavedAck}
+            onCheckedChange={(checked) => setPinSavedAck(checked === true)}
+            className="mt-0.5"
+          />
+          I&apos;ve saved this PIN somewhere safe.
+        </label>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            disabled={!pinSavedAck}
+            onClick={() => setRevealedPin(null)}
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </section>
   );
 }

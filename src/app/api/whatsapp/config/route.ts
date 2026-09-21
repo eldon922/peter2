@@ -291,6 +291,12 @@ export async function POST(request: Request) {
     // was supplied (see below). Distinct from registrationError — this
     // is not a failure, just an incomplete-but-valid save.
     let registrationSkipped = false
+    // Only set inside the success branch below, for THIS call's
+    // registration — not carried over from `existing`. Echoed back in
+    // the response so the UI can show the same "write this down"
+    // confirmation Embedded Signup shows, even though the customer
+    // typed this PIN themselves rather than us generating it.
+    let justRegisteredPin: string | null = null
 
     const needsRegistration = !sameNumber || (typeof pin === 'string' && pin.length > 0)
     if (needsRegistration) {
@@ -313,6 +319,7 @@ export async function POST(request: Request) {
             pin,
           })
           registeredAt = new Date().toISOString()
+          justRegisteredPin = pin
         } catch (err) {
           if (err instanceof RegisterPinMismatchError) {
             registrationErrorCode = 'pin_mismatch'
@@ -435,6 +442,7 @@ export async function POST(request: Request) {
       // Meta test number). The UI shows the "Not registered" banner
       // rather than claiming the number is fully live.
       registration_skipped: registrationSkipped,
+      registered_pin: justRegisteredPin,
       phone_info: phoneInfo,
     })
   } catch (error) {
