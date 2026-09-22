@@ -69,6 +69,44 @@ export function chunkRows<T>(rows: T[]): T[][] {
   return chunks;
 }
 
+/**
+ * Retry a request a few times with backoff.
+ *
+ * A large CSV import fires dozens to hundreds of sequential requests
+ * (lookup chunks, insert chunks, per-row fallbacks, renames). Each one
+ * individually is unlikely to fail, but across that many round trips a
+ * single dropped connection, 429, or proxy hiccup becomes close to
+ * certain — and without a retry, that one failure used to abort the
+ * entire import. Retrying is safe here because every write in the
+ * import path is already idempotent (phone is unique per account, and
+ * a 23505 on retry is treated as "already there", not an error).
+ *
+ * Not a general-purpose retry: it assumes the operation is safe to
+ * repeat, which is true for the requests this module chunks but not
+ * true in general (e.g. non-idempotent RPCs).
+ */
+export async function withRetry<T>(
+  fn: () => PromiseLike<T>,
+  opts: { attempts?: number; baseDelayMs?: number } = {}
+): Promise<T> {
+  const attempts = opts.attempts ?? 3;
+  const baseDelayMs = opts.baseDelayMs ?? 500;
+  let lastErr: unknown;
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i === attempts - 1) break;
+      await new Promise((resolve) =>
+        setTimeout(resolve, baseDelayMs * 2 ** i)
+      );
+    }
+  }
+  throw lastErr;
+}
+
 // ============================================================
 // Reading more rows than one response will carry.
 //

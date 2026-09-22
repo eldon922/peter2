@@ -18,7 +18,7 @@ import {
   type ContactTagAssignment,
 } from '@/lib/contacts/resolve-import-tags';
 import { planContactImport } from '@/lib/contacts/import-merge';
-import { chunkIds } from '@/lib/supabase/batching';
+import { chunkIds, withRetry } from '@/lib/supabase/batching';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -157,6 +157,16 @@ export function ImportModal({
     skipped: number;
     failed: number;
     tagsAssigned: number;
+    /** True when this summary reflects a run that was cut short by an
+     *  error partway through, not a normal completion. */
+    partial: boolean;
+  } | null>(null);
+  /** Rows attempted so far vs. total, so a large import (which can be
+   *  hundreds of sequential requests) doesn't look stalled or wrong
+   *  while it's still working. */
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
   } | null>(null);
 
   function reset() {
@@ -167,6 +177,7 @@ export function ImportModal({
     setHasCompanyColumn(false);
     setTagColorByKey(new Map());
     setResult(null);
+    setProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -227,6 +238,22 @@ export function ImportModal({
   async function handleImport() {
     if (parsedRows.length === 0) return;
     setImporting(true);
+    setProgress(null);
+
+    // Declared outside the try block on purpose: a large import is
+    // dozens to hundreds of sequential requests, and if one fails
+    // partway through, the catch block below still needs to report
+    // what actually happened rather than lose it behind a generic
+    // error toast — rows already written to the DB shouldn't vanish
+    // from the summary just because a later request timed out.
+    let imported = 0;
+    // In-file duplicates were already collapsed at parse time; they
+    // still count as skipped in the summary.
+    let skipped = inFileDuplicates;
+    let updated = 0;
+    let failed = 0;
+    let tagsAssigned = 0;
+    let skippedNames: string[] = [];
 
     try {
       const {
@@ -236,13 +263,6 @@ export function ImportModal({
       if (!user) throw new Error('Not authenticated');
       if (!accountId)
         throw new Error('Your profile is not linked to an account.');
-
-      let imported = 0;
-      // In-file duplicates were already collapsed at parse time; they
-      // still count as skipped in the summary.
-      let skipped = inFileDuplicates;
-      let updated = 0;
-      let failed = 0;
 
       const unique = parsedRows;
 
@@ -261,12 +281,26 @@ export function ImportModal({
         string,
         { id: string; name: string | null }
       >();
-      for (const slice of chunkIds(importedKeys)) {
-        const { data: existingRows } = await supabase
-          .from('contacts')
-          .select('id, phone_normalized, name')
-          .eq('account_id', accountId)
-          .in('phone_normalized', slice);
+      const lookupChunks = chunkIds(importedKeys);
+      for (let i = 0; i < lookupChunks.length; i++) {
+        const slice = lookupChunks[i];
+        const { data: existingRows, error } = await withRetry(() =>
+          supabase
+            .from('contacts')
+            .select('id, phone_normalized, name')
+            .eq('account_id', accountId)
+            .in('phone_normalized', slice)
+        );
+        // Unlike the writes below, a failed lookup isn't safe to just
+        // shrug off: silently treating "couldn't check" as "not found"
+        // would attempt to insert rows that already exist. Retried a
+        // few times above; if it's still failing, stop and report what
+        // happened rather than risk misclassifying the rest of the file.
+        if (error) {
+          throw new Error(
+            `Couldn't look up existing contacts (batch ${i + 1} of ${lookupChunks.length}): ${error.message}`
+          );
+        }
         for (const r of (existingRows ?? []) as {
           id: string;
           phone_normalized: string | null;
@@ -295,21 +329,34 @@ export function ImportModal({
         ...toMerge.flatMap((m) => m.row.tagNames),
       ];
       let tagIdByKey = new Map<string, string>();
-      let skippedNames: string[] = [];
       if (allTagNames.length > 0) {
-        ({ tagIdByKey, skippedNames } = await resolveImportTagIds(supabase, {
-          accountId,
-          userId: user.id,
-          tagNames: allTagNames,
-          canCreateTags: canEditSettings,
-        }));
+        ({ tagIdByKey, skippedNames } = await withRetry(() =>
+          resolveImportTagIds(supabase, {
+            accountId,
+            userId: user.id,
+            tagNames: allTagNames,
+            canCreateTags: canEditSettings,
+          })
+        ));
       }
 
       const tagAssignments: ContactTagAssignment[] = [];
 
+      // Total units of work across both phases, for the progress
+      // indicator — otherwise a multi-thousand-row import just shows a
+      // spinner for however long it takes, indistinguishable from
+      // being stuck.
+      const totalWork = toInsert.length + toMerge.length;
+      let doneWork = 0;
+      setProgress({ done: 0, total: totalWork });
+
       // 3) Batch insert the genuinely-new rows in chunks of 50. The DB
       //    unique index is the backstop: a 23505 (race, or a format
       //    that normalizes equal) counts as skipped, not failed.
+      //    Each chunk (and each per-row fallback) is retried a few
+      //    times on transient failures before giving up — see
+      //    withRetry. This is safe to retry because a repeat of an
+      //    already-succeeded insert just comes back as a 23505.
       const chunkSize = 50;
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
@@ -323,10 +370,15 @@ export function ImportModal({
           company: row.company || null,
         }));
 
-        const { data, error } = await supabase
-          .from('contacts')
-          .insert(rows)
-          .select('id');
+        let data: { id: string }[] | null = null;
+        let error: { message: string } | null = null;
+        try {
+          ({ data, error } = await withRetry(() =>
+            supabase.from('contacts').insert(rows).select('id')
+          ));
+        } catch (err) {
+          error = err instanceof Error ? err : new Error(String(err));
+        }
 
         if (error) {
           // Retry individually so one bad/duplicate row doesn't sink
@@ -334,11 +386,15 @@ export function ImportModal({
           for (let j = 0; j < rows.length; j++) {
             const row = rows[j];
             const source = chunk[j];
-            const { data: singleData, error: singleErr } = await supabase
-              .from('contacts')
-              .insert(row)
-              .select('id')
-              .single();
+            let singleData: { id: string } | null = null;
+            let singleErr: unknown = null;
+            try {
+              ({ data: singleData, error: singleErr } = await withRetry(() =>
+                supabase.from('contacts').insert(row).select('id').single()
+              ));
+            } catch (err) {
+              singleErr = err;
+            }
 
             if (!singleErr && singleData) {
               imported++;
@@ -369,6 +425,9 @@ export function ImportModal({
             });
           }
         }
+
+        doneWork += chunk.length;
+        setProgress({ done: doneWork, total: totalWork });
       }
 
       // 3b) Apply the merge rows. Tags go through the same assignment
@@ -388,11 +447,15 @@ export function ImportModal({
         const batch = renames.slice(i, i + RENAME_CONCURRENCY);
         const results = await Promise.all(
           batch.map((m) =>
-            supabase
-              .from('contacts')
-              .update({ name: m.rename })
-              .eq('id', m.id)
-              .eq('account_id', accountId)
+            withRetry(() =>
+              supabase
+                .from('contacts')
+                .update({ name: m.rename })
+                .eq('id', m.id)
+                .eq('account_id', accountId)
+            ).catch((err) => ({
+              error: err instanceof Error ? err : new Error(String(err)),
+            }))
           )
         );
         for (let k = 0; k < results.length; k++) {
@@ -401,6 +464,8 @@ export function ImportModal({
             renameFailures.add(batch[k].id);
           }
         }
+        doneWork += batch.length;
+        setProgress({ done: doneWork, total: totalWork });
       }
 
       for (const m of toMerge) {
@@ -408,6 +473,11 @@ export function ImportModal({
           tagAssignments.push({ contactId: m.id, tagNames: m.row.tagNames });
         }
       }
+      // Merge rows that only needed tags (no rename) never went through
+      // the rename loop above, so progress hasn't counted them yet.
+      doneWork += toMerge.length - renames.length;
+      setProgress({ done: doneWork, total: totalWork });
+
       // Counted once per row touched, whether it was renamed, re-tagged
       // or both — the summary reports rows, not writes. A row whose only
       // contribution was a rename that failed is reported as failed, not
@@ -418,18 +488,16 @@ export function ImportModal({
 
       // 4) Wire tags onto the contacts we just created. Failure here must
       //    not mask a successful contact import.
-      let tagsAssigned = 0;
       try {
-        tagsAssigned = await assignImportedContactTags(
-          supabase,
-          tagAssignments,
-          tagIdByKey
+        tagsAssigned = await withRetry(() =>
+          assignImportedContactTags(supabase, tagAssignments, tagIdByKey)
         );
       } catch {
         toast.warning(t('toastTagsWarning'));
       }
 
-      setResult({ imported, updated, skipped, failed, tagsAssigned });
+      setProgress(null);
+      setResult({ imported, updated, skipped, failed, tagsAssigned, partial: false });
       if (imported > 0) {
         toast.success(t('toastImported', { count: imported }));
       }
@@ -460,7 +528,23 @@ export function ImportModal({
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('toastError');
       toast.error(message);
+      // Rows already written to the DB before the failure are real —
+      // matching on phone means they won't be re-created on a retry,
+      // so hiding them here would just make a partial import look like
+      // a total failure. Show what happened and let the user re-run
+      // the same file to pick up the rest.
+      if (imported > 0 || updated > 0 || skipped > 0 || failed > 0) {
+        setResult({
+          imported,
+          updated,
+          skipped,
+          failed,
+          tagsAssigned,
+          partial: true,
+        });
+      }
     } finally {
+      setProgress(null);
       setImporting(false);
     }
   }
@@ -567,7 +651,7 @@ export function ImportModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          {preview.length > 0 && !result && (
+          {preview.length > 0 && !result && !importing && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
@@ -671,9 +755,28 @@ export function ImportModal({
             </div>
           )}
 
+          {!result && importing && progress && (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <Loader2 className="text-primary size-5 animate-spin" />
+              <p className="text-sm text-muted-foreground">
+                {t('importingProgress', {
+                  done: progress.done,
+                  total: progress.total,
+                })}
+              </p>
+            </div>
+          )}
+
           {result && (
             <div className="rounded-xl border border-border bg-background/50 p-4">
-              <p className="text-sm font-medium text-popover-foreground">{t('importComplete')}</p>
+              <p className="text-sm font-medium text-popover-foreground">
+                {result.partial ? t('importPartial') : t('importComplete')}
+              </p>
+              {result.partial && (
+                <p className="mt-1 text-xs leading-relaxed text-amber-500">
+                  {t('importPartialHint')}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-3">
                 {result.imported > 0 && (
                   <div className="text-primary flex items-center gap-1.5 text-sm">
