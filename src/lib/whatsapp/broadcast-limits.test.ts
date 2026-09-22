@@ -9,7 +9,9 @@ import {
   ROUTE_MAX_DURATION_SECONDS,
   SEND_BATCH_DELAY_MS,
   SEND_BATCH_SIZE,
+  getSendPacing,
   maxDeliverableRecipients,
+  maxRecipientsFor,
 } from './broadcast-limits';
 
 // broadcast-limits.ts is the single source of truth for the send
@@ -114,15 +116,19 @@ describe('the fan-out paces from the shared constants', () => {
   // `deliverBroadcast` in `after()` — the dashboard hook no longer
   // loops batches from the browser itself (see
   // `use-broadcast-sending.ts`'s Step 4), so there is exactly one
-  // place left that pages sends, and this guards that it still uses
-  // the shared constants rather than a hard-coded number.
+  // place left that pages sends, and this guards that it still resolves
+  // pacing from the shared module rather than a hard-coded number.
+  //
+  // Pacing itself now varies by connection type (`getSendPacing`), so
+  // this no longer asserts the literal constant names appear — it
+  // asserts the send loop defers to the shared resolver instead of
+  // inlining its own batch shape.
 
   const SEND_PATHS = ['src/lib/whatsapp/broadcast-core.ts'];
 
-  it.each(SEND_PATHS)('%s paces from the shared constants', (relPath) => {
+  it.each(SEND_PATHS)('%s paces via getSendPacing', (relPath) => {
     const source = readFileSync(join(process.cwd(), relPath), 'utf8');
-    expect(source).toContain('SEND_BATCH_SIZE');
-    expect(source).toContain('SEND_BATCH_DELAY_MS');
+    expect(source).toContain('getSendPacing');
   });
 
   it('bills capacity at the rate the batch shape actually achieves', () => {
@@ -134,5 +140,32 @@ describe('the fan-out paces from the shared constants', () => {
     expect(maxDeliverableRecipients(SEND_BATCH_DELAY_MS * 10)).toBe(
       SEND_BATCH_SIZE * 10,
     );
+  });
+
+  it('getSendPacing keeps a coexistence number under its 20 mps ceiling', () => {
+    for (const type of ['coexistence', null, undefined] as const) {
+      const pacing = getSendPacing(type);
+      const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
+      expect(optimisticMps).toBeLessThan(20);
+    }
+  });
+
+  it('getSendPacing gives a Cloud-API-only number a faster profile', () => {
+    const coexistence = getSendPacing('coexistence');
+    for (const type of ['manual', 'embedded_signup'] as const) {
+      const pacing = getSendPacing(type);
+      const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
+      // Faster than coexistence, and at most Meta's 80 mps default
+      // Cloud API ceiling — this is an average-rate bound, not a
+      // promise Meta will never throttle a burst.
+      expect(pacing.batchSize).toBeGreaterThan(coexistence.batchSize);
+      expect(optimisticMps).toBeLessThanOrEqual(80);
+    }
+  });
+
+  it('maxRecipientsFor tracks the faster profile, not the conservative default', () => {
+    expect(maxRecipientsFor('manual')).toBeGreaterThan(MAX_RECIPIENTS);
+    expect(maxRecipientsFor('coexistence')).toBe(MAX_RECIPIENTS);
+    expect(maxRecipientsFor(null)).toBe(MAX_RECIPIENTS);
   });
 });

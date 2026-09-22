@@ -15,6 +15,8 @@ import {
   MAX_RECIPIENTS,
   SEND_BATCH_DELAY_MS,
   SEND_BATCH_SIZE,
+  SEND_BATCH_DELAY_MS_FAST,
+  SEND_BATCH_SIZE_FAST,
 } from './broadcast-limits';
 
 vi.mock('@/lib/whatsapp/encryption', () => ({
@@ -352,6 +354,31 @@ describe('createBroadcast contact resolution', () => {
 
     expect(plan.planned).toHaveLength(1);
     expect(plan.rejected).toBe(2);
+  });
+
+  it("carries the account's connection_type onto the plan", async () => {
+    const { db } = contactsDb();
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+14155550123' }],
+    });
+    // CONFIG_ROW has no connection_type — falls back to the
+    // pacing-conservative default, not the faster profile.
+    expect(plan.connectionType).toBe('coexistence');
+  });
+
+  it('threads a Cloud-API connection_type through instead of defaulting', async () => {
+    const { db } = makeDb({
+      contacts: { rows: [] },
+      whatsapp_config: { rows: [{ ...CONFIG_ROW, connection_type: 'manual' }] },
+      message_templates: { rows: [TEMPLATE_NO_VARS] },
+      broadcasts: { rows: [{ id: 'b-1' }] },
+    });
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+14155550123' }],
+    });
+    expect(plan.connectionType).toBe('manual');
   });
 });
 
@@ -894,6 +921,18 @@ describe('planBroadcastSend', () => {
     expect(plan.planned).toHaveLength(0);
     expect(reads).not.toContain('whatsapp_config');
   });
+
+  it("carries the account's connection_type through to the plan", async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: { rows: [pendingRow()] },
+      whatsapp_config: { rows: [{ ...CONFIG_ROW, connection_type: 'embedded_signup' }] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+    expect(plan.connectionType).toBe('embedded_signup');
+  });
 });
 
 describe('deliverBroadcast', () => {
@@ -1034,6 +1073,42 @@ describe('deliverBroadcast', () => {
     expect(elapsed).toBeGreaterThanOrEqual(
       SEND_BATCH_DELAY_MS + spanningTwoBatches.length * latencyMs
     );
+  });
+
+  it('uses the faster batch shape for a plan carrying a Cloud-API connectionType', async () => {
+    const spanningTwoFastBatches = Array.from(
+      { length: SEND_BATCH_SIZE_FAST + 1 },
+      (_, i) => ({
+        recipientRowId: `rec-${i}`,
+        phone: '14155550123',
+        params: [] as string[],
+      })
+    );
+    const at: number[] = [];
+    sendTemplateMessage.mockImplementation(async () => {
+      at.push(Date.now());
+      return { messageId: 'wamid.x' };
+    });
+
+    const { db } = makeDb({
+      broadcasts: { rows: [{ sent_count: spanningTwoFastBatches.length }] },
+    });
+    await deliverBroadcast(
+      db,
+      plan({ planned: spanningTwoFastBatches, connectionType: 'manual' })
+    );
+
+    // A coexistence-paced run would have paused at SEND_BATCH_SIZE,
+    // well before this group of SEND_BATCH_SIZE_FAST finishes —
+    // asserting the full unthrottled run confirms the wider group size
+    // took effect, not just that a pause happened somewhere.
+    expect(at).toHaveLength(SEND_BATCH_SIZE_FAST + 1);
+    for (let i = 1; i < SEND_BATCH_SIZE_FAST; i++) {
+      expect(at[i] - at[i - 1]).toBeLessThan(50);
+    }
+    expect(
+      at[SEND_BATCH_SIZE_FAST] - at[SEND_BATCH_SIZE_FAST - 1]
+    ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS_FAST - 20);
   });
 
   it('keeps a partly-successful broadcast "sent" when every retry fails', async () => {

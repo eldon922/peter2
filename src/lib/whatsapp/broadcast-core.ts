@@ -24,8 +24,7 @@ import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   DELIVER_BUDGET_MS,
   MAX_RECIPIENTS,
-  SEND_BATCH_DELAY_MS,
-  SEND_BATCH_SIZE,
+  getSendPacing,
 } from '@/lib/whatsapp/broadcast-limits';
 import {
   sanitizePhoneForMeta,
@@ -35,7 +34,7 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import type { SendTimeParams } from '@/lib/whatsapp/template-send-builder';
-import type { Contact, MessageTemplate } from '@/types';
+import type { Contact, MessageTemplate, WhatsAppConnectionType } from '@/types';
 import { findOrCreateContactsBulk } from '@/lib/api/v1/contacts';
 import {
   bodyPlaceholderKeys,
@@ -110,6 +109,14 @@ export interface BroadcastPlan {
   /** Phones rejected up front (invalid E.164) — counted as failed. */
   rejected: number;
   /**
+   * `whatsapp_config.connection_type` for this account, used by
+   * `deliverBroadcast` to pick send pacing (see `getSendPacing`).
+   * Undefined only on the zero-`sendable`-rows early return in
+   * `planBroadcastRetry`/`planBroadcastSend`, where nothing will be
+   * sent and pacing never runs.
+   */
+  connectionType?: WhatsAppConnectionType;
+  /**
    * True when this plan re-sends already-failed rows. Changes how the
    * terminal broadcast status is computed: a retry where everything
    * fails again must not mark a partially-successful broadcast
@@ -145,6 +152,7 @@ async function loadSendContext(
   phoneNumberId: string;
   accessToken: string;
   templateRow: MessageTemplate | null;
+  connectionType: WhatsAppConnectionType;
 }> {
   const { data: config, error: configError } = await db
     .from('whatsapp_config')
@@ -178,6 +186,11 @@ async function loadSendContext(
     phoneNumberId: config.phone_number_id,
     accessToken: decrypt(config.access_token),
     templateRow: (rawTemplateRow as MessageTemplate | null) ?? null,
+    // `connection_type` defaults to 'manual' at the DB level (migration
+    // 042), so this is only ever missing on a malformed row — fall back
+    // to the pacing-conservative 'coexistence' rather than assume the
+    // faster profile is safe.
+    connectionType: (config.connection_type as WhatsAppConnectionType) ?? 'coexistence',
   };
 }
 
@@ -216,12 +229,8 @@ export async function createBroadcast(
 
   // Meta credentials + template row (fail fast before anything is
   // persisted or sent).
-  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
-    db,
-    accountId,
-    templateName,
-    templateLanguage
-  );
+  const { phoneNumberId, accessToken, templateRow, connectionType } =
+    await loadSendContext(db, accountId, templateName, templateLanguage);
 
   // Resolve each recipient to a contact. Invalid phones are dropped
   // (counted as rejected) rather than aborting the whole broadcast.
@@ -352,6 +361,7 @@ export async function createBroadcast(
     phoneNumberId,
     accessToken,
     templateRow,
+    connectionType,
     planned,
     rejected,
   };
@@ -498,12 +508,8 @@ export async function planBroadcastRetry(
     };
   }
 
-  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
-    db,
-    accountId,
-    broadcast.template_name,
-    templateLanguage
-  );
+  const { phoneNumberId, accessToken, templateRow, connectionType } =
+    await loadSendContext(db, accountId, broadcast.template_name, templateLanguage);
 
   // Without the local template row we cannot tell whether this template
   // has a media header or body placeholders, so every downstream
@@ -644,6 +650,7 @@ export async function planBroadcastRetry(
     phoneNumberId,
     accessToken,
     templateRow,
+    connectionType,
     planned,
     rejected: 0,
     isRetry: true,
@@ -747,12 +754,8 @@ export async function planBroadcastSend(
     };
   }
 
-  const { phoneNumberId, accessToken, templateRow } = await loadSendContext(
-    db,
-    accountId,
-    broadcast.template_name,
-    templateLanguage
-  );
+  const { phoneNumberId, accessToken, templateRow, connectionType } =
+    await loadSendContext(db, accountId, broadcast.template_name, templateLanguage);
 
   // `template_params` was resolved and stored by the wizard at insert
   // time, so every row already carries exactly what to send — no
@@ -778,6 +781,7 @@ export async function planBroadcastSend(
     phoneNumberId,
     accessToken,
     templateRow,
+    connectionType,
     planned,
     rejected: 0,
   };
@@ -789,11 +793,10 @@ export async function planBroadcastSend(
  * Best-effort per recipient — one failure never aborts the rest.
  * Designed to run inside `after()`.
  *
- * Paced in groups of SEND_BATCH_SIZE with a SEND_BATCH_DELAY_MS pause
- * between them — the same shape the dashboard's client-driven path uses
- * (`use-broadcast-sending`), so the two agree on burst behaviour and not
- * just on average rate. Bounded by DELIVER_BUDGET_MS so the invocation
- * isn't killed mid-write.
+ * Paced in groups sized by `getSendPacing(plan.connectionType)` — a
+ * coexistence number stays on the conservative default shape; a
+ * Cloud-API-only number gets the faster profile. Bounded by
+ * DELIVER_BUDGET_MS so the invocation isn't killed mid-write.
  *
  * The per-status count columns on `broadcasts` are owned by the DB
  * aggregate trigger (migrations 003/005): each recipient-row update
@@ -808,12 +811,16 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
+  const pacing = getSendPacing(plan.connectionType);
 
   log.info('fan-out started', {
     broadcast: plan.broadcastId,
     recipients: plan.planned.length,
     template: plan.templateName,
     retry: Boolean(plan.isRetry),
+    connectionType: plan.connectionType,
+    batchSize: pacing.batchSize,
+    batchDelayMs: pacing.batchDelayMs,
   });
 
   // Everything below runs inside try/finally so the terminal status is
@@ -827,8 +834,8 @@ export async function deliverBroadcast(
     // Deadline guard — stop while there is still time to write the
     // remaining rows, rather than being killed mid-loop and stranding
     // them in 'pending'. Checked before the batch pause below, so an
-    // already-blown budget doesn't spend a further SEND_BATCH_DELAY_MS
-    // of the write reserve on a sleep it will never send after.
+    // already-blown budget doesn't spend a further batch pause of the
+    // write reserve on a sleep it will never send after.
     if (Date.now() - startedAt > DELIVER_BUDGET_MS) {
       const unsent = plan.planned.slice(index);
       console.warn(
@@ -853,8 +860,8 @@ export async function deliverBroadcast(
     // Expressed as a modulo on the flat index rather than a chunk loop
     // so the per-recipient deadline guard above still runs — the client
     // has no duration budget to guard, the server does.
-    if (index > 0 && index % SEND_BATCH_SIZE === 0) {
-      await sleep(SEND_BATCH_DELAY_MS);
+    if (index > 0 && index % pacing.batchSize === 0) {
+      await sleep(pacing.batchDelayMs);
     }
 
     const variants = phoneVariants(recipient.phone);

@@ -243,7 +243,7 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts \
 
 Recipients are capped per request at whatever one delivery pass can
 drain — the send loop's time budget divided by its per-message pacing
-cost. That is **2900 at the shipped defaults**, but tuning either
+cost. That is **5900 at the shipped defaults**, but tuning either
 constant moves it, so read the effective figure from the `400` message
 rather than hard-coding it. Note the cap assumes zero send latency, so a
 full-cap request will not finish in one pass in practice; the tail comes
