@@ -80,11 +80,13 @@ describe('DELIVER_BUDGET_MS follows the route ceiling', () => {
   });
 });
 
-describe('MAX_RECIPIENTS governs both the create and retry paths', () => {
+describe('MAX_RECIPIENTS is an advisory figure, not an enforced cap', () => {
   it('is the deliverable ceiling, not an independent number', () => {
-    // Accepting more than one pass can deliver is what produced the
-    // "Send window elapsed" failures. Deriving it means the two can
-    // never disagree, whatever the timing constants are tuned to.
+    // The figure itself is still meaningful — it's what one delivery
+    // pass can actually drain — even though nothing rejects a request
+    // for exceeding it anymore. Deriving it means it can never disagree
+    // with the pacing that actually runs, whatever the timing constants
+    // are tuned to.
     expect(MAX_RECIPIENTS).toBe(maxDeliverableRecipients());
   });
 
@@ -102,12 +104,14 @@ describe('MAX_RECIPIENTS governs both the create and retry paths', () => {
     expect(Number.isInteger(MAX_RECIPIENTS)).toBe(true);
   });
 
-  it('is quoted accurately by docs/public-api.md', () => {
-    // The public docs cite the shipped figure. Deriving the cap means
-    // that number moves when the timing constants do — this fails if the
-    // prose is left behind.
+  it('is described accurately by docs/public-api.md — no hard cap, not a fixed figure', () => {
+    // createBroadcast used to reject a request over MAX_RECIPIENTS with
+    // a 400, and the docs quoted that literal figure. Neither is true
+    // anymore — the docs must not claim a hard cap, and must not quote
+    // a number that goes stale the moment the timing constants change.
     const docs = readFileSync(join(process.cwd(), 'docs/public-api.md'), 'utf8');
-    expect(docs).toContain(`**${MAX_RECIPIENTS} at the shipped defaults**`);
+    expect(docs).toContain('no hard cap');
+    expect(docs).not.toContain(`${MAX_RECIPIENTS} at the shipped defaults`);
   });
 });
 

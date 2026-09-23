@@ -10,7 +10,8 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
-import { MAX_RECIPIENTS } from '@/lib/whatsapp/broadcast-limits';
+import { maxRecipientsFor } from '@/lib/whatsapp/broadcast-limits';
+import type { WhatsAppConnectionType } from '@/types';
 
 // Re-exported so existing importers of this hook keep working. The
 // implementations moved to lib/broadcasts/variables so the server-side
@@ -72,9 +73,9 @@ async function fetchContactsByIds(
   return contacts;
 }
 
-function audienceTooLargeError(size: number): Error {
+function audienceTooLargeError(size: number, limit: number): Error {
   return new Error(
-    `This audience has ${size.toLocaleString()} contacts, but a single broadcast is limited to ${MAX_RECIPIENTS.toLocaleString()}. Narrow the audience (for example by tag) and send it in parts.`,
+    `This audience has ${size.toLocaleString()} contacts, but a single broadcast is limited to ${limit.toLocaleString()}. Narrow the audience (for example by tag) and send it in parts.`,
   );
 }
 
@@ -91,7 +92,10 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
    * through to the send. Pages are ordered by `id` so offset paging is
    * stable.
    */
-  async function resolveAudience(audience: AudienceConfig): Promise<Contact[]> {
+  async function resolveAudience(
+    audience: AudienceConfig,
+    recipientLimit: number,
+  ): Promise<Contact[]> {
     const supabase = createClient();
 
     let contacts: Contact[] = [];
@@ -136,8 +140,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       const uniquePhones = new Set(
         audience.csvContacts.map((c) => c.phone).filter(Boolean),
       );
-      if (uniquePhones.size > MAX_RECIPIENTS) {
-        throw audienceTooLargeError(uniquePhones.size);
+      if (uniquePhones.size > recipientLimit) {
+        throw audienceTooLargeError(uniquePhones.size, recipientLimit);
       }
       contacts = await upsertCsvContacts(supabase, audience.csvContacts);
     }
@@ -312,18 +316,40 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
       // ── Step 1: Resolve audience contacts ─────────────────────────
       setProgress(5);
-      const contacts = await resolveAudience(payload.audience);
+
+      // Same pacing profile the server actually sends with (see
+      // getSendPacing/maxRecipientsFor in broadcast-limits.ts) — a
+      // Cloud-API-only account gets a real threshold here instead of
+      // the flat coexistence-conservative one. Defaults to the
+      // conservative profile on a lookup failure or a missing row,
+      // matching the server's own fallback in loadSendContext.
+      let connectionType: WhatsAppConnectionType | undefined;
+      if (accountId) {
+        const { data: config } = await supabase
+          .from('whatsapp_config')
+          .select('connection_type')
+          .eq('account_id', accountId)
+          .maybeSingle();
+        connectionType = config?.connection_type as
+          | WhatsAppConnectionType
+          | undefined;
+      }
+      const recipientLimit = maxRecipientsFor(connectionType);
+
+      const contacts = await resolveAudience(payload.audience, recipientLimit);
 
       if (contacts.length === 0) {
         throw new Error('No contacts found for this audience.');
       }
 
-      // A broadcast is delivered by a single server invocation, which can
-      // plan at most MAX_RECIPIENTS rows. Rows beyond that would be
-      // inserted below and then never sent — 'pending' with nothing to
-      // pick them up — so refuse up front, before anything is written.
-      if (contacts.length > MAX_RECIPIENTS) {
-        throw audienceTooLargeError(contacts.length);
+      // Server-side sending no longer hard-caps a broadcast — a larger
+      // audience just takes more automatic retry passes to fully drain
+      // (see createBroadcast's comment in broadcast-core.ts). This
+      // check exists purely so the person sending isn't surprised by
+      // that: past this size, "sending" will visibly take a while
+      // rather than complete in the one pass they might be expecting.
+      if (contacts.length > recipientLimit) {
+        throw audienceTooLargeError(contacts.length, recipientLimit);
       }
 
       // Media-header templates (image/video/document) require a media

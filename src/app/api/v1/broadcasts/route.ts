@@ -7,8 +7,10 @@
 //     "name": "July promo",                 // optional label
 //     "template_name": "promo_july",        // required, approved template
 //     "template_language": "en_US",         // optional (default en_US)
-//     "recipients": [                        // required, 1..MAX_RECIPIENTS
-//                                            // (derived — see broadcast-limits.ts)
+//     "recipients": [                        // required, non-empty array
+//                                            // (no hard cap — a large
+//                                            // audience spans multiple
+//                                            // automatic retry passes)
 //       { "to": "+14155550123", "params": ["Jane"] },
 //       { "to": "+14155550124" }
 //     ]
@@ -30,11 +32,11 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // The `after()` fan-out below sends to every recipient sequentially and
 // runs within this route's max duration (the same constraint the
 // webhook route documents). Give it headroom beyond the platform
-// default so a modest batch isn't cut off mid-send — which would leave
-// recipient rows 'pending' and the broadcast stuck 'sending'. This is a
-// bound, not a guarantee: a near-cap (MAX_RECIPIENTS) audience can
-// still exceed 60s, so very large sends should be split across
-// requests. A durable queue/cron drain is the complete fix (follow-up).
+// default so a modest batch isn't cut off mid-send. This is a bound,
+// not a guarantee: a large audience can still exceed it in one pass —
+// deliverBroadcast marks whatever's left as 'failed' rather than
+// stranding it, and the retry endpoint drains the rest automatically.
+// A durable queue/cron drain is the complete fix (follow-up).
 //
 // MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
 // — DELIVER_BUDGET_MS is derived from it. It cannot be imported: Next

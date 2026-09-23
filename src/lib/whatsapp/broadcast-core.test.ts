@@ -247,16 +247,13 @@ describe('createBroadcast validation', () => {
     ).rejects.toBeInstanceOf(BroadcastError);
   });
 
-  it('rejects more recipients than one pass can deliver', async () => {
-    // Derived from the cap rather than hard-coded: a literal stops
-    // exercising the guard the moment the delivery budget changes.
-    const recipients = Array.from({ length: MAX_RECIPIENTS + 1 }, () => ({
-      to: '+14155550123',
-    }));
-    await expect(
-      createBroadcast(db, 'acc', 'user', { templateName: 'promo', recipients })
-    ).rejects.toMatchObject({ status: 400 });
-  });
+  // There used to be a "rejects more recipients than one pass can
+  // deliver" test here. That cap is gone: createBroadcast now accepts
+  // an audience of any size and lets it drain over however many
+  // automatic retry passes it takes (see the comment above
+  // loadSendContext's call site) — see
+  // "createBroadcast contact resolution > accepts an audience larger
+  // than one pass can deliver" below for the coverage that replaced it.
 });
 
 describe('createBroadcast contact resolution', () => {
@@ -287,6 +284,26 @@ describe('createBroadcast contact resolution', () => {
 
     // All 50 suffixes fit one filter chunk, so exactly one lookup.
     expect(reads.filter((t) => t === 'contacts')).toHaveLength(1);
+  });
+
+  it('accepts an audience larger than one pass can deliver instead of rejecting it', async () => {
+    // There used to be a hard `recipients.length > MAX_RECIPIENTS` 400
+    // here. It's gone: a broadcast this size is now accepted in full
+    // and drains over however many automatic retry passes it takes
+    // (deliverBroadcast marks whatever doesn't fit the time budget as
+    // 'failed', and the retry endpoint picks those back up) — see the
+    // comment above loadSendContext's call site in createBroadcast.
+    const { db } = contactsDb();
+    const size = MAX_RECIPIENTS + 5;
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: Array.from({ length: size }, (_, i) => ({
+        to: `+1415555${String(i).padStart(4, '0')}`,
+      })),
+    });
+
+    expect(plan.planned).toHaveLength(size);
+    expect(plan.rejected).toBe(0);
   });
 
   it('reuses an existing contact instead of creating a duplicate', async () => {
@@ -446,10 +463,14 @@ describe('planBroadcastRetry', () => {
     expect(claim!.values).toMatchObject({ error_message: null, attempt_count: 2 });
   });
 
-  it('reports remaining as a true count of unclaimed failed rows', async () => {
-    // Regression: `remaining` was derived from a `limit(CAP + 1)` window,
-    // so it could only ever be 0 or 1 — the UI told a user with hundreds
-    // of failures that "1 more" was left, every single retry.
+  it('claims every failed row regardless of count — no artificial ceiling', async () => {
+    // Regression (two-part): `remaining` used to be derived from a
+    // `limit(CAP + 1)` window, so it could only ever be 0 or 1 — the UI
+    // told a user with hundreds of failures that "1 more" was left,
+    // every single retry. The claim itself was also capped at
+    // MAX_RECIPIENTS; it no longer is (see the comment above this
+    // query in planBroadcastRetry) — a retry now claims everything in
+    // one pass, however many failed, and `remaining` is genuinely 0.
     const overflow = MAX_RECIPIENTS + 25;
     const { db } = makeDb({
       broadcasts: { rows: [sentBroadcast()] },
@@ -469,14 +490,15 @@ describe('planBroadcastRetry', () => {
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
 
-    expect(plan.planned).toHaveLength(MAX_RECIPIENTS);
-    expect(plan.remaining).toBe(overflow - MAX_RECIPIENTS);
+    expect(plan.planned).toHaveLength(overflow);
+    expect(plan.remaining).toBe(0);
   });
 
-  it('claims up to the cap and reports the true remainder even when the server clips to 1,000 rows', async () => {
-    // Same clamp as planBroadcastSend: without paging, a retry could only
-    // ever claim 1,000 rows however high the cap, and `remaining` (from
-    // the exact count) would overstate what a further retry would do.
+  it('claims past the server\'s 1,000-row page clip without losing any', async () => {
+    // Without fetchAllRows's paging, a plain `.limit()`/select is
+    // clipped to the server's `max_rows` (1,000 by default) regardless
+    // of how high the caller asks — every retry beyond the first 1,000
+    // failures would silently claim nothing further.
     const overflow = MAX_RECIPIENTS + 25;
     const { db } = makeDb(
       {
@@ -499,8 +521,8 @@ describe('planBroadcastRetry', () => {
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
 
-    expect(plan.planned).toHaveLength(MAX_RECIPIENTS);
-    expect(plan.remaining).toBe(25);
+    expect(plan.planned).toHaveLength(overflow);
+    expect(plan.remaining).toBe(0);
   });
 
   it('reports remaining as 0 when every failed row is claimed', async () => {

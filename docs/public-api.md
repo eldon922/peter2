@@ -241,13 +241,15 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts \
       }'
 ```
 
-Recipients are capped per request at whatever one delivery pass can
-drain — the send loop's time budget divided by its per-message pacing
-cost. That is **5900 at the shipped defaults**, but tuning either
-constant moves it, so read the effective figure from the `400` message
-rather than hard-coding it. Note the cap assumes zero send latency, so a
-full-cap request will not finish in one pass in practice; the tail comes
-back as `remaining` for you to retry. Split larger sends. Invalid phone numbers are
+There is no hard cap on `recipients` — a broadcast larger than one
+delivery pass can drain is accepted in full and finishes over however
+many automatic retry passes it takes (poll `GET
+/api/v1/broadcasts/{id}` for progress, and call the retry endpoint
+below if any recipients are still outstanding once it settles). As a
+rough guide, one pass sends on the order of a few thousand to tens of
+thousands of recipients depending on the account's messaging rate —
+see `maxRecipientsFor` in `broadcast-limits.ts` if you want the exact
+figure for a given connection type. Invalid phone numbers are
 dropped and counted as `rejected`. Response (202):
 
 ```json

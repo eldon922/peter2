@@ -173,46 +173,32 @@ export function maxDeliverableRecipients(
 }
 
 /**
- * Recipients handled in one request — both the create path (validated
- * against the submitted array before anything is persisted or sent) and
- * the retry path (failed rows claimed per call). One number governs
- * both: a retry is just a second send of the same audience, and giving
- * the two paths different ceilings meant a broadcast you were allowed
- * to *start* could not be *finished* at the same granularity.
+ * A rough "how many will fit in one pass" figure, not an enforced cap.
+ * Neither `createBroadcast` nor `planBroadcastRetry`/`planBroadcastSend`
+ * reject a larger audience — they now claim it in full and let it drain
+ * over however many automatic retry passes it takes (see the comment in
+ * `createBroadcast`). This is exported for callers that want to *warn*
+ * about that up front rather than enforce it: the dashboard wizard
+ * (`use-broadcast-sending.ts`) uses it to tell someone sending to a huge
+ * audience that it'll take a while, before they commit to it.
  *
- * Derived, not declared: the cap *is* what one invocation can drain, so
- * tuning ROUTE_MAX_DURATION_SECONDS or the batch constants moves it
- * automatically and the two can never disagree.
+ * Derived, not declared: tuning ROUTE_MAX_DURATION_SECONDS or the batch
+ * constants moves this automatically.
  *
- * Two things follow from taking the ceiling directly, both deliberate:
- *
- *   - There is no latency headroom. A full-cap request only completes in
- *     one pass if Meta answers instantly; under real latency the tail is
- *     marked failed and `remaining` reports it honestly, so it degrades
- *     into extra retry passes rather than lost recipients.
- *   - It is a moving number, so `docs/public-api.md` describes how it is
- *     derived instead of quoting a fixed figure that would go stale.
- *
- * ⚠️ This models the *send* phase only. `createBroadcast` also resolves
- * contacts one round trip at a time, inline in the request rather than
- * in `after()`, so a larger cap costs request latency this arithmetic
- * does not account for.
+ * ⚠️ Optimistic by construction — see maxDeliverableRecipients above.
+ * A full-"cap" audience will not drain in one pass under real latency;
+ * it just means more retry passes, not lost recipients.
  */
 export const MAX_RECIPIENTS = maxDeliverableRecipients();
 
 /**
  * `MAX_RECIPIENTS`, resolved for a specific connection type's pacing
- * instead of the shipped conservative default. For a call site that
- * knows (or can look up) `connection_type` before capping a request —
- * so a Cloud-API-only account isn't held to the coexistence-derived
- * ceiling it doesn't actually need.
- *
- * Not currently wired into `createBroadcast`'s submission-time check
- * or `planBroadcastRetry`'s claim limit — both still use the
- * conservative `MAX_RECIPIENTS` there, matching `docs/public-api.md`.
- * This exists for the send-pacing path (`deliverBroadcast`, via
- * `getSendPacing`) and is available for those call sites too if the
- * per-call cap should ever follow suit.
+ * instead of the shipped conservative default — so a Cloud-API-only
+ * account's "this will take a while" warning uses its real, faster
+ * capacity instead of being held to the coexistence-derived figure it
+ * doesn't actually need. Used by `use-broadcast-sending.ts`'s
+ * audience-size check; `getSendPacing` is what actually governs send
+ * speed.
  */
 export function maxRecipientsFor(
   connectionType: WhatsAppConnectionType | null | undefined,
