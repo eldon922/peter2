@@ -18,7 +18,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { sendTemplateMessage } from '@/lib/whatsapp/meta-api';
+import { sendTemplateMessage, getPhoneNumberThroughput } from '@/lib/whatsapp/meta-api';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
@@ -108,11 +108,13 @@ export interface BroadcastPlan {
   /** Phones rejected up front (invalid E.164) — counted as failed. */
   rejected: number;
   /**
-   * `whatsapp_config.connection_type` for this account, used by
-   * `deliverBroadcast` to pick send pacing (see `getSendPacing`).
-   * Undefined only on the zero-`sendable`-rows early return in
-   * `planBroadcastRetry`/`planBroadcastSend`, where nothing will be
-   * sent and pacing never runs.
+   * `whatsapp_config.connection_type` for this account. Used by
+   * `deliverBroadcast` for exactly one thing: clamping pacing to the
+   * coexistence ceiling (see `getSendPacing` in
+   * broadcast-limits.ts) when `'coexistence'` — otherwise pacing comes
+   * from a live Meta throughput check, not this field. Undefined only
+   * on the zero-`sendable`-rows early return in
+   * `planBroadcastRetry`/`planBroadcastSend`.
    */
   connectionType?: WhatsAppConnectionType;
   /**
@@ -796,10 +798,11 @@ export async function planBroadcastSend(
  * Best-effort per recipient — one failure never aborts the rest.
  * Designed to run inside `after()`.
  *
- * Paced in groups sized by `getSendPacing(plan.connectionType)` — a
- * coexistence number stays on the conservative default shape; a
- * Cloud-API-only number gets the faster profile. Bounded by
- * DELIVER_BUDGET_MS so the invocation isn't killed mid-write.
+ * Paced in groups sized by `getSendPacing`, resolved from a live
+ * throughput check against Meta for this account and clamped to the
+ * coexistence ceiling when `plan.connectionType === 'coexistence'`.
+ * Bounded by DELIVER_BUDGET_MS so the invocation isn't killed
+ * mid-write.
  *
  * The per-status count columns on `broadcasts` are owned by the DB
  * aggregate trigger (migrations 003/005): each recipient-row update
@@ -814,14 +817,21 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
-  const pacing = getSendPacing(plan.connectionType);
+  const throughput = await getPhoneNumberThroughput({
+    phoneNumberId: plan.phoneNumberId,
+    accessToken: plan.accessToken,
+  });
+  const pacing = getSendPacing(
+    throughput?.level,
+    plan.connectionType === 'coexistence',
+  );
 
   log.info('fan-out started', {
     broadcast: plan.broadcastId,
     recipients: plan.planned.length,
     template: plan.templateName,
     retry: Boolean(plan.isRetry),
-    connectionType: plan.connectionType,
+    throughputLevel: throughput?.level,
     batchSize: pacing.batchSize,
     batchDelayMs: pacing.batchDelayMs,
   });

@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
 import { fetchAllRows } from '@/lib/supabase/batching';
-import { MAX_RECIPIENTS } from '@/lib/whatsapp/broadcast-limits';
 import { Button } from '@/components/ui/button';
 import {
   Users,
@@ -93,6 +92,30 @@ export function Step2SelectAudience({
   const [loadingFields, setLoadingFields] = useState(false);
   const [estimatedCount, setEstimatedCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
+  // Infinity until the server answers — matches
+  // use-broadcast-sending.ts's fallback, so a still-loading or failed
+  // lookup never shows a false warning. Same route as the send-time
+  // check, so the two never disagree: it reflects Meta's live
+  // messaging-limit tier for this account (see recipientLimitForTier
+  // in broadcast-limits.ts).
+  const [recipientLimit, setRecipientLimit] = useState(Infinity);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/broadcasts/recipient-limit')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { limit?: number } | null) => {
+        if (!cancelled && typeof data?.limit === 'number') {
+          setRecipientLimit(data.limit);
+        }
+      })
+      .catch(() => {
+        // Left at Infinity — no warning shown rather than a wrong one.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Tags are used both by the primary "Filter by Tags" audience type
   // AND by the exclude-list below — so always load once on mount.
@@ -477,11 +500,12 @@ export function Step2SelectAudience({
             Select an audience type to see the estimate.
           </p>
         )}
-        {!loadingCount && estimatedCount !== null && estimatedCount > MAX_RECIPIENTS && (
+        {!loadingCount && estimatedCount !== null && estimatedCount > recipientLimit && (
           <p className="mt-2 text-xs text-amber-500">
-            A single broadcast can reach at most {MAX_RECIPIENTS.toLocaleString()}{' '}
-            recipients. Narrow the audience (for example by tag) and send it in
-            parts.
+            At this account&apos;s current sending speed, one broadcast reaches
+            about {recipientLimit.toLocaleString()} recipients per pass — the
+            rest will go out automatically over further retry passes, so this
+            audience will take a while to fully send.
           </p>
         )}
       </div>

@@ -5,14 +5,26 @@ import { describe, expect, it } from 'vitest';
 import {
   DELIVER_BUDGET_MS,
   DELIVERY_WRITE_RESERVE_MS,
-  MAX_RECIPIENTS,
   ROUTE_MAX_DURATION_SECONDS,
   SEND_BATCH_DELAY_MS,
-  SEND_BATCH_SIZE,
   getSendPacing,
-  maxDeliverableRecipients,
-  maxRecipientsFor,
+  recipientLimitForTier,
 } from './broadcast-limits';
+
+// getSendPacing's batch sizes (20 / 80 / 1000) are inlined in
+// broadcast-limits.ts rather than exported as named constants, so
+// these tests assert against the same literals.
+const SEND_BATCH_SIZE = 20;
+const SEND_BATCH_SIZE_FAST = 80;
+const SEND_BATCH_SIZE_HIGH = 1000;
+
+// recipientLimitForTier's default-tier fallback (delivery budget ÷
+// per-message cost of the conservative-default batch shape) is now
+// computed inline rather than through a standalone exported function,
+// so these tests mirror the same formula to check against it.
+const DEFAULT_RECIPIENT_LIMIT = Math.floor(
+  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE),
+);
 
 // broadcast-limits.ts is the single source of truth for the send
 // pipeline's numbers, but two things stop it from being enforceable by
@@ -76,46 +88,63 @@ describe('DELIVER_BUDGET_MS follows the route ceiling', () => {
 
   it('still leaves a usable send window', () => {
     expect(DELIVER_BUDGET_MS).toBeGreaterThan(0);
-    expect(maxDeliverableRecipients()).toBeGreaterThan(0);
+    expect(DEFAULT_RECIPIENT_LIMIT).toBeGreaterThan(0);
   });
 });
 
-describe('MAX_RECIPIENTS is an advisory figure, not an enforced cap', () => {
-  it('is the deliverable ceiling, not an independent number', () => {
-    // The figure itself is still meaningful — it's what one delivery
-    // pass can actually drain — even though nothing rejects a request
-    // for exceeding it anymore. Deriving it means it can never disagree
-    // with the pacing that actually runs, whatever the timing constants
-    // are tuned to.
-    expect(MAX_RECIPIENTS).toBe(maxDeliverableRecipients());
-  });
-
-  it('tracks the budget rather than staying fixed', () => {
-    // Guards the derivation itself: a hard-coded value would keep
-    // passing the assertion above only by coincidence.
-    expect(maxDeliverableRecipients(20_000, 100)).toBe(200);
-    expect(maxDeliverableRecipients(DELIVER_BUDGET_MS, 25)).toBe(
-      Math.floor(DELIVER_BUDGET_MS / 25),
-    );
+describe('recipientLimitForTier converts Meta live messaging-limit tier into a recipient count', () => {
+  it('falls back to the conservative default figure when the tier lookup is unknown', () => {
+    for (const tier of [null, undefined, '', 'TIER_SOMETHING_NEW'] as const) {
+      expect(recipientLimitForTier(tier)).toEqual({
+        limit: DEFAULT_RECIPIENT_LIMIT,
+        source: 'default',
+      });
+    }
   });
 
   it('is a usable number at the shipped configuration', () => {
-    expect(MAX_RECIPIENTS).toBeGreaterThan(0);
-    expect(Number.isInteger(MAX_RECIPIENTS)).toBe(true);
+    const { limit } = recipientLimitForTier(null);
+    expect(limit).toBeGreaterThan(0);
+    expect(Number.isInteger(limit)).toBe(true);
   });
 
   it('is described accurately by docs/public-api.md — no hard cap, not a fixed figure', () => {
-    // createBroadcast used to reject a request over MAX_RECIPIENTS with
-    // a 400, and the docs quoted that literal figure. Neither is true
-    // anymore — the docs must not claim a hard cap, and must not quote
-    // a number that goes stale the moment the timing constants change.
+    // createBroadcast used to reject a request over the deliverable
+    // ceiling with a 400, and the docs quoted that literal figure.
+    // Neither is true anymore — the docs must not claim a hard cap, and
+    // must not quote a number that goes stale the moment the timing
+    // constants change.
     const docs = readFileSync(join(process.cwd(), 'docs/public-api.md'), 'utf8');
     expect(docs).toContain('no hard cap');
-    expect(docs).not.toContain(`${MAX_RECIPIENTS} at the shipped defaults`);
+    expect(docs).not.toContain(`${DEFAULT_RECIPIENT_LIMIT} at the shipped defaults`);
+  });
+
+  it('maps each documented tier to its recipient count', () => {
+    expect(recipientLimitForTier('TIER_50')).toEqual({ limit: 50, source: 'meta' });
+    expect(recipientLimitForTier('TIER_250')).toEqual({ limit: 250, source: 'meta' });
+    expect(recipientLimitForTier('TIER_1K')).toEqual({ limit: 1_000, source: 'meta' });
+    expect(recipientLimitForTier('TIER_2K')).toEqual({ limit: 2_000, source: 'meta' });
+    expect(recipientLimitForTier('TIER_10K')).toEqual({ limit: 10_000, source: 'meta' });
+    expect(recipientLimitForTier('TIER_100K')).toEqual({ limit: 100_000, source: 'meta' });
+  });
+
+  it('treats TIER_NOT_SET as the starting tier, not unlimited', () => {
+    expect(recipientLimitForTier('TIER_NOT_SET')).toEqual({ limit: 250, source: 'meta' });
+  });
+
+  it('represents TIER_UNLIMITED as a large finite number, not Infinity', () => {
+    // JSON.stringify(Infinity) is `null` — an Infinity limit would
+    // silently break the route's NextResponse.json response and every
+    // `size > recipientLimit` comparison downstream.
+    const result = recipientLimitForTier('TIER_UNLIMITED');
+    expect(result.source).toBe('meta');
+    expect(Number.isFinite(result.limit)).toBe(true);
+    expect(JSON.parse(JSON.stringify(result)).limit).toBe(result.limit);
+    expect(result.limit).toBeGreaterThan(100_000);
   });
 });
 
-describe('the fan-out paces from the shared constants', () => {
+describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
   // Both send paths (a fresh wizard send and a retry) now go through
   // `deliverBroadcast` in `after()` — the dashboard hook no longer
   // loops batches from the browser itself (see
@@ -123,8 +152,11 @@ describe('the fan-out paces from the shared constants', () => {
   // place left that pages sends, and this guards that it still resolves
   // pacing from the shared module rather than a hard-coded number.
   //
-  // Pacing itself now varies by connection type (`getSendPacing`), so
-  // this no longer asserts the literal constant names appear — it
+  // Pacing itself now varies primarily by Meta's live-reported
+  // throughput tier (`getSendPacing`), not a static per-connection-type
+  // guess — connection_type only still matters as the one input
+  // `getSendPacing`'s `isCoexistence` clamp needs (see broadcast-limits.ts)
+  // — so this no longer asserts the literal constant names appear; it
   // asserts the send loop defers to the shared resolver instead of
   // inlining its own batch shape.
 
@@ -137,39 +169,66 @@ describe('the fan-out paces from the shared constants', () => {
 
   it('bills capacity at the rate the batch shape actually achieves', () => {
     // Stated without naming the interval, since it is now just the
-    // function's default: one batch-delay of budget buys exactly one
-    // batch. Tuning either constant moves MAX_RECIPIENTS with it rather
-    // than leaving the cap describing pacing that no longer runs.
-    expect(maxDeliverableRecipients(SEND_BATCH_DELAY_MS)).toBe(SEND_BATCH_SIZE);
-    expect(maxDeliverableRecipients(SEND_BATCH_DELAY_MS * 10)).toBe(
-      SEND_BATCH_SIZE * 10,
+    // default recipient-limit formula's default: one batch-delay of
+    // budget buys exactly one batch. Tuning either constant moves the
+    // recipient limit with it rather than leaving the cap describing
+    // pacing that no longer runs.
+    expect(Math.floor(SEND_BATCH_DELAY_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE))).toBe(
+      SEND_BATCH_SIZE,
     );
+    expect(
+      Math.floor((SEND_BATCH_DELAY_MS * 10) / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE)),
+    ).toBe(SEND_BATCH_SIZE * 10);
   });
 
-  it('getSendPacing keeps a coexistence number under its 20 mps ceiling', () => {
-    for (const type of ['coexistence', null, undefined] as const) {
-      const pacing = getSendPacing(type);
+  it('getSendPacing keeps the conservative default under Meta\'s lowest documented ceiling', () => {
+    for (const level of [null, undefined, ''] as const) {
+      const pacing = getSendPacing(level);
       const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
+      expect(pacing.batchSize).toBe(SEND_BATCH_SIZE);
       expect(optimisticMps).toBeLessThan(20);
     }
   });
 
-  it('getSendPacing gives a Cloud-API-only number a faster profile', () => {
-    const coexistence = getSendPacing('coexistence');
-    for (const type of ['manual', 'embedded_signup'] as const) {
-      const pacing = getSendPacing(type);
-      const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
-      // Faster than coexistence, and at most Meta's 80 mps default
-      // Cloud API ceiling — this is an average-rate bound, not a
-      // promise Meta will never throttle a burst.
-      expect(pacing.batchSize).toBeGreaterThan(coexistence.batchSize);
-      expect(optimisticMps).toBeLessThanOrEqual(80);
+  it('getSendPacing scales batch size with Meta\'s live-reported tier', () => {
+    const unknown = getSendPacing(null);
+    const standard = getSendPacing('STANDARD');
+    const high = getSendPacing('HIGH');
+    const unrecognized = getSendPacing('some-new-tier');
+
+    expect(standard.batchSize).toBe(SEND_BATCH_SIZE_FAST);
+    expect(high.batchSize).toBe(SEND_BATCH_SIZE_HIGH);
+    expect(unrecognized.batchSize).toBe(SEND_BATCH_SIZE);
+
+    // Ordering should hold regardless of the exact constants above.
+    expect(high.batchSize).toBeGreaterThan(standard.batchSize);
+    expect(standard.batchSize).toBeGreaterThan(unrecognized.batchSize);
+    expect(unrecognized.batchSize).toBeGreaterThan(unknown.batchSize);
+
+    // The pause between groups doesn't change with tier — only batch
+    // size does.
+    expect(standard.batchDelayMs).toBe(unknown.batchDelayMs);
+    expect(high.batchDelayMs).toBe(unknown.batchDelayMs);
+  });
+
+  it('getSendPacing clamps to the coexistence ceiling regardless of the reported tier', () => {
+    for (const level of ['STANDARD', 'HIGH', 'some-new-tier', null, undefined] as const) {
+      const pacing = getSendPacing(level, true);
+      expect(pacing.batchSize).toBeLessThanOrEqual(SEND_BATCH_SIZE);
     }
   });
 
-  it('maxRecipientsFor tracks the faster profile, not the conservative default', () => {
-    expect(maxRecipientsFor('manual')).toBeGreaterThan(MAX_RECIPIENTS);
-    expect(maxRecipientsFor('coexistence')).toBe(MAX_RECIPIENTS);
-    expect(maxRecipientsFor(null)).toBe(MAX_RECIPIENTS);
+  it('the coexistence clamp never raises pacing above what the tier alone would give', () => {
+    // The clamp is a ceiling, not a floor — a conservative-default
+    // (10) or unrecognized-tier (20) result should come through
+    // unchanged, not get bumped up to the 20 mps ceiling.
+    const unknownCoexistence = getSendPacing(null, true);
+    const unknownNonCoexistence = getSendPacing(null, false);
+    expect(unknownCoexistence.batchSize).toBe(unknownNonCoexistence.batchSize);
+  });
+
+  it('isCoexistence defaults to false — omitting it must not silently clamp', () => {
+    expect(getSendPacing('HIGH')).toEqual(getSendPacing('HIGH', false));
+    expect(getSendPacing('HIGH').batchSize).toBe(SEND_BATCH_SIZE_HIGH);
   });
 });

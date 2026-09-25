@@ -245,11 +245,12 @@ There is no hard cap on `recipients` — a broadcast larger than one
 delivery pass can drain is accepted in full and finishes over however
 many automatic retry passes it takes (poll `GET
 /api/v1/broadcasts/{id}` for progress, and call the retry endpoint
-below if any recipients are still outstanding once it settles). As a
-rough guide, one pass sends on the order of a few thousand to tens of
-thousands of recipients depending on the account's messaging rate —
-see `maxRecipientsFor` in `broadcast-limits.ts` if you want the exact
-figure for a given connection type. Invalid phone numbers are
+below if any recipients are still outstanding once it settles). The
+account's own messaging limit with Meta — 250, 2,000, 10,000,
+100,000, or unlimited, depending on the account's tier — is the real
+ceiling on how many unique recipients can be messaged in a rolling
+24-hour period; see `recipientLimitForTier` in `broadcast-limits.ts`
+if you want the exact figure for an account. Invalid phone numbers are
 dropped and counted as `rejected`. Response (202):
 
 ```json

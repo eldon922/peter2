@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Contact, MessageTemplate } from '@/types';
@@ -10,8 +11,6 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
-import { maxRecipientsFor } from '@/lib/whatsapp/broadcast-limits';
-import type { WhatsAppConnectionType } from '@/types';
 
 // Re-exported so existing importers of this hook keep working. The
 // implementations moved to lib/broadcasts/variables so the server-side
@@ -73,10 +72,31 @@ async function fetchContactsByIds(
   return contacts;
 }
 
-function audienceTooLargeError(size: number, limit: number): Error {
-  return new Error(
-    `This audience has ${size.toLocaleString()} contacts, but a single broadcast is limited to ${limit.toLocaleString()}. Narrow the audience (for example by tag) and send it in parts.`,
-  );
+/**
+ * Non-blocking now — see the comment at its call site.
+ * `/api/broadcasts/recipient-limit`'s server-side check (Meta's live
+ * messaging-limit tier for the account — see recipientLimitForTier in
+ * broadcast-limits.ts) is the source of `limit`.
+ */
+function audienceTooLargeWarning(size: number, limit: number): string {
+  return `This audience has ${size.toLocaleString()} contacts. At this account's current sending speed, a single broadcast reaches about ${limit.toLocaleString()} per pass — the rest will go out automatically over further retry passes, so sending may take a while.`;
+}
+
+/**
+ * Best-effort: a failed fetch here should never block sending, just
+ * mean the size warning below is skipped. `Infinity` makes every
+ * `size > recipientLimit` comparison false without a separate
+ * "did the lookup succeed" branch at each call site.
+ */
+async function fetchRecipientLimit(): Promise<number> {
+  try {
+    const res = await fetch('/api/broadcasts/recipient-limit');
+    if (!res.ok) return Infinity;
+    const data = (await res.json()) as { limit?: number };
+    return typeof data.limit === 'number' ? data.limit : Infinity;
+  } catch {
+    return Infinity;
+  }
 }
 
 export function useBroadcastSending(): UseBroadcastSendingReturn {
@@ -92,10 +112,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
    * through to the send. Pages are ordered by `id` so offset paging is
    * stable.
    */
-  async function resolveAudience(
-    audience: AudienceConfig,
-    recipientLimit: number,
-  ): Promise<Contact[]> {
+  async function resolveAudience(audience: AudienceConfig): Promise<Contact[]> {
     const supabase = createClient();
 
     let contacts: Contact[] = [];
@@ -135,14 +152,6 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     } else if (audience.type === 'custom_field' && audience.customField) {
       contacts = await resolveCustomFieldAudience(supabase, audience.customField);
     } else if (audience.type === 'csv' && audience.csvContacts) {
-      // Checked before upserting: that step creates contacts, and an
-      // audience we are about to refuse should not leave them behind.
-      const uniquePhones = new Set(
-        audience.csvContacts.map((c) => c.phone).filter(Boolean),
-      );
-      if (uniquePhones.size > recipientLimit) {
-        throw audienceTooLargeError(uniquePhones.size, recipientLimit);
-      }
       contacts = await upsertCsvContacts(supabase, audience.csvContacts);
     }
 
@@ -316,27 +325,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
       // ── Step 1: Resolve audience contacts ─────────────────────────
       setProgress(5);
-
-      // Same pacing profile the server actually sends with (see
-      // getSendPacing/maxRecipientsFor in broadcast-limits.ts) — a
-      // Cloud-API-only account gets a real threshold here instead of
-      // the flat coexistence-conservative one. Defaults to the
-      // conservative profile on a lookup failure or a missing row,
-      // matching the server's own fallback in loadSendContext.
-      let connectionType: WhatsAppConnectionType | undefined;
-      if (accountId) {
-        const { data: config } = await supabase
-          .from('whatsapp_config')
-          .select('connection_type')
-          .eq('account_id', accountId)
-          .maybeSingle();
-        connectionType = config?.connection_type as
-          | WhatsAppConnectionType
-          | undefined;
-      }
-      const recipientLimit = maxRecipientsFor(connectionType);
-
-      const contacts = await resolveAudience(payload.audience, recipientLimit);
+      const contacts = await resolveAudience(payload.audience);
 
       if (contacts.length === 0) {
         throw new Error('No contacts found for this audience.');
@@ -344,12 +333,16 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
       // Server-side sending no longer hard-caps a broadcast — a larger
       // audience just takes more automatic retry passes to fully drain
-      // (see createBroadcast's comment in broadcast-core.ts). This
-      // check exists purely so the person sending isn't surprised by
-      // that: past this size, "sending" will visibly take a while
-      // rather than complete in the one pass they might be expecting.
+      // (see createBroadcast's comment in broadcast-core.ts), so this
+      // is advisory only: it doesn't block or throw, it just lets the
+      // person sending know up front that it'll take a while instead
+      // of them assuming "sending" means "sent" a moment later. The
+      // limit itself comes from the server (recipient-limit route),
+      // which can ask Meta for this account's live messaging-limit
+      // tier — something the browser can never do on its own.
+      const recipientLimit = await fetchRecipientLimit();
       if (contacts.length > recipientLimit) {
-        throw audienceTooLargeError(contacts.length, recipientLimit);
+        toast.warning(audienceTooLargeWarning(contacts.length, recipientLimit));
       }
 
       // Media-header templates (image/video/document) require a media

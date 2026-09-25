@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INTERACTIVE_LIMITS,
+  getMessagingLimit,
+  getPhoneNumberThroughput,
   registerPhoneNumber,
   RegisterPinMismatchError,
   sendInteractiveButtons,
@@ -90,6 +92,128 @@ describe("registerPhoneNumber", () => {
     });
     await expect(promise).rejects.not.toBeInstanceOf(RegisterPinMismatchError);
     await expect(promise).rejects.toThrow(/Server error/);
+  });
+});
+
+describe("getPhoneNumberThroughput", () => {
+  function jsonResponse(status: number, body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the throughput field on success", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { throughput: { level: "HIGH" } }),
+    );
+    const result = await getPhoneNumberThroughput({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toEqual({ level: "HIGH" });
+  });
+
+  it("returns null rather than throwing on a non-OK response", async () => {
+    // This is used live to pace sends (see getSendPacing in
+    // broadcast-limits.ts) — a lookup failure must degrade quietly to
+    // the conservative default pacing, never surface as an error.
+    fetchMock.mockResolvedValue(
+      jsonResponse(401, { error: { message: "bad token" } }),
+    );
+    const result = await getPhoneNumberThroughput({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null rather than throwing on a network failure", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    const result = await getPhoneNumberThroughput({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the field is missing from an otherwise-OK response", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, {}));
+    const result = await getPhoneNumberThroughput({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
+  });
+});
+
+describe("getMessagingLimit", () => {
+  function jsonResponse(status: number, body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the tier on success", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, { whatsapp_business_manager_messaging_limit: "TIER_10K" }),
+    );
+    const result = await getMessagingLimit({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toEqual({ tier: "TIER_10K" });
+  });
+
+  it("returns null rather than throwing on a non-OK response", async () => {
+    // This is advisory data (see recipientLimitForTier in
+    // broadcast-limits.ts) — a lookup failure must degrade quietly,
+    // never surface as an error to whatever's asking.
+    fetchMock.mockResolvedValue(
+      jsonResponse(401, { error: { message: "bad token" } }),
+    );
+    const result = await getMessagingLimit({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null rather than throwing on a network failure", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    const result = await getMessagingLimit({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the field is missing from an otherwise-OK response", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, {}));
+    const result = await getMessagingLimit({
+      phoneNumberId: "PNID",
+      accessToken: "tok",
+    });
+    expect(result).toBeNull();
   });
 });
 

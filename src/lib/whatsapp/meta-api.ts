@@ -15,7 +15,7 @@
  * call in this file. A second hard-coded version string is exactly the
  * kind of drift that leaves one endpoint on a deprecated version.
  */
-export const META_API_VERSION = 'v21.0'
+export const META_API_VERSION = 'v26.0'
 export const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 export interface MetaSendResult {
@@ -106,6 +106,85 @@ export async function verifyPhoneNumber(
     await throwMetaError(response, `Meta API error: ${response.status}`)
   }
   return response.json()
+}
+
+/**
+ * Fetch a phone number's current throughput tier from Meta, live — this
+ * is not cached anywhere in wacrm, since it can change on Meta's side
+ * (an automatic quality-based upgrade) without wacrm being told.
+ *
+ * Returns `null` rather than throwing on any failure (missing field,
+ * network error, Meta error response): this is used live to pace
+ * sends (see `getSendPacing` in broadcast-limits.ts, called from
+ * `deliverBroadcast`), and a lookup failure there should fall back to
+ * the conservative default pacing rather than block or fail the send.
+ */
+export async function getPhoneNumberThroughput(
+  args: VerifyPhoneNumberArgs
+): Promise<MetaThroughputLevel | null> {
+  const { phoneNumberId, accessToken } = args
+  try {
+    const url = `${META_API_BASE}/${phoneNumberId}?fields=throughput`
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!response.ok) return null
+    const data = (await response.json()) as { throughput?: MetaThroughputLevel }
+    return data.throughput ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Meta's per-account messaging-limit tier — the maximum number of
+ * unique WhatsApp users a business can message outside a
+ * customer-service window within a rolling 24-hour period
+ * (https://developers.facebook.com/documentation/business-messaging/whatsapp/messaging-limits).
+ * Set at the business-portfolio level and shared by every phone
+ * number in it.
+ *
+ * `messaging_limit_tier`, which used to report this field, is
+ * deprecated in favor of `whatsapp_business_manager_messaging_limit` —
+ * this is the replacement. `META_API_VERSION` above (v26.0, the
+ * current latest) is well past this field's rollout, so no version
+ * bump is needed for it specifically — still worth a live smoke test
+ * against a real account before relying on this, since that's not the
+ * same as having exercised it against Meta.
+ */
+export interface MetaMessagingLimitInfo {
+  tier: string
+}
+
+/**
+ * Fetch a phone number's current messaging-limit tier from Meta,
+ * live — this is not cached anywhere in wacrm, since Meta's automatic
+ * scaling can change it without wacrm being told.
+ *
+ * Returns `null` rather than throwing on any failure (missing field,
+ * network error, Meta error response): this is meant for an advisory
+ * check (see `recipientLimitForTier` in broadcast-limits.ts), and a
+ * lookup failure there should fall back to the flat conservative
+ * default, not block whatever called this.
+ */
+export async function getMessagingLimit(
+  args: VerifyPhoneNumberArgs
+): Promise<MetaMessagingLimitInfo | null> {
+  const { phoneNumberId, accessToken } = args
+  try {
+    const url = `${META_API_BASE}/${phoneNumberId}?fields=whatsapp_business_manager_messaging_limit`
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!response.ok) return null
+    const data = (await response.json()) as {
+      whatsapp_business_manager_messaging_limit?: string
+    }
+    const tier = data.whatsapp_business_manager_messaging_limit
+    return tier ? { tier } : null
+  } catch {
+    return null
+  }
 }
 
 // ============================================================
@@ -597,6 +676,7 @@ export async function uploadResumableMedia(
 // ============================================================
 
 import type { MetaTemplateSubmitPayload } from './template-components'
+import { MetaThroughputLevel } from './broadcast-limits'
 
 export interface SubmitMessageTemplateArgs {
   wabaId: string

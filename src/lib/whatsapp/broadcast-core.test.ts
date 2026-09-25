@@ -12,19 +12,36 @@ import {
 import { phoneVariants } from './phone-utils';
 import {
   DELIVER_BUDGET_MS,
-  MAX_RECIPIENTS,
   SEND_BATCH_DELAY_MS,
-  SEND_BATCH_SIZE,
-  SEND_BATCH_DELAY_MS_FAST,
-  SEND_BATCH_SIZE_FAST,
 } from './broadcast-limits';
+
+// getSendPacing's batch sizes (20 / 80 / 1000) are inlined in
+// broadcast-limits.ts rather than exported as named constants, so
+// these tests assert against the same literals.
+const SEND_BATCH_SIZE = 20;
+const SEND_BATCH_SIZE_FAST = 80;
+
+// recipientLimitForTier's default-tier fallback (delivery budget ÷
+// per-message cost of the conservative-default batch shape) is now
+// computed inline in broadcast-limits.ts rather than through a
+// standalone exported function, so this mirrors the same formula.
+const DEFAULT_RECIPIENT_LIMIT = Math.floor(
+  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE),
+);
 
 vi.mock('@/lib/whatsapp/encryption', () => ({
   decrypt: (v: string) => v,
 }));
 
 const sendTemplateMessage = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/whatsapp/meta-api', () => ({ sendTemplateMessage }));
+// Defaults to resolving `null` (lookup unknown/unavailable) so every
+// existing test keeps getting the conservative default pacing unless
+// it explicitly mocks a tier — matching getSendPacing's own fallback.
+const getPhoneNumberThroughput = vi.hoisted(() => vi.fn(async () => null));
+vi.mock('@/lib/whatsapp/meta-api', () => ({
+  sendTemplateMessage,
+  getPhoneNumberThroughput,
+}));
 
 // ============================================================
 // Minimal chainable Supabase double.
@@ -287,14 +304,14 @@ describe('createBroadcast contact resolution', () => {
   });
 
   it('accepts an audience larger than one pass can deliver instead of rejecting it', async () => {
-    // There used to be a hard `recipients.length > MAX_RECIPIENTS` 400
-    // here. It's gone: a broadcast this size is now accepted in full
+    // There used to be a hard `recipients.length > recipientLimitForTier(...)`
+    // 400 here. It's gone: a broadcast this size is now accepted in full
     // and drains over however many automatic retry passes it takes
     // (deliverBroadcast marks whatever doesn't fit the time budget as
     // 'failed', and the retry endpoint picks those back up) — see the
     // comment above loadSendContext's call site in createBroadcast.
     const { db } = contactsDb();
-    const size = MAX_RECIPIENTS + 5;
+    const size = DEFAULT_RECIPIENT_LIMIT + 5;
     const plan = await createBroadcast(db, 'acc', 'user', {
       templateName: 'promo',
       recipients: Array.from({ length: size }, (_, i) => ({
@@ -467,11 +484,12 @@ describe('planBroadcastRetry', () => {
     // Regression (two-part): `remaining` used to be derived from a
     // `limit(CAP + 1)` window, so it could only ever be 0 or 1 — the UI
     // told a user with hundreds of failures that "1 more" was left,
-    // every single retry. The claim itself was also capped at
-    // MAX_RECIPIENTS; it no longer is (see the comment above this
-    // query in planBroadcastRetry) — a retry now claims everything in
-    // one pass, however many failed, and `remaining` is genuinely 0.
-    const overflow = MAX_RECIPIENTS + 25;
+    // every single retry. The claim itself was also capped at the
+    // default recipient limit; it no longer is (see the comment
+    // above this query in planBroadcastRetry) — a retry now claims
+    // everything in one pass, however many failed, and `remaining` is
+    // genuinely 0.
+    const overflow = DEFAULT_RECIPIENT_LIMIT + 25;
     const { db } = makeDb({
       broadcasts: { rows: [sentBroadcast()] },
       broadcast_recipients: {
@@ -499,7 +517,7 @@ describe('planBroadcastRetry', () => {
     // clipped to the server's `max_rows` (1,000 by default) regardless
     // of how high the caller asks — every retry beyond the first 1,000
     // failures would silently claim nothing further.
-    const overflow = MAX_RECIPIENTS + 25;
+    const overflow = DEFAULT_RECIPIENT_LIMIT + 25;
     const { db } = makeDb(
       {
         broadcasts: { rows: [sentBroadcast()] },
@@ -816,7 +834,7 @@ function pendingRow(over: Record<string, unknown> = {}) {
 
 describe('planBroadcastSend', () => {
   it('plans every pending recipient even when the server clips responses to 1,000 rows', async () => {
-    // Regression: the read asked for `limit(MAX_RECIPIENTS)`, but
+    // Regression: the read asked for `limit(recipientLimitForTier(...).limit)`, but
     // PostgREST clamps any response to its `max_rows` (1,000 by default),
     // so a 2,500-recipient broadcast planned only the first 1,000 and left
     // the other 1,500 'pending' forever — a state nothing ever picks up.
@@ -1089,7 +1107,7 @@ describe('deliverBroadcast', () => {
 
     // SEND_BATCH_DELAY_MS is an unconditional sleep, unlike the
     // compensating governor this replaced — real latency does NOT count
-    // toward it. maxDeliverableRecipients() is optimistic by exactly
+    // toward it. The default recipient limit is optimistic by exactly
     // this much, which is why the API reports `remaining` rather than
     // promising a single pass.
     expect(elapsed).toBeGreaterThanOrEqual(
@@ -1097,7 +1115,9 @@ describe('deliverBroadcast', () => {
     );
   });
 
-  it('uses the faster batch shape for a plan carrying a Cloud-API connectionType', async () => {
+  it('uses the faster batch shape when Meta reports a faster live throughput tier', async () => {
+    getPhoneNumberThroughput.mockResolvedValueOnce({ level: 'STANDARD' });
+
     const spanningTwoFastBatches = Array.from(
       { length: SEND_BATCH_SIZE_FAST + 1 },
       (_, i) => ({
@@ -1115,22 +1135,62 @@ describe('deliverBroadcast', () => {
     const { db } = makeDb({
       broadcasts: { rows: [{ sent_count: spanningTwoFastBatches.length }] },
     });
-    await deliverBroadcast(
-      db,
-      plan({ planned: spanningTwoFastBatches, connectionType: 'manual' })
-    );
+    await deliverBroadcast(db, plan({ planned: spanningTwoFastBatches }));
 
-    // A coexistence-paced run would have paused at SEND_BATCH_SIZE,
-    // well before this group of SEND_BATCH_SIZE_FAST finishes —
-    // asserting the full unthrottled run confirms the wider group size
-    // took effect, not just that a pause happened somewhere.
+    // A conservative-default-paced run would have paused at
+    // SEND_BATCH_SIZE, well before this group of SEND_BATCH_SIZE_FAST
+    // finishes — asserting the full unthrottled run confirms the
+    // wider group size took effect, not just that a pause happened
+    // somewhere.
     expect(at).toHaveLength(SEND_BATCH_SIZE_FAST + 1);
     for (let i = 1; i < SEND_BATCH_SIZE_FAST; i++) {
       expect(at[i] - at[i - 1]).toBeLessThan(50);
     }
     expect(
       at[SEND_BATCH_SIZE_FAST] - at[SEND_BATCH_SIZE_FAST - 1]
-    ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS_FAST - 20);
+    ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS - 20);
+  });
+
+  it('clamps to the coexistence ceiling even when Meta reports a faster tier', async () => {
+    // Meta's throughput field doesn't reveal coexistence status (see
+    // the comment on MetaThroughputLevel in meta-api.ts) — a
+    // coexistence number can still be reported as 'STANDARD'. Pacing
+    // must clamp to SEND_BATCH_SIZE regardless.
+    getPhoneNumberThroughput.mockResolvedValueOnce({ level: 'STANDARD' });
+
+    const spanningOneClampedBatch = Array.from(
+      { length: SEND_BATCH_SIZE + 1 },
+      (_, i) => ({
+        recipientRowId: `rec-${i}`,
+        phone: '14155550123',
+        params: [] as string[],
+      })
+    );
+    const at: number[] = [];
+    sendTemplateMessage.mockImplementation(async () => {
+      at.push(Date.now());
+      return { messageId: 'wamid.x' };
+    });
+
+    const { db } = makeDb({
+      broadcasts: { rows: [{ sent_count: spanningOneClampedBatch.length }] },
+    });
+    await deliverBroadcast(
+      db,
+      plan({ planned: spanningOneClampedBatch, connectionType: 'coexistence' })
+    );
+
+    // If the STANDARD tier had gone through unclamped (batch size 80),
+    // all of these would have gone out back-to-back with no pause.
+    // Clamped to 20, the pause should land right after the 20th send.
+    expect(at).toHaveLength(SEND_BATCH_SIZE + 1);
+    for (let i = 1; i < SEND_BATCH_SIZE; i++) {
+      expect(at[i] - at[i - 1]).toBeLessThan(50);
+    }
+    expect(
+      at[SEND_BATCH_SIZE] -
+        at[SEND_BATCH_SIZE - 1]
+    ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS - 20);
   });
 
   it('keeps a partly-successful broadcast "sent" when every retry fails', async () => {
