@@ -380,6 +380,11 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
           // instead of silently falling back to the template default.
           header_media_url: headerMediaUrl || null,
           header_media_id: headerMediaId || null,
+          // Meta drops uploaded media after 30 days; retries use this to
+          // notice an aged id. Stamped at insert, which trails the actual
+          // upload by however long the user sat in the wizard — the check
+          // keeps a 1-day margin for that.
+          header_media_uploaded_at: headerMediaId ? new Date().toISOString() : null,
           audience_filter: {
             type: payload.audience.type,
             tagIds: payload.audience.tagIds,

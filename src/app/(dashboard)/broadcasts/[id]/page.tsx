@@ -503,7 +503,7 @@ export default function BroadcastDetailPage() {
         // The server refuses rather than guessing whenever it can't
         // reproduce the original message. Two of those refusals are
         // answerable by the user, so ask instead of just reporting.
-        if (data.code === 'header_media_required') {
+        if (data.code === 'header_media_required' || data.code === 'header_media_expired') {
           setMediaPrompt({
             recipientId,
             url: '',

@@ -20,6 +20,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { sendTemplateMessage, getPhoneNumberThroughput } from '@/lib/whatsapp/meta-api';
 import { fetchAllRows } from '@/lib/supabase/batching';
+import { isMetaMediaIdExpired } from '@/lib/whatsapp/media-expiry';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   DELIVER_BUDGET_MS,
@@ -413,7 +414,7 @@ export async function planBroadcastRetry(
   const { data: broadcast, error: bErr } = await db
     .from('broadcasts')
     .select(
-      'id, template_name, template_language, template_variables, header_media_url, header_media_id, status'
+      'id, created_at, template_name, template_language, template_variables, header_media_url, header_media_id, header_media_uploaded_at, status'
     )
     .eq('id', broadcastId)
     .eq('account_id', accountId)
@@ -544,10 +545,29 @@ export async function planBroadcastRetry(
   // A media id (uploaded once, reused by Meta) is preferred over a URL
   // (re-fetched by Meta on every send) whenever both are available —
   // same preference `template-send-builder.ts` applies at build time.
-  let headerMediaId = suppliedMediaId || storedMediaId || undefined;
+  //
+  // Meta drops uploaded media after 30 days, so a stored id past that
+  // window would fail for every recipient. Ignore it (falling through
+  // to any supplied/stored URL) and, if nothing else is available, ask
+  // for fresh media below. `created_at` bounds the upload time for rows
+  // that predate `header_media_uploaded_at`.
+  const storedMediaExpired =
+    !suppliedMediaId &&
+    !!storedMediaId &&
+    isMetaMediaIdExpired(broadcast.header_media_uploaded_at ?? broadcast.created_at);
+  const usableStoredMediaId = storedMediaExpired ? undefined : storedMediaId;
+  let headerMediaId = suppliedMediaId || usableStoredMediaId || undefined;
   let headerMediaUrl = headerMediaId ? undefined : suppliedMediaUrl || storedMediaUrl || undefined;
 
   if (isMediaHeader) {
+    if (!headerMediaId && !headerMediaUrl && storedMediaExpired) {
+      throw new BroadcastError(
+        'header_media_expired',
+        `The ${headerType} uploaded for this broadcast has expired (WhatsApp keeps uploaded media for 30 days). Upload it again to retry.`,
+        422,
+        { headerType }
+      );
+    }
     if (!headerMediaId && !headerMediaUrl) {
       throw new BroadcastError(
         'header_media_required',
@@ -567,12 +587,22 @@ export async function planBroadcastRetry(
     if (suppliedMediaId && suppliedMediaId !== storedMediaId) {
       await db
         .from('broadcasts')
-        .update({ header_media_id: suppliedMediaId, header_media_url: null })
+        .update({
+          header_media_id: suppliedMediaId,
+          header_media_uploaded_at: new Date().toISOString(),
+          header_media_url: null,
+        })
         .eq('id', broadcastId);
     } else if (!suppliedMediaId && suppliedMediaUrl && suppliedMediaUrl !== storedMediaUrl) {
       await db
         .from('broadcasts')
-        .update({ header_media_url: suppliedMediaUrl })
+        .update(
+          // The URL replaces an expired id, so drop the dead id too —
+          // otherwise every later retry re-evaluates it.
+          storedMediaExpired
+            ? { header_media_url: suppliedMediaUrl, header_media_id: null, header_media_uploaded_at: null }
+            : { header_media_url: suppliedMediaUrl }
+        )
         .eq('id', broadcastId);
     }
   } else {

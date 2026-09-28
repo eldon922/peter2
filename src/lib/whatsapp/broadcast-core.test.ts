@@ -791,6 +791,108 @@ describe('planBroadcastRetry', () => {
     ).rejects.toMatchObject({ code: 'bad_request', status: 400 });
   });
 
+  describe('stored Meta media id expiry (30-day retention)', () => {
+    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    const imageDb = (broadcast: Record<string, unknown>) =>
+      makeDb({
+        broadcasts: { rows: [sentBroadcast(broadcast)] },
+        broadcast_recipients: { rows: [failedRow({ template_params: [] })] },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: {
+          rows: [{ ...TEMPLATE_NO_VARS, header_type: 'image' }],
+        },
+      });
+
+    it('reuses a stored media id that is still fresh', async () => {
+      const { db } = imageDb({
+        header_media_id: 'media-1',
+        header_media_uploaded_at: daysAgo(5),
+        created_at: daysAgo(5),
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+    });
+
+    it('refuses an expired id instead of sending it, and consumes no failures', async () => {
+      const { db, writes } = imageDb({
+        header_media_id: 'media-1',
+        header_media_uploaded_at: daysAgo(40),
+        created_at: daysAgo(40),
+      });
+      await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'header_media_expired',
+        status: 422,
+        details: { headerType: 'image' },
+      });
+      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(0);
+    });
+
+    it('falls back to created_at when the upload time was never recorded', async () => {
+      const { db } = imageDb({
+        header_media_id: 'media-1',
+        header_media_uploaded_at: null,
+        created_at: daysAgo(40),
+      });
+      await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'header_media_expired',
+      });
+    });
+
+    it('does not block when no time is known at all', async () => {
+      const { db } = imageDb({
+        header_media_id: 'media-1',
+        header_media_uploaded_at: null,
+        created_at: null,
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+    });
+
+    it('accepts a freshly uploaded id in place of an expired one and stamps it', async () => {
+      const { db, writes } = imageDb({
+        header_media_id: 'old',
+        header_media_uploaded_at: daysAgo(40),
+        created_at: daysAgo(40),
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1', { headerMediaId: 'fresh' });
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'fresh' });
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcasts',
+          values: expect.objectContaining({
+            header_media_id: 'fresh',
+            header_media_url: null,
+            header_media_uploaded_at: expect.any(String),
+          }),
+        })
+      );
+    });
+
+    it('accepts a URL in place of an expired id and clears the dead id', async () => {
+      const { db, writes } = imageDb({
+        header_media_id: 'old',
+        header_media_uploaded_at: daysAgo(40),
+        created_at: daysAgo(40),
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1', {
+        headerMediaUrl: 'https://cdn/new.jpg',
+      });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaUrl: 'https://cdn/new.jpg',
+      });
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcasts',
+          values: {
+            header_media_url: 'https://cdn/new.jpg',
+            header_media_id: null,
+            header_media_uploaded_at: null,
+          },
+        })
+      );
+    });
+  });
+
   it('refuses when the template is gone rather than sending a degraded message', async () => {
     const { db, writes } = makeDb({
       broadcasts: { rows: [sentBroadcast()] },
