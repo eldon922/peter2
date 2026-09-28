@@ -44,6 +44,7 @@ export default function NewBroadcastPage() {
     Record<string, { type: 'static' | 'field' | 'custom_field'; value: string }>
   >({});
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [headerMediaId, setHeaderMediaId] = useState('');
   const [name, setName] = useState('');
 
   async function handleSend() {
@@ -62,6 +63,7 @@ export default function NewBroadcastPage() {
         },
         variables,
         headerMediaUrl,
+        headerMediaId,
       });
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
@@ -220,6 +222,8 @@ export default function NewBroadcastPage() {
               onUpdate={setVariables}
               headerMediaUrl={headerMediaUrl}
               onHeaderMediaUrlChange={setHeaderMediaUrl}
+              headerMediaId={headerMediaId}
+              onHeaderMediaIdChange={setHeaderMediaId}
               onNext={() => setCurrentStep(3)}
               onBack={() => setCurrentStep(1)}
             />

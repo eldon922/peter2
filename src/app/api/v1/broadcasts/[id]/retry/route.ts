@@ -56,12 +56,16 @@ export async function POST(
 
     const body = (await request.json().catch(() => null)) as {
       header_media_url?: unknown;
+      header_media_id?: unknown;
     } | null;
     const headerMediaUrl =
       typeof body?.header_media_url === 'string' ? body.header_media_url : undefined;
+    const headerMediaId =
+      typeof body?.header_media_id === 'string' ? body.header_media_id : undefined;
 
     const plan = await planBroadcastRetry(ctx.supabase, ctx.accountId, id, {
       headerMediaUrl,
+      headerMediaId,
     });
 
     // ctx.supabase is already service-role, so it serves both the

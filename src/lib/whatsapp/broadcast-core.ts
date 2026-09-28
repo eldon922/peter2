@@ -408,12 +408,12 @@ export async function planBroadcastRetry(
   db: SupabaseClient,
   accountId: string,
   broadcastId: string,
-  opts: { recipientId?: string; headerMediaUrl?: string } = {}
+  opts: { recipientId?: string; headerMediaUrl?: string; headerMediaId?: string } = {}
 ): Promise<BroadcastPlan> {
   const { data: broadcast, error: bErr } = await db
     .from('broadcasts')
     .select(
-      'id, template_name, template_language, template_variables, header_media_url, status'
+      'id, template_name, template_language, template_variables, header_media_url, header_media_id, status'
     )
     .eq('id', broadcastId)
     .eq('account_id', accountId)
@@ -528,43 +528,55 @@ export async function planBroadcastRetry(
     );
   }
 
-  // Media headers need a URL on every send. We will NOT quietly fall
-  // back to the template's current default here: for a broadcast that
-  // predates header_media_url, that would re-send a different image
-  // than the original with no indication anything changed. Ask for it
-  // instead — the caller can supply one and we persist it so this is a
-  // one-time prompt.
+  // Media headers need a URL or a media id on every send. We will NOT
+  // quietly fall back to the template's current default here: for a
+  // broadcast that predates header media being recorded, that would
+  // re-send a different file than the original with no indication
+  // anything changed. Ask for it instead — the caller can supply one
+  // and we persist it so this is a one-time prompt.
   const headerType = templateRow.header_type;
   const isMediaHeader =
     headerType === 'image' || headerType === 'video' || headerType === 'document';
+  const suppliedMediaId = opts.headerMediaId?.trim();
+  const storedMediaId = broadcast.header_media_id?.trim();
   const suppliedMediaUrl = opts.headerMediaUrl?.trim();
   const storedMediaUrl = broadcast.header_media_url?.trim();
-  let headerMediaUrl = suppliedMediaUrl || storedMediaUrl || undefined;
+  // A media id (uploaded once, reused by Meta) is preferred over a URL
+  // (re-fetched by Meta on every send) whenever both are available —
+  // same preference `template-send-builder.ts` applies at build time.
+  let headerMediaId = suppliedMediaId || storedMediaId || undefined;
+  let headerMediaUrl = headerMediaId ? undefined : suppliedMediaUrl || storedMediaUrl || undefined;
 
   if (isMediaHeader) {
-    if (!headerMediaUrl) {
+    if (!headerMediaId && !headerMediaUrl) {
       throw new BroadcastError(
         'header_media_required',
-        `This broadcast uses a ${headerType} header but predates media URLs being recorded, so we cannot tell which ${headerType} it sent. Supply the URL to retry with.`,
+        `This broadcast uses a ${headerType} header but predates media being recorded, so we cannot tell which ${headerType} it sent. Supply the media to retry with.`,
         422,
         { headerType }
       );
     }
-    if (!isValidHttpUrl(headerMediaUrl)) {
+    if (headerMediaUrl && !isValidHttpUrl(headerMediaUrl)) {
       throw new BroadcastError(
         'bad_request',
         'The media URL must be a valid http(s) URL.',
         400
       );
     }
-    // Persist a newly supplied URL so later retries don't re-prompt.
-    if (suppliedMediaUrl && suppliedMediaUrl !== storedMediaUrl) {
+    // Persist a newly supplied id/URL so later retries don't re-prompt.
+    if (suppliedMediaId && suppliedMediaId !== storedMediaId) {
+      await db
+        .from('broadcasts')
+        .update({ header_media_id: suppliedMediaId, header_media_url: null })
+        .eq('id', broadcastId);
+    } else if (!suppliedMediaId && suppliedMediaUrl && suppliedMediaUrl !== storedMediaUrl) {
       await db
         .from('broadcasts')
         .update({ header_media_url: suppliedMediaUrl })
         .eq('id', broadcastId);
     }
   } else {
+    headerMediaId = undefined;
     headerMediaUrl = undefined;
   }
 
@@ -597,9 +609,11 @@ export async function planBroadcastRetry(
 
   // Always explicit for media headers — validated above, never left to
   // the builder's template-default fallback.
-  const messageParams: SendTimeParams | undefined = headerMediaUrl
-    ? { headerMediaUrl }
-    : undefined;
+  const messageParams: SendTimeParams | undefined = headerMediaId
+    ? { headerMediaId }
+    : headerMediaUrl
+      ? { headerMediaUrl }
+      : undefined;
 
   // Claim: compare-and-set on status. Only rows we actually win are
   // planned, so concurrent retries can't double-send.
@@ -694,7 +708,7 @@ export async function planBroadcastSend(
 ): Promise<BroadcastPlan> {
   const { data: broadcast, error: bErr } = await db
     .from('broadcasts')
-    .select('id, template_name, template_language, header_media_url, status')
+    .select('id, template_name, template_language, header_media_url, header_media_id, status')
     .eq('id', broadcastId)
     .eq('account_id', accountId)
     .maybeSingle();
@@ -768,9 +782,14 @@ export async function planBroadcastSend(
   const headerType = templateRow?.header_type;
   const isMediaHeader =
     headerType === 'image' || headerType === 'video' || headerType === 'document';
-  const headerMediaUrl = broadcast.header_media_url?.trim() || undefined;
+  const headerMediaId = broadcast.header_media_id?.trim() || undefined;
+  const headerMediaUrl = headerMediaId ? undefined : broadcast.header_media_url?.trim() || undefined;
   const messageParams: SendTimeParams | undefined =
-    isMediaHeader && headerMediaUrl ? { headerMediaUrl } : undefined;
+    isMediaHeader && headerMediaId
+      ? { headerMediaId }
+      : isMediaHeader && headerMediaUrl
+        ? { headerMediaUrl }
+        : undefined;
 
   const planned: PlannedRecipient[] = sendable.map((row) => ({
     recipientRowId: row.id,

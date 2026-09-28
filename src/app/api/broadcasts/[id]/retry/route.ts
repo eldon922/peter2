@@ -56,19 +56,25 @@ export async function POST(
     const body = (await request.json().catch(() => null)) as {
       recipient_id?: unknown;
       header_media_url?: unknown;
+      header_media_id?: unknown;
     } | null;
     const recipientId =
       typeof body?.recipient_id === 'string' ? body.recipient_id : undefined;
     // Supplied by the UI after a `header_media_required` refusal. The
     // planner persists it, so the prompt happens once per broadcast.
+    // A media id (upload path) takes priority over a URL when both are
+    // present — see planBroadcastRetry.
     const headerMediaUrl =
       typeof body?.header_media_url === 'string' ? body.header_media_url : undefined;
+    const headerMediaId =
+      typeof body?.header_media_id === 'string' ? body.header_media_id : undefined;
 
     // Plan with the request-scoped client: RLS enforces account
     // ownership on every read and on the claim.
     const plan = await planBroadcastRetry(supabase, accountId, id, {
       recipientId,
       headerMediaUrl,
+      headerMediaId,
     });
 
     // ...but fan out on the service-role client. The cookie-backed

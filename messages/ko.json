@@ -801,7 +801,23 @@
           "name": "이름",
           "phone": "전화번호",
           "email": "이메일"
-        }
+        },
+        "uploadTab": "업로드",
+        "urlTab": "URL 붙여넣기",
+        "recommended": "더 빠름",
+        "uploading": "업로드 중…",
+        "chooseFile": "파일 선택",
+        "replaceFile": "파일 교체",
+        "imageHint": "JPEG 또는 PNG, 5MB 이하",
+        "videoHint": "MP4 또는 3GPP, 16MB 이하",
+        "documentHint": "PDF, 16MB 이하",
+        "uploadedReady": "{name} 업로드 완료 — 전송 준비됨",
+        "toastUploadSuccess": "미디어가 업로드되었습니다.",
+        "toastUploadFailed": "업로드에 실패했습니다.",
+        "toastInvalidMediaFile": "{kind}은(는) 다음 중 하나여야 합니다: {types}.",
+        "toastMediaTooLarge": "파일 크기가 {size}MB입니다 — 제한은 {limit}MB입니다.",
+        "headerMediaMissing": "이 템플릿을 보내려면 미디어 파일 또는 URL이 필요합니다.",
+        "headerMediaInvalid": "유효한 http(s) URL을 입력하세요."
       },
       "scheduleSend": {
         "title": "검토 및 전송",
@@ -1474,7 +1490,10 @@
       "toastInvalidImage": "헤더 이미지는 JPEG 또는 PNG여야 합니다.",
       "toastImageTooLarge": "이미지 크기가 {size}MB입니다 — Meta 제한은 5MB입니다.",
       "toastUploadSuccess": "이미지가 업로드되었습니다.",
-      "toastUploadFailed": "업로드에 실패했습니다."
+      "toastUploadFailed": "업로드에 실패했습니다.",
+      "uploadFile": "파일 업로드",
+      "toastInvalidMediaFile": "{kind}은(는) 다음 중 하나여야 합니다: {types}.",
+      "toastMediaTooLarge": "{kind} 크기가 {size}MB입니다 — 제한은 {limit}MB입니다."
     },
     "roles": {
       "admin": "관리자",

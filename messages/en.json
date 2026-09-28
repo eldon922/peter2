@@ -800,7 +800,23 @@
           "name": "Name",
           "phone": "Phone",
           "email": "Email"
-        }
+        },
+        "uploadTab": "Upload",
+        "urlTab": "Paste URL",
+        "recommended": "Faster",
+        "uploading": "Uploading…",
+        "chooseFile": "Choose file",
+        "replaceFile": "Replace file",
+        "imageHint": "JPEG or PNG, ≤5 MB",
+        "videoHint": "MP4 or 3GPP, ≤16 MB",
+        "documentHint": "PDF, ≤16 MB",
+        "uploadedReady": "{name} uploaded — ready to send",
+        "toastUploadSuccess": "Media uploaded.",
+        "toastUploadFailed": "Upload failed.",
+        "toastInvalidMediaFile": "{kind} must be one of: {types}.",
+        "toastMediaTooLarge": "File is {size} MB — the limit is {limit} MB.",
+        "headerMediaMissing": "A media file or URL is required to send this template.",
+        "headerMediaInvalid": "Enter a valid http(s) URL."
       },
       "scheduleSend": {
         "title": "Review & Send",
@@ -1474,7 +1490,10 @@
       "toastInvalidImage": "Header image must be a JPEG or PNG.",
       "toastImageTooLarge": "Image is {size} MB — Meta's limit is 5 MB.",
       "toastUploadSuccess": "Image uploaded.",
-      "toastUploadFailed": "Upload failed."
+      "toastUploadFailed": "Upload failed.",
+      "uploadFile": "Upload file",
+      "toastInvalidMediaFile": "{kind} must be one of: {types}.",
+      "toastMediaTooLarge": "{kind} is {size} MB — the limit is {limit} MB."
     },
     "roles": {
       "admin": "Admin",

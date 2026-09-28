@@ -45,8 +45,16 @@ interface BroadcastPayload {
    * time for media-header templates — Meta rejects the send without
    * it. Passed through as `messageParams.headerMediaUrl`; the builder
    * falls back to the template's stored URL only when this is empty.
+   * Ignored when `headerMediaId` is also set — the id path wins.
    */
   headerMediaUrl?: string;
+  /**
+   * Meta media id (from the Upload Media endpoint) for the same
+   * header. Preferred over `headerMediaUrl` — Meta caches an uploaded
+   * id server-side, so a broadcast fan-out doesn't re-fetch a link on
+   * every single recipient send.
+   */
+  headerMediaId?: string;
 }
 
 interface UseBroadcastSendingReturn {
@@ -346,11 +354,13 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       }
 
       // Media-header templates (image/video/document) require a media
-      // URL on every send. Collected in the personalize step, persisted
-      // on the broadcast row below, and turned back into a send-time
-      // `messageParams.headerMediaUrl` by the server
-      // (`planBroadcastSend`) when it builds the fan-out plan.
-      const headerMediaUrl = payload.headerMediaUrl?.trim();
+      // URL or media id on every send. Collected in the personalize
+      // step, persisted on the broadcast row below, and turned back
+      // into a send-time `messageParams` by the server
+      // (`planBroadcastSend`) when it builds the fan-out plan. The id
+      // (upload path) wins when both are present.
+      const headerMediaId = payload.headerMediaId?.trim();
+      const headerMediaUrl = headerMediaId ? undefined : payload.headerMediaUrl?.trim();
 
       // ── Step 2: Create broadcast row ──────────────────────────────
       // Count columns are owned by the DB aggregate trigger (migrations
@@ -369,6 +379,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
           // Persisted so a retry reproduces this exact media header
           // instead of silently falling back to the template default.
           header_media_url: headerMediaUrl || null,
+          header_media_id: headerMediaId || null,
           audience_filter: {
             type: payload.audience.type,
             tagIds: payload.audience.tagIds,

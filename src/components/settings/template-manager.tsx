@@ -440,14 +440,28 @@ export function TemplateManager() {
   const headerNeedsMedia =
     form.header_format !== 'none' && form.header_format !== 'text';
 
-  async function handleHeaderImageFile(file: File) {
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      toast.error(t('toastInvalidImage'));
+  // Mime allow-lists per header type. Image was the original (#230)
+  // scope; video/document now get the same upload button instead of
+  // URL-only entry — sizes still enforced by MEDIA_MAX_BYTES_BY_KIND.
+  const HEADER_MEDIA_ACCEPT: Record<'image' | 'video' | 'document', string[]> = {
+    image: ['image/jpeg', 'image/png'],
+    video: ['video/mp4', 'video/3gpp'],
+    document: ['application/pdf'],
+  };
+
+  async function handleHeaderMediaFile(file: File, kind: 'image' | 'video' | 'document') {
+    const allowed = HEADER_MEDIA_ACCEPT[kind];
+    if (!allowed.includes(file.type)) {
+      toast.error(t('toastInvalidMediaFile', { kind, types: allowed.join(', ') }));
       return;
     }
-    if (file.size > MEDIA_MAX_BYTES_BY_KIND.image) {
+    if (file.size > MEDIA_MAX_BYTES_BY_KIND[kind]) {
       toast.error(
-        t('toastImageTooLarge', { size: (file.size / 1024 / 1024).toFixed(1) }),
+        t('toastMediaTooLarge', {
+          kind,
+          size: (file.size / 1024 / 1024).toFixed(1),
+          limit: (MEDIA_MAX_BYTES_BY_KIND[kind] / 1024 / 1024).toFixed(0),
+        }),
       );
       return;
     }
@@ -799,16 +813,18 @@ export function TemplateManager() {
 
               {headerNeedsMedia && (
                 <div className="space-y-2 mt-2">
-                  {form.header_format === 'image' && (
+                  {(form.header_format === 'image' ||
+                    form.header_format === 'video' ||
+                    form.header_format === 'document') && (
                     <div className="flex items-center gap-2">
                       <input
                         ref={headerFileRef}
                         type="file"
-                        accept="image/jpeg,image/png"
+                        accept={HEADER_MEDIA_ACCEPT[form.header_format].join(',')}
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
-                          if (f) void handleHeaderImageFile(f);
+                          if (f) void handleHeaderMediaFile(f, form.header_format as 'image' | 'video' | 'document');
                           e.target.value = '';
                         }}
                       />
@@ -824,10 +840,14 @@ export function TemplateManager() {
                         ) : (
                           <Upload className="h-3.5 w-3.5" />
                         )}
-                        {t('uploadImage')}
+                        {form.header_format === 'image' ? t('uploadImage') : t('uploadFile')}
                       </Button>
                       <span className="text-[11px] text-muted-foreground">
-                        {t('uploadHint')}
+                        {form.header_format === 'image'
+                          ? t('uploadHint')
+                          : form.header_format === 'video'
+                            ? t('videoHint')
+                            : t('documentHint')}
                       </span>
                     </div>
                   )}

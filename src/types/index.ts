@@ -442,6 +442,12 @@ export interface Broadcast {
    * NULL on broadcasts created before it.
    */
   header_media_url?: string | null;
+  /**
+   * Meta media id (from the Upload Media endpoint) for the same header —
+   * preferred over header_media_url when both are present. Added in
+   * migration 046; NULL on broadcasts created before it.
+   */
+  header_media_id?: string | null;
   scheduled_at?: string;
   status: BroadcastStatus;
   total_recipients: number;

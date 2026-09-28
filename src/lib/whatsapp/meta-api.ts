@@ -1194,3 +1194,53 @@ export async function downloadMedia(
   const buffer = Buffer.from(await response.arrayBuffer())
   return { buffer, contentType }
 }
+
+export interface UploadPhoneMediaArgs {
+  /** The sending phone number's id — this endpoint is phone-number-scoped. */
+  phoneNumberId: string
+  accessToken: string
+  bytes: Uint8Array
+  mimeType: string
+  fileName: string
+}
+
+/**
+ * Upload a file to Meta via the "Upload Media" endpoint
+ * (`POST /{phone-number-id}/media`) and return the resulting media id.
+ *
+ * See https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#upload-media
+ *
+ * Distinct from `uploadResumableMedia` above: that one is app-scoped and
+ * only produces an `example.header_handle` for TEMPLATE CREATION. This
+ * one is phone-number-scoped and produces a reusable media `id` that can
+ * be passed as `{ id }` in a message's media component — the id Meta
+ * caches server-side, so a broadcast that sends the same media to many
+ * recipients no longer makes Meta re-fetch a link on every single send.
+ */
+export async function uploadPhoneMedia(
+  args: UploadPhoneMediaArgs,
+): Promise<{ id: string }> {
+  const { phoneNumberId, accessToken, bytes, mimeType, fileName } = args
+
+  // Uint8Array → Blob is the shape node-fetch/undici's FormData wants;
+  // passing the raw bytes directly loses the filename/type Meta expects
+  // in the multipart part.
+  const blob = new Blob([bytes as unknown as BlobPart], { type: mimeType })
+  const form = new FormData()
+  form.append('messaging_product', 'whatsapp')
+  form.append('file', blob, fileName)
+
+  const response = await fetch(`${META_API_BASE}/${phoneNumberId}/media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Media upload failed: ${response.status}`)
+  }
+  const data = (await response.json()) as { id?: string }
+  if (!data.id) {
+    throw new Error('Meta did not return a media id.')
+  }
+  return { id: data.id }
+}

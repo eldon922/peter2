@@ -800,7 +800,23 @@
           "name": "Nama",
           "phone": "Telepon",
           "email": "Email"
-        }
+        },
+        "uploadTab": "Unggah",
+        "urlTab": "Tempel URL",
+        "recommended": "Lebih cepat",
+        "uploading": "Mengunggah…",
+        "chooseFile": "Pilih file",
+        "replaceFile": "Ganti file",
+        "imageHint": "JPEG atau PNG, ≤5 MB",
+        "videoHint": "MP4 atau 3GPP, ≤16 MB",
+        "documentHint": "PDF, ≤16 MB",
+        "uploadedReady": "{name} berhasil diunggah — siap dikirim",
+        "toastUploadSuccess": "Media berhasil diunggah.",
+        "toastUploadFailed": "Gagal mengunggah.",
+        "toastInvalidMediaFile": "{kind} harus salah satu dari: {types}.",
+        "toastMediaTooLarge": "Ukuran file {size} MB — batasnya {limit} MB.",
+        "headerMediaMissing": "File media atau URL diperlukan untuk mengirim template ini.",
+        "headerMediaInvalid": "Masukkan URL http(s) yang valid."
       },
       "scheduleSend": {
         "title": "Tinjau & Kirim",
@@ -1464,7 +1480,10 @@
       "toastInvalidImage": "Gambar header harus JPEG atau PNG.",
       "toastImageTooLarge": "Gambar berukuran {size} MB — batas Meta adalah 5 MB.",
       "toastUploadSuccess": "Gambar diunggah.",
-      "toastUploadFailed": "Gagal mengunggah."
+      "toastUploadFailed": "Gagal mengunggah.",
+      "uploadFile": "Unggah file",
+      "toastInvalidMediaFile": "{kind} harus salah satu dari: {types}.",
+      "toastMediaTooLarge": "{kind} berukuran {size} MB — batasnya {limit} MB."
     },
     "roles": {
       "admin": "Admin",

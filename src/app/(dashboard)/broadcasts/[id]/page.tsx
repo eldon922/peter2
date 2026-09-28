@@ -39,6 +39,9 @@ import {
   RotateCw,
   AlertTriangle,
   ImageIcon,
+  FileIcon,
+  Upload,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -227,6 +230,10 @@ export default function BroadcastDetailPage() {
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
   const tStatus = useTranslations('Broadcasts.status');
+  // Shared with the wizard's personalize step — same upload/URL
+  // strings, same recommendation, so a retry prompt doesn't teach the
+  // user a second vocabulary for the same choice.
+  const tMedia = useTranslations('Broadcasts.wizard.personalize');
   const broadcastId = params.id as string;
   const canSend = useCan('send-messages');
 
@@ -262,21 +269,105 @@ export default function BroadcastDetailPage() {
   const [mediaPrompt, setMediaPrompt] = useState<{
     recipientId?: string;
     url: string;
+    /** Meta media id from the upload path — mutually exclusive with url. */
+    mediaId: string;
     /** The server's explanation, shown as the dialog description. */
     error: string;
     /** image | video | document — drives the label and the preview. */
     headerType: string;
   } | null>(null);
+  // 'upload' is the recommended default here too — see step3-personalize.
+  const [mediaPromptMode, setMediaPromptMode] = useState<'upload' | 'url'>('upload');
+  const [mediaPromptUploading, setMediaPromptUploading] = useState(false);
+  const [mediaPromptFileName, setMediaPromptFileName] = useState('');
+  const [mediaPromptPreviewUrl, setMediaPromptPreviewUrl] = useState('');
+
+  // Mirrors the same maps in step3-personalize.tsx / the upload route.
+  const MEDIA_ACCEPT: Record<string, string[]> = {
+    image: ['image/jpeg', 'image/png'],
+    video: ['video/mp4', 'video/3gpp'],
+    document: ['application/pdf'],
+  };
+  const MEDIA_MAX_BYTES: Record<string, number> = {
+    image: 5 * 1024 * 1024,
+    video: 16 * 1024 * 1024,
+    document: 16 * 1024 * 1024,
+  };
 
   // Same validation the personalize step applies to a media header, so
   // a URL rejected there is rejected here and vice versa.
   const mediaPromptError = useMemo<'missing' | 'invalid' | null>(() => {
     if (!mediaPrompt) return null;
+    if (mediaPrompt.mediaId.trim()) return null;
     const value = mediaPrompt.url.trim();
     if (!value) return 'missing';
     if (!isValidHttpUrl(value)) return 'invalid';
     return null;
   }, [mediaPrompt]);
+
+  // Revoke the object URL used for the upload-tab preview when it's
+  // replaced or the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+    };
+  }, [mediaPromptPreviewUrl]);
+
+  async function handleMediaPromptFile(file: File) {
+    const headerType = mediaPrompt?.headerType;
+    if (!headerType || !(headerType in MEDIA_ACCEPT)) return;
+    const allowed = MEDIA_ACCEPT[headerType];
+    if (!allowed.includes(file.type)) {
+      toast.error(
+        tMedia('toastInvalidMediaFile', { kind: headerType, types: allowed.join(', ') }),
+      );
+      return;
+    }
+    const maxBytes = MEDIA_MAX_BYTES[headerType];
+    if (file.size > maxBytes) {
+      toast.error(
+        tMedia('toastMediaTooLarge', {
+          size: (file.size / 1024 / 1024).toFixed(1),
+          limit: (maxBytes / 1024 / 1024).toFixed(0),
+        }),
+      );
+      return;
+    }
+
+    setMediaPromptUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('kind', headerType);
+      const res = await fetch('/api/whatsapp/media/upload', { method: 'POST', body: form });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!res.ok || !data.id) {
+        throw new Error(data.error || tMedia('toastUploadFailed'));
+      }
+      if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+      setMediaPromptPreviewUrl(URL.createObjectURL(file));
+      setMediaPromptFileName(file.name);
+      setMediaPrompt((prev) => (prev ? { ...prev, mediaId: data.id!, url: '' } : prev));
+      toast.success(tMedia('toastUploadSuccess'));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tMedia('toastUploadFailed'));
+    } finally {
+      setMediaPromptUploading(false);
+    }
+  }
+
+  function switchMediaPromptMode(next: 'upload' | 'url') {
+    setMediaPromptMode(next);
+    if (next === 'upload') {
+      setMediaPrompt((prev) => (prev ? { ...prev, url: '' } : prev));
+    } else {
+      if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+      setMediaPromptPreviewUrl('');
+      setMediaPromptFileName('');
+      setMediaPrompt((prev) => (prev ? { ...prev, mediaId: '' } : prev));
+    }
+  }
+
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Plain function rather than useCallback, matching the broadcasts
@@ -398,9 +489,12 @@ export default function BroadcastDetailPage() {
         body: JSON.stringify({
           ...(recipientId ? { recipient_id: recipientId } : {}),
           // Only present after the user answered the media prompt below.
-          ...(mediaPrompt?.url.trim()
-            ? { header_media_url: mediaPrompt.url.trim() }
-            : {}),
+          // A media id (upload path) takes priority over a URL.
+          ...(mediaPrompt?.mediaId.trim()
+            ? { header_media_id: mediaPrompt.mediaId.trim() }
+            : mediaPrompt?.url.trim()
+              ? { header_media_url: mediaPrompt.url.trim() }
+              : {}),
         }),
       });
       const data = await res.json();
@@ -413,9 +507,14 @@ export default function BroadcastDetailPage() {
           setMediaPrompt({
             recipientId,
             url: '',
+            mediaId: '',
             error: data.error,
             headerType: data.headerType ?? 'image',
           });
+          setMediaPromptMode('upload');
+          setMediaPromptFileName('');
+          if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+          setMediaPromptPreviewUrl('');
           return;
         }
         toast.error(
@@ -429,6 +528,9 @@ export default function BroadcastDetailPage() {
       }
 
       setMediaPrompt(null);
+      if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+      setMediaPromptPreviewUrl('');
+      setMediaPromptFileName('');
 
       if (data.retrying > 0) {
         // Snapshot before `refresh()` below moves the counts — this is
@@ -742,52 +844,169 @@ export default function BroadcastDetailPage() {
                     {mediaPrompt.headerType}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    type="url"
-                    autoFocus
-                    value={mediaPrompt.url}
-                    onChange={(e) =>
-                      setMediaPrompt({ ...mediaPrompt, url: e.target.value })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && mediaPromptError === null) {
-                        handleRetry(mediaPrompt.recipientId);
-                      }
-                    }}
-                    placeholder={t('mediaPromptPlaceholder')}
-                    className="min-w-[18rem] flex-1 border-border bg-muted text-foreground placeholder:text-muted-foreground"
-                  />
-                  <Button
-                    size="sm"
-                    disabled={mediaPromptError !== null || retrying !== null}
-                    onClick={() => handleRetry(mediaPrompt.recipientId)}
-                    className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+
+                <div className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => switchMediaPromptMode('upload')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      mediaPromptMode === 'upload'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    {retrying !== null ? t('retrying') : t('mediaPromptConfirm')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={retrying !== null}
-                    onClick={() => setMediaPrompt(null)}
-                    className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    <Upload className="h-3.5 w-3.5" />
+                    {tMedia('uploadTab')}
+                    <span
+                      className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold ${
+                        mediaPromptMode === 'upload'
+                          ? 'bg-primary-foreground/20'
+                          : 'bg-primary/15 text-primary'
+                      }`}
+                    >
+                      <Zap className="h-2.5 w-2.5" />
+                      {tMedia('recommended')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMediaPromptMode('url')}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      mediaPromptMode === 'url'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
                   >
-                    {t('cancel')}
-                  </Button>
+                    {tMedia('urlTab')}
+                  </button>
                 </div>
+
+                {mediaPromptMode === 'upload' ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-3 py-2 text-xs transition-colors hover:border-primary/50 hover:bg-muted">
+                      <input
+                        type="file"
+                        accept={MEDIA_ACCEPT[mediaPrompt.headerType]?.join(',')}
+                        className="hidden"
+                        disabled={mediaPromptUploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void handleMediaPromptFile(f);
+                          e.target.value = '';
+                        }}
+                      />
+                      {mediaPromptUploading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      ) : mediaPrompt.headerType === 'image' ? (
+                        <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <span className="font-medium text-foreground">
+                        {mediaPromptUploading
+                          ? tMedia('uploading')
+                          : mediaPrompt.mediaId
+                            ? tMedia('replaceFile')
+                            : tMedia('chooseFile')}
+                      </span>
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                      {tMedia(`${mediaPrompt.headerType}Hint`)}
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={mediaPromptError !== null || retrying !== null}
+                      onClick={() => handleRetry(mediaPrompt.recipientId)}
+                      className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {retrying !== null ? t('retrying') : t('mediaPromptConfirm')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={retrying !== null}
+                      onClick={() => {
+                        setMediaPrompt(null);
+                        if (mediaPromptPreviewUrl) URL.revokeObjectURL(mediaPromptPreviewUrl);
+                        setMediaPromptPreviewUrl('');
+                        setMediaPromptFileName('');
+                      }}
+                      className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    >
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="url"
+                      autoFocus
+                      value={mediaPrompt.url}
+                      onChange={(e) =>
+                        setMediaPrompt({ ...mediaPrompt, url: e.target.value })
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && mediaPromptError === null) {
+                          handleRetry(mediaPrompt.recipientId);
+                        }
+                      }}
+                      placeholder={t('mediaPromptPlaceholder')}
+                      className="min-w-[18rem] flex-1 border-border bg-muted text-foreground placeholder:text-muted-foreground"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={mediaPromptError !== null || retrying !== null}
+                      onClick={() => handleRetry(mediaPrompt.recipientId)}
+                      className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {retrying !== null ? t('retrying') : t('mediaPromptConfirm')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={retrying !== null}
+                      onClick={() => setMediaPrompt(null)}
+                      className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    >
+                      {t('cancel')}
+                    </Button>
+                  </div>
+                )}
+
+                {mediaPrompt.mediaId && !mediaPromptUploading && (
+                  <div className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs text-primary">
+                    <Zap className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">
+                      {tMedia('uploadedReady', {
+                        name: mediaPromptFileName || mediaPrompt.headerType,
+                      })}
+                    </span>
+                  </div>
+                )}
+
                 {/* Only images can be previewed inline; video/document
-                    URLs are taken on trust, same as the wizard. */}
+                    are taken on trust, same as the wizard. */}
                 {mediaPrompt.headerType === 'image' &&
+                  mediaPromptMode === 'upload' &&
+                  mediaPromptPreviewUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mediaPromptPreviewUrl}
+                      alt={t('mediaPromptPreviewAlt')}
+                      className="mt-1 max-h-40 rounded-lg border border-border object-contain"
+                    />
+                  )}
+                {mediaPrompt.headerType === 'image' &&
+                  mediaPromptMode === 'url' &&
                   mediaPromptError === null && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={mediaPrompt.url.trim()}
                       alt={t('mediaPromptPreviewAlt')}
-                      className="mt-3 max-h-40 rounded-lg border border-border object-contain"
+                      className="mt-1 max-h-40 rounded-lg border border-border object-contain"
                     />
                   )}
-                {mediaPromptError === 'invalid' && (
+                {mediaPromptMode === 'url' && mediaPromptError === 'invalid' && (
                   <p className="text-xs text-amber-300">{t('mediaPromptInvalid')}</p>
                 )}
               </div>
