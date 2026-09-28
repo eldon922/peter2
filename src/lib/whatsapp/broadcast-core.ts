@@ -21,6 +21,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendTemplateMessage, getPhoneNumberThroughput } from '@/lib/whatsapp/meta-api';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import { isMetaMediaIdExpired } from '@/lib/whatsapp/media-expiry';
+import {
+  isBroadcastMediaKind,
+  uploadMediaFromUrl,
+  type BroadcastMediaKind,
+} from '@/lib/whatsapp/media-upload';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   DELIVER_BUDGET_MS,
@@ -145,6 +150,34 @@ function sleep(ms: number): Promise<void> {
  * a malformed local row here fails loudly once instead of producing N
  * identical opaque TypeErrors inside the send loop.
  */
+/**
+ * Every broadcast sends its media header by Meta media id, never by
+ * link: an id is uploaded once and Meta reuses it, whereas a link makes
+ * Meta re-download the same file for every single recipient. When the
+ * media only exists as a URL, upload it here and return the id.
+ *
+ * A failure is a 502 — deliberately NOT a silent fall back to sending
+ * the link, which is exactly the slow path this exists to prevent.
+ */
+async function uploadHeaderMediaOrThrow(
+  kind: BroadcastMediaKind,
+  url: string,
+  phoneNumberId: string,
+  accessToken: string
+): Promise<string> {
+  try {
+    const { id } = await uploadMediaFromUrl({ url, kind, phoneNumberId, accessToken });
+    return id;
+  } catch (e) {
+    throw new BroadcastError(
+      'media_upload_failed',
+      `Could not upload the ${kind} to WhatsApp: ${e instanceof Error ? e.message : 'unknown error'}`,
+      502,
+      { headerType: kind }
+    );
+  }
+}
+
 async function loadSendContext(
   db: SupabaseClient,
   accountId: string,
@@ -302,6 +335,28 @@ export async function createBroadcast(
     );
   }
 
+  // Media-header templates: upload the template's image/video/document
+  // to Meta ONCE, before anything is persisted (so an upload failure
+  // leaves no stranded rows) and send every recipient by media id.
+  const apiHeaderType = templateRow?.header_type;
+  const apiMediaSource = templateRow?.header_media_url?.trim() || undefined;
+  let apiMediaId: string | undefined;
+  if (isBroadcastMediaKind(apiHeaderType) && apiMediaSource) {
+    if (!isValidHttpUrl(apiMediaSource)) {
+      throw new BroadcastError(
+        'bad_request',
+        "The template's media URL is not a valid http(s) URL.",
+        400
+      );
+    }
+    apiMediaId = await uploadHeaderMediaOrThrow(
+      apiHeaderType,
+      apiMediaSource,
+      phoneNumberId,
+      accessToken
+    );
+  }
+
   // Persist the broadcast + its recipients. The count columns
   // (sent/delivered/read/replied/failed) are owned by the DB aggregate
   // trigger (migrations 003/005) and derived purely from
@@ -320,6 +375,15 @@ export async function createBroadcast(
       template_language: templateLanguage,
       status: 'sending',
       total_recipients: deduped.length,
+      // The URL is kept as the re-upload source: Meta drops the id after
+      // 30 days, and a retry then re-uploads from it automatically.
+      ...(apiMediaId
+        ? {
+            header_media_id: apiMediaId,
+            header_media_uploaded_at: new Date().toISOString(),
+            header_media_url: apiMediaSource,
+          }
+        : {}),
     })
     .select('id')
     .single();
@@ -354,7 +418,12 @@ export async function createBroadcast(
   const byContact = new Map(deduped.map((r) => [r.contactId, r]));
   const planned: PlannedRecipient[] = recipientRows.map((row) => {
     const r = byContact.get(row.contact_id as string)!;
-    return { recipientRowId: row.id as string, phone: r.phone, params: r.params };
+    return {
+      recipientRowId: row.id as string,
+      phone: r.phone,
+      params: r.params,
+      ...(apiMediaId ? { messageParams: { headerMediaId: apiMediaId } } : {}),
+    };
   });
 
   return {
@@ -583,8 +652,30 @@ export async function planBroadcastRetry(
         400
       );
     }
-    // Persist a newly supplied id/URL so later retries don't re-prompt.
-    if (suppliedMediaId && suppliedMediaId !== storedMediaId) {
+    if (!headerMediaId && headerMediaUrl) {
+      // Only a URL is available: a supplied one, or the source URL kept
+      // on the broadcast (which is also how an id that aged out is
+      // refreshed without asking anyone). Send by media id regardless —
+      // upload it now, and keep the URL as the source for next time.
+      // Thrown before any row is claimed, so a failed upload consumes
+      // no failures.
+      headerMediaId = await uploadHeaderMediaOrThrow(
+        headerType as BroadcastMediaKind,
+        headerMediaUrl,
+        phoneNumberId,
+        accessToken
+      );
+      await db
+        .from('broadcasts')
+        .update({
+          header_media_id: headerMediaId,
+          header_media_uploaded_at: new Date().toISOString(),
+          header_media_url: headerMediaUrl,
+        })
+        .eq('id', broadcastId);
+      headerMediaUrl = undefined;
+    } else if (suppliedMediaId && suppliedMediaId !== storedMediaId) {
+      // A directly uploaded file has no source URL to keep.
       await db
         .from('broadcasts')
         .update({
@@ -592,17 +683,6 @@ export async function planBroadcastRetry(
           header_media_uploaded_at: new Date().toISOString(),
           header_media_url: null,
         })
-        .eq('id', broadcastId);
-    } else if (!suppliedMediaId && suppliedMediaUrl && suppliedMediaUrl !== storedMediaUrl) {
-      await db
-        .from('broadcasts')
-        .update(
-          // The URL replaces an expired id, so drop the dead id too —
-          // otherwise every later retry re-evaluates it.
-          storedMediaExpired
-            ? { header_media_url: suppliedMediaUrl, header_media_id: null, header_media_uploaded_at: null }
-            : { header_media_url: suppliedMediaUrl }
-        )
         .eq('id', broadcastId);
     }
   } else {
@@ -738,7 +818,9 @@ export async function planBroadcastSend(
 ): Promise<BroadcastPlan> {
   const { data: broadcast, error: bErr } = await db
     .from('broadcasts')
-    .select('id, template_name, template_language, header_media_url, header_media_id, status')
+    .select(
+      'id, created_at, template_name, template_language, header_media_url, header_media_id, header_media_uploaded_at, status'
+    )
     .eq('id', broadcastId)
     .eq('account_id', accountId)
     .maybeSingle();
@@ -812,14 +894,58 @@ export async function planBroadcastSend(
   const headerType = templateRow?.header_type;
   const isMediaHeader =
     headerType === 'image' || headerType === 'video' || headerType === 'document';
-  const headerMediaId = broadcast.header_media_id?.trim() || undefined;
-  const headerMediaUrl = headerMediaId ? undefined : broadcast.header_media_url?.trim() || undefined;
-  const messageParams: SendTimeParams | undefined =
-    isMediaHeader && headerMediaId
-      ? { headerMediaId }
-      : isMediaHeader && headerMediaUrl
-        ? { headerMediaUrl }
+  // Media headers always go out by Meta media id (see
+  // uploadHeaderMediaOrThrow). Use the stored id while it is fresh;
+  // otherwise upload from the broadcast's source URL, falling back to the
+  // template's own default image — the wizard seeds that same URL, and an
+  // API-created broadcast has nothing else. With no source at all we leave
+  // messageParams unset and the builder fails each recipient with an
+  // explicit "needs a media link or id" message, as before.
+  let messageParams: SendTimeParams | undefined;
+  if (isMediaHeader && isBroadcastMediaKind(headerType)) {
+    const storedId = broadcast.header_media_id?.trim() || undefined;
+    const freshId =
+      storedId &&
+      !isMetaMediaIdExpired(broadcast.header_media_uploaded_at ?? broadcast.created_at)
+        ? storedId
         : undefined;
+    if (freshId) {
+      messageParams = { headerMediaId: freshId };
+    } else {
+      const source =
+        broadcast.header_media_url?.trim() || templateRow?.header_media_url?.trim() || undefined;
+      if (source && isValidHttpUrl(source)) {
+        let mediaId: string;
+        try {
+          mediaId = await uploadHeaderMediaOrThrow(headerType, source, phoneNumberId, accessToken);
+        } catch (e) {
+          // The wizard already inserted these rows and stamped the
+          // broadcast 'sending'. Fail them with the reason and close the
+          // broadcast, otherwise it polls 'sending' forever; a retry can
+          // pick them up once the media is fixed.
+          await db
+            .from('broadcast_recipients')
+            .update({
+              status: 'failed',
+              error_message: e instanceof Error ? e.message : 'Media upload failed',
+            })
+            .eq('broadcast_id', broadcastId)
+            .eq('status', 'pending');
+          await finalizeBroadcastStatus(db, broadcastId, 0);
+          throw e;
+        }
+        await db
+          .from('broadcasts')
+          .update({
+            header_media_id: mediaId,
+            header_media_uploaded_at: new Date().toISOString(),
+            header_media_url: source,
+          })
+          .eq('id', broadcastId);
+        messageParams = { headerMediaId: mediaId };
+      }
+    }
+  }
 
   const planned: PlannedRecipient[] = sendable.map((row) => ({
     recipientRowId: row.id,

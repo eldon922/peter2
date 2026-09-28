@@ -43,6 +43,14 @@ vi.mock('@/lib/whatsapp/meta-api', () => ({
   getPhoneNumberThroughput,
 }));
 
+// Media headers are always sent by Meta media id; the URL → id upload is
+// mocked so no test touches the network or DNS.
+const uploadMediaFromUrl = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/whatsapp/media-upload', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/whatsapp/media-upload')>()),
+  uploadMediaFromUrl,
+}));
+
 // ============================================================
 // Minimal chainable Supabase double.
 //
@@ -239,6 +247,8 @@ function sentBroadcast(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   sendTemplateMessage.mockReset();
   sendTemplateMessage.mockResolvedValue({ messageId: 'wamid.new' });
+  uploadMediaFromUrl.mockReset();
+  uploadMediaFromUrl.mockResolvedValue({ id: 'meta-media-1' });
 });
 
 describe('createBroadcast validation', () => {
@@ -321,6 +331,64 @@ describe('createBroadcast contact resolution', () => {
 
     expect(plan.planned).toHaveLength(size);
     expect(plan.rejected).toBe(0);
+  });
+
+  it('uploads a media-header template image to Meta once and sends every recipient by id', async () => {
+    const { db, writes } = makeDb({
+      contacts: { rows: [] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: {
+        rows: [
+          {
+            ...TEMPLATE_NO_VARS,
+            header_type: 'image',
+            header_media_url: 'https://cdn/template-default.jpg',
+          },
+        ],
+      },
+      broadcasts: { rows: [{ id: 'b-1' }] },
+    });
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+14155550101' }, { to: '+14155550102' }],
+    });
+
+    expect(uploadMediaFromUrl).toHaveBeenCalledTimes(1);
+    expect(plan.planned).toHaveLength(2);
+    for (const p of plan.planned) {
+      expect(p.messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    }
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: 'broadcasts',
+        op: 'insert',
+        values: expect.objectContaining({
+          header_media_id: 'meta-media-1',
+          header_media_url: 'https://cdn/template-default.jpg',
+        }),
+      })
+    );
+  });
+
+  it('persists nothing when the media upload fails', async () => {
+    uploadMediaFromUrl.mockRejectedValue(new Error('Meta says no'));
+    const { db, writes } = makeDb({
+      contacts: { rows: [] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: {
+        rows: [
+          { ...TEMPLATE_NO_VARS, header_type: 'image', header_media_url: 'https://cdn/t.jpg' },
+        ],
+      },
+      broadcasts: { rows: [{ id: 'b-1' }] },
+    });
+    await expect(
+      createBroadcast(db, 'acc', 'user', {
+        templateName: 'promo',
+        recipients: [{ to: '+14155550101' }],
+      })
+    ).rejects.toMatchObject({ code: 'media_upload_failed', status: 502 });
+    expect(writes.filter((w) => w.table === 'broadcasts')).toHaveLength(0);
   });
 
   it('reuses an existing contact instead of creating a duplicate', async () => {
@@ -707,8 +775,8 @@ describe('planBroadcastRetry', () => {
     ).toHaveLength(0);
   });
 
-  it('attaches the stored header media URL for media templates', async () => {
-    const { db } = makeDb({
+  it('uploads the stored source URL to Meta and sends by media id, not link', async () => {
+    const { db, writes } = makeDb({
       broadcasts: {
         rows: [sentBroadcast({ header_media_url: 'https://cdn/x.jpg' })],
       },
@@ -720,9 +788,26 @@ describe('planBroadcastRetry', () => {
     });
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
-    expect(plan.planned[0].messageParams).toEqual({
-      headerMediaUrl: 'https://cdn/x.jpg',
-    });
+    expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    expect(uploadMediaFromUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://cdn/x.jpg',
+        kind: 'image',
+        phoneNumberId: 'pn-1',
+        accessToken: 'tok',
+      })
+    );
+    // Keeps the URL as the re-upload source alongside the new id.
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: 'broadcasts',
+        values: {
+          header_media_id: 'meta-media-1',
+          header_media_uploaded_at: expect.any(String),
+          header_media_url: 'https://cdn/x.jpg',
+        },
+      })
+    );
   });
 
   it('asks for the media URL rather than reusing the template default', async () => {
@@ -765,13 +850,15 @@ describe('planBroadcastRetry', () => {
       headerMediaUrl: 'https://cdn/chosen.jpg',
     });
 
-    expect(plan.planned[0].messageParams).toEqual({
-      headerMediaUrl: 'https://cdn/chosen.jpg',
-    });
+    expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
     expect(writes).toContainEqual(
       expect.objectContaining({
         table: 'broadcasts',
-        values: { header_media_url: 'https://cdn/chosen.jpg' },
+        values: {
+          header_media_id: 'meta-media-1',
+          header_media_uploaded_at: expect.any(String),
+          header_media_url: 'https://cdn/chosen.jpg',
+        },
       })
     );
   });
@@ -868,7 +955,7 @@ describe('planBroadcastRetry', () => {
       );
     });
 
-    it('accepts a URL in place of an expired id and clears the dead id', async () => {
+    it('replaces an expired id with a fresh upload from a supplied URL', async () => {
       const { db, writes } = imageDb({
         header_media_id: 'old',
         header_media_uploaded_at: daysAgo(40),
@@ -877,19 +964,58 @@ describe('planBroadcastRetry', () => {
       const plan = await planBroadcastRetry(db, 'acc', 'b-1', {
         headerMediaUrl: 'https://cdn/new.jpg',
       });
-      expect(plan.planned[0].messageParams).toEqual({
-        headerMediaUrl: 'https://cdn/new.jpg',
-      });
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
       expect(writes).toContainEqual(
         expect.objectContaining({
           table: 'broadcasts',
           values: {
+            header_media_id: 'meta-media-1',
+            header_media_uploaded_at: expect.any(String),
             header_media_url: 'https://cdn/new.jpg',
-            header_media_id: null,
-            header_media_uploaded_at: null,
           },
         })
       );
+    });
+
+    it('re-uploads an expired id from the stored source URL without asking anyone', async () => {
+      const { db } = imageDb({
+        header_media_id: 'old',
+        header_media_url: 'https://cdn/source.jpg',
+        header_media_uploaded_at: daysAgo(40),
+        created_at: daysAgo(40),
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+      expect(uploadMediaFromUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://cdn/source.jpg' })
+      );
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    });
+
+    it('does not re-upload while the stored id is still fresh', async () => {
+      const { db } = imageDb({
+        header_media_id: 'media-1',
+        header_media_url: 'https://cdn/source.jpg',
+        header_media_uploaded_at: daysAgo(3),
+        created_at: daysAgo(3),
+      });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+      expect(uploadMediaFromUrl).not.toHaveBeenCalled();
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+    });
+
+    it('fails the retry (502) rather than falling back to a link, and consumes no failures', async () => {
+      uploadMediaFromUrl.mockRejectedValue(new Error('Meta says no'));
+      const { db, writes } = imageDb({
+        header_media_id: 'old',
+        header_media_url: 'https://cdn/source.jpg',
+        header_media_uploaded_at: daysAgo(40),
+        created_at: daysAgo(40),
+      });
+      await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'media_upload_failed',
+        status: 502,
+      });
+      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(0);
     });
   });
 
@@ -1037,19 +1163,77 @@ describe('planBroadcastSend', () => {
     });
   });
 
-  it('carries the broadcast-stored media URL into messageParams for a media-header template', async () => {
-    const { db } = makeDb({
-      broadcasts: {
-        rows: [sentBroadcast({ status: 'sending', header_media_url: 'https://cdn/x.jpg' })],
-      },
-      broadcast_recipients: { rows: [pendingRow()] },
-      whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'image' }] },
+  describe('media headers are always sent by Meta media id', () => {
+    const imageTemplate = { ...TEMPLATE_ROW, header_type: 'image' };
+    const sendDb = (broadcast: Record<string, unknown>, template: Record<string, unknown> = imageTemplate) =>
+      makeDb({
+        broadcasts: { rows: [sentBroadcast({ status: 'sending', ...broadcast })] },
+        broadcast_recipients: { rows: [pendingRow()] },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: { rows: [template] },
+      });
+
+    it('uploads the broadcast-stored URL and stores the id', async () => {
+      const { db, writes } = sendDb({ header_media_url: 'https://cdn/x.jpg' });
+      const plan = await planBroadcastSend(db, 'acc', 'b-1');
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+      expect(uploadMediaFromUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://cdn/x.jpg', kind: 'image' })
+      );
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcasts',
+          values: {
+            header_media_id: 'meta-media-1',
+            header_media_uploaded_at: expect.any(String),
+            header_media_url: 'https://cdn/x.jpg',
+          },
+        })
+      );
     });
 
-    const plan = await planBroadcastSend(db, 'acc', 'b-1');
-    expect(plan.planned[0].messageParams).toEqual({
-      headerMediaUrl: 'https://cdn/x.jpg',
+    it("uploads the template's default image when the broadcast recorded none", async () => {
+      const { db } = sendDb(
+        { header_media_url: null },
+        { ...imageTemplate, header_media_url: 'https://cdn/template-default.jpg' }
+      );
+      const plan = await planBroadcastSend(db, 'acc', 'b-1');
+      expect(uploadMediaFromUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://cdn/template-default.jpg' })
+      );
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    });
+
+    it('reuses a fresh stored id without uploading again', async () => {
+      const { db } = sendDb({
+        header_media_id: 'media-1',
+        header_media_uploaded_at: new Date().toISOString(),
+      });
+      const plan = await planBroadcastSend(db, 'acc', 'b-1');
+      expect(uploadMediaFromUrl).not.toHaveBeenCalled();
+      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+    });
+
+    it('fails the pending rows and closes the broadcast when the upload fails', async () => {
+      uploadMediaFromUrl.mockRejectedValue(new Error('Meta says no'));
+      const { db, writes } = sendDb({ header_media_url: 'https://cdn/x.jpg' });
+      await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'media_upload_failed',
+        status: 502,
+      });
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcast_recipients',
+          values: expect.objectContaining({ status: 'failed' }),
+          filters: expect.arrayContaining([['status', 'pending']]),
+        })
+      );
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcasts',
+          values: expect.objectContaining({ status: 'failed' }),
+        })
+      );
     });
   });
 
