@@ -775,7 +775,8 @@
       "toastNotSignedIn": "로그인되어 있지 않습니다.",
       "toastNotLinked": "프로필이 계정에 연결되어 있지 않습니다.",
       "toastFailedDraft": "초안 저장 실패: {error}",
-      "toastDraftSaved": "초안이 저장되었습니다"
+      "toastDraftSaved": "초안이 저장되었습니다",
+      "leaveConfirm": "완료하지 않은 브로드캐스트가 있습니다. 이 페이지를 나가면 진행 내용이 사라집니다. 나갈까요?"
     },
     "wizard": {
       "next": "다음",

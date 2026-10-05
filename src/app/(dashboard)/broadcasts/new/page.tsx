@@ -11,6 +11,7 @@ import { Step2SelectAudience } from '@/components/broadcasts/step2-select-audien
 import { Step3Personalize } from '@/components/broadcasts/step3-personalize';
 import { Step4ScheduleSend } from '@/components/broadcasts/step4-schedule-send';
 import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
+import { useLeaveGuard } from '@/hooks/use-leave-guard';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -48,6 +49,12 @@ export default function NewBroadcastPage() {
   const [headerMediaId, setHeaderMediaId] = useState('');
   const [name, setName] = useState('');
 
+  // Anything chosen so far would be lost by leaving; ask first.
+  const { release, confirmLeave } = useLeaveGuard(
+    template !== null || name.trim() !== '',
+    t('leaveConfirm')
+  );
+
   // Viewers are read-only — send them back to the list.
   useEffect(() => {
     if (!profileLoading && !canSendMessages) router.replace('/broadcasts');
@@ -71,6 +78,7 @@ export default function NewBroadcastPage() {
         headerMediaUrl,
         headerMediaId,
       });
+      await release();
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
       // Previously swallowed with console.error — the wizard would
@@ -134,6 +142,13 @@ export default function NewBroadcastPage() {
       return;
     }
     toast.success(t('toastDraftSaved'));
+    await release();
+    router.push('/broadcasts');
+  }
+
+  async function handleLeave() {
+    if (!confirmLeave()) return;
+    await release();
     router.push('/broadcasts');
   }
 
@@ -210,7 +225,7 @@ export default function NewBroadcastPage() {
               selectedTemplate={template}
               onSelect={setTemplate}
               onNext={() => setCurrentStep(1)}
-              onBack={() => router.push('/broadcasts')}
+              onBack={handleLeave}
             />
           )}
           {currentStep === 1 && (

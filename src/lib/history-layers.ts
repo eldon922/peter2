@@ -19,17 +19,27 @@ let nextId = 1;
 let ignorePops = 0;
 let listening = false;
 
-function onPopState() {
+function onPopState(e: PopStateEvent) {
   if (ignorePops > 0) {
     ignorePops--;
     return;
   }
+  const top = stack[stack.length - 1];
+  if (!top) return;
+  // Landed back on the overlay's own entry (e.g. after a hash link).
+  if (e.state?.__layer === top.id) return;
+  // A #fragment link also fires popstate; that isn't Back.
+  if (e.state == null && window.location.hash) return;
   stack.pop()?.onPop();
 }
 
 export interface HistoryLayer {
-  /** Drop the layer without calling `onPop` (the overlay closed itself). */
-  remove: () => void;
+  /**
+   * Drop the layer without calling `onPop` (the overlay closed itself).
+   * Returns true when it also rewound history, which settles with a
+   * `popstate` a moment later.
+   */
+  remove: () => boolean;
   /** Close like Back would: pops history, which calls `onPop`. */
   pop: () => void;
 }
@@ -53,7 +63,7 @@ export function pushLayer(onPop: () => void): HistoryLayer {
   return {
     remove() {
       const idx = stack.indexOf(layer);
-      if (idx === -1) return;
+      if (idx === -1) return false;
       // Only rewind history if our entry is still the current one — if the
       // page navigated on in the meantime, going back would undo that.
       const rewind = isTop(layer);
@@ -62,6 +72,7 @@ export function pushLayer(onPop: () => void): HistoryLayer {
         ignorePops++;
         window.history.back();
       }
+      return rewind;
     },
     pop() {
       if (isTop(layer)) {

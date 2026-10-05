@@ -774,7 +774,8 @@
       "toastNotSignedIn": "Belum masuk.",
       "toastNotLinked": "Profil Anda belum tertaut ke sebuah akun.",
       "toastFailedDraft": "Gagal menyimpan draf: {error}",
-      "toastDraftSaved": "Draf disimpan"
+      "toastDraftSaved": "Draf disimpan",
+      "leaveConfirm": "Anda memiliki siaran yang belum selesai. Tinggalkan halaman ini dan kehilangan kemajuan Anda?"
     },
     "wizard": {
       "next": "Lanjut",
