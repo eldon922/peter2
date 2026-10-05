@@ -81,6 +81,13 @@ const nextConfig: NextConfig = {
   // Harmless outside Docker: `next start` keeps working as before.
   output: "standalone",
 
+  experimental: {
+    // Middleware buffers only the first 10MB of a request body by
+    // default. Media uploads accept files up to 16MB, so a larger
+    // file would arrive cut off.
+    proxyClientMaxBodySize: "20mb",
+  },
+
   /**
    * Cross-origin dev access (Next.js 16).
    *
