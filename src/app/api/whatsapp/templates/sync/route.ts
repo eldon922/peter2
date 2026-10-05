@@ -6,6 +6,7 @@ import {
   toErrorResponse,
 } from '@/lib/auth/account'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { META_API_BASE } from '@/lib/whatsapp/meta-api'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import { chunkIds } from '@/lib/supabase/batching'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
@@ -25,9 +26,6 @@ import type { TemplateButton, TemplateSampleValues } from '@/types'
  * Meta) are kept and marked DELETED instead of silently lingering as
  * APPROVED.
  */
-
-const META_API_VERSION = 'v21.0'
-const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 interface MetaButton {
   type: string

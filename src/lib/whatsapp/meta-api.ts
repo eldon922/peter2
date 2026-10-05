@@ -9,13 +9,15 @@
  * instead of a runtime rejection from Meta.
  */
 
+import { META_API_VERSION } from './meta-version'
+
 /**
  * Exported (rather than module-private) so the Embedded Signup helpers
  * in `./embedded-signup.ts` pin the same Graph version as every other
  * call in this file. A second hard-coded version string is exactly the
- * kind of drift that leaves one endpoint on a deprecated version.
+ * kind of drift that leaves one endpoint on a deprecated version — the
+ * version itself is set once, in `./meta-version`.
  */
-export const META_API_VERSION = 'v26.0'
 export const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 export interface MetaSendResult {
@@ -151,11 +153,11 @@ export async function getPhoneNumberThroughput(
  *
  * `messaging_limit_tier`, which used to report this field, is
  * deprecated in favor of `whatsapp_business_manager_messaging_limit` —
- * this is the replacement. `META_API_VERSION` above (v26.0, the
- * current latest) is well past this field's rollout, so no version
- * bump is needed for it specifically — still worth a live smoke test
- * against a real account before relying on this, since that's not the
- * same as having exercised it against Meta.
+ * this is the replacement. The Graph version in `./meta-version` is
+ * well past this field's rollout, so no version bump is needed for it
+ * specifically — still worth a live smoke test against a real account
+ * before relying on this, since that's not the same as having
+ * exercised it against Meta.
  */
 export interface MetaMessagingLimitInfo {
   tier: string

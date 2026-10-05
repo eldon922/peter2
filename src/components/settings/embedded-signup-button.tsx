@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Loader2, MessageCircle, Copy, Check, ShieldAlert } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
+import { META_API_VERSION } from '@/lib/whatsapp/meta-version';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -49,9 +50,6 @@ import {
  */
 const FB_APP_ID = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
 const ES_CONFIG_ID = process.env.NEXT_PUBLIC_META_ES_CONFIG_ID;
-
-/** Graph version for FB.init — kept in step with META_API_VERSION. */
-const FB_SDK_VERSION = 'v21.0';
 
 /** Origins Meta's signup popup posts its session info from. */
 const META_MESSAGE_ORIGINS = [
@@ -145,7 +143,7 @@ export function EmbeddedSignupButton({
         appId: FB_APP_ID,
         autoLogAppEvents: true,
         xfbml: false,
-        version: FB_SDK_VERSION,
+        version: META_API_VERSION,
       });
       initialisedRef.current = true;
     }
