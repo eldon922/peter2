@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -24,7 +24,7 @@ const steps = [
 export default function NewBroadcastPage() {
   const router = useRouter();
   const t = useTranslations('Broadcasts.new');
-  const { accountId } = useAuth();
+  const { accountId, canSendMessages, profileLoading } = useAuth();
   const { createAndSendBroadcast, isProcessing, progress } = useBroadcastSending();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -46,6 +46,11 @@ export default function NewBroadcastPage() {
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
   const [headerMediaId, setHeaderMediaId] = useState('');
   const [name, setName] = useState('');
+
+  // Viewers are read-only — send them back to the list.
+  useEffect(() => {
+    if (!profileLoading && !canSendMessages) router.replace('/broadcasts');
+  }, [profileLoading, canSendMessages, router]);
 
   async function handleSend() {
     if (!template) return;

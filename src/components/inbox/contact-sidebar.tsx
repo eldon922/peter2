@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCan } from "@/hooks/use-can";
 import { cn } from "@/lib/utils";
 import type { Contact, Deal, ContactNote, Tag } from "@/types";
 import {
@@ -37,6 +38,7 @@ export function ContactSidebar({ contact, className }: ContactSidebarProps) {
   const tThread = useTranslations("Inbox.messageThread");
 
   const { accountId } = useAuth();
+  const canAct = useCan("send-messages");
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
@@ -274,13 +276,14 @@ export function ContactSidebar({ contact, className }: ContactSidebarProps) {
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder={tSidebar("addNotePlaceholder")}
                   rows={2}
-                  className="flex-1 resize-none rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50"
+                  disabled={!canAct}
+                  className="flex-1 resize-none rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <Button
                   size="sm"
                   className="h-auto bg-primary px-2 hover:bg-primary/90"
                   onClick={handleAddNote}
-                  disabled={!newNote.trim() || addingNote}
+                  disabled={!canAct || !newNote.trim() || addingNote}
                 >
                   <Plus className="h-3 w-3" />
                 </Button>

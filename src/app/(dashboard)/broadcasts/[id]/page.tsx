@@ -768,7 +768,9 @@ export default function BroadcastDetailPage() {
             </Button>
           </div>
         ) : (
-          <Button
+          <GatedButton
+            canAct={canSend}
+            gateReason="delete broadcasts"
             variant="outline"
             size="sm"
             disabled={broadcast.status === 'sending'}
@@ -782,7 +784,7 @@ export default function BroadcastDetailPage() {
           >
             <Trash2 className="h-3.5 w-3.5" />
             {t('delete')}
-          </Button>
+          </GatedButton>
         )}
         </div>
         </div>

@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LOCALES, LOCALE_COOKIE } from "@/i18n/locales";
+import { LOCALES, saveLocale } from "@/i18n/locales";
 
 export function LanguageToggle() {
   const t = useTranslations("LanguageToggle");
@@ -19,7 +19,7 @@ export function LanguageToggle() {
 
   function pick(code: string) {
     if (code === locale) return;
-    document.cookie = `${LOCALE_COOKIE}=${code}; path=/; max-age=31536000; samesite=lax`;
+    saveLocale(code);
     router.refresh();
   }
 

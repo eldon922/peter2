@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCan } from "@/hooks/use-can";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
@@ -196,6 +197,7 @@ export function MessageThread({
   const tQuote = useTranslations("Inbox.replyQuote");
 
   const { user } = useAuth();
+  const canAct = useCan("send-messages");
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1043,8 +1045,10 @@ export function MessageThread({
 
           {/* Status dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger className={cn(
-                  "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted",
+            <DropdownMenuTrigger
+                disabled={!canAct}
+                className={cn(
+                  "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted disabled:pointer-events-none",
                   currentStatus?.color ?? "text-muted-foreground"
                 )}>
                 {currentStatus ? t(`status${currentStatus.label}`) : t("status")}
@@ -1069,8 +1073,9 @@ export function MessageThread({
           {/* Assign dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger
+              disabled={!canAct}
               className={cn(
-                "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted",
+                "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted disabled:pointer-events-none",
                 assignedAgentId ? "text-primary" : "text-muted-foreground"
               )}
             >
@@ -1179,6 +1184,7 @@ export function MessageThread({
                     // Toggle is computed at the call site — `msgReactions`
                     // and `user?.id` are already in scope, no extra hook.
                     const handlePillToggle = (emoji: string) => {
+                      if (!canAct) return;
                       const own = msgReactions?.find(
                         (r) =>
                           r.actor_type === "agent" &&
@@ -1191,6 +1197,7 @@ export function MessageThread({
                       <MessageActions
                         key={msg.id}
                         message={msg}
+                        readOnly={!canAct}
                         onReply={() => handleStartReply(msg)}
                         onReact={(emoji) => {
                           if (emoji) void postReaction(msg.id, emoji);

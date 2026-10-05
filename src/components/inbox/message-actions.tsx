@@ -20,6 +20,8 @@ interface MessageActionsProps {
   message: Message;
   onReply: () => void;
   onReact: (emoji: string) => void;
+  /** Viewers can copy text but not react or reply. */
+  readOnly?: boolean;
   children: ReactNode;
 }
 
@@ -32,6 +34,7 @@ export function MessageActions({
   message,
   onReply,
   onReact,
+  readOnly = false,
   children,
 }: MessageActionsProps) {
   const t = useTranslations("Inbox.actions");
@@ -110,6 +113,7 @@ export function MessageActions({
           isAgent ? "right-3" : "left-3",
         )}
       >
+        {!readOnly && (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger
             className="flex h-7 w-7 items-center justify-center rounded-full text-popover-foreground hover:bg-muted hover:text-foreground"
@@ -134,6 +138,8 @@ export function MessageActions({
             ))}
           </PopoverContent>
         </Popover>
+        )}
+        {!readOnly && (
         <button
           type="button"
           onClick={handleReply}
@@ -142,6 +148,7 @@ export function MessageActions({
         >
           <CornerUpLeft className="h-4 w-4" />
         </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}

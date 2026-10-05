@@ -19,6 +19,8 @@ import {
   MEDIA_MAX_BYTES_BY_KIND,
 } from '@/lib/storage/upload-media';
 import { useAuth } from '@/hooks/use-auth';
+import { useCan } from '@/hooks/use-can';
+import { GatedButton } from '@/components/ui/gated-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -110,6 +112,8 @@ export function TemplateManager() {
   const t = useTranslations('Settings.templates');
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
+  // Templates are settings-class data: the APIs require admin+.
+  const canEdit = useCan('edit-settings');
 
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
@@ -484,19 +488,25 @@ export function TemplateManager() {
         description={t('description')}
         action={
           <div className="flex items-center gap-2">
-            <Button
+            <GatedButton
               variant="outline"
+              canAct={canEdit}
+              gateReason="manage templates"
               onClick={handleSyncFromMeta}
               disabled={syncing}
               title={t('syncTitle')}
             >
               <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? t('syncing') : t('syncFromMeta')}
-            </Button>
-            <Button onClick={openCreate}>
+            </GatedButton>
+            <GatedButton
+              canAct={canEdit}
+              gateReason="manage templates"
+              onClick={openCreate}
+            >
               <Plus className="size-4" />
               {t('newTemplate')}
-            </Button>
+            </GatedButton>
           </div>
         }
       />
@@ -574,6 +584,7 @@ export function TemplateManager() {
                       </div>
                     )}
                   </div>
+                  {canEdit && (
                   <div className="flex items-center gap-1 shrink-0 ml-2">
                     {statusKey === 'APPROVED' && (
                       <Button
@@ -625,6 +636,7 @@ export function TemplateManager() {
                       )}
                     </Button>
                   </div>
+                  )}
                 </CardContent>
               </Card>
             );

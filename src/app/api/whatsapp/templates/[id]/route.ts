@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
   deleteMessageTemplate,
@@ -55,6 +56,12 @@ export async function PATCH(
         { error: 'Invalid template id.' },
         { status: 400 },
       )
+    }
+    // Templates are settings-class data (same gate as submit/sync).
+    try {
+      await requireRole('admin')
+    } catch (err) {
+      return toErrorResponse(err)
     }
     const supabase = await createClient()
     const {
@@ -241,6 +248,12 @@ export async function DELETE(
         { error: 'Invalid template id.' },
         { status: 400 },
       )
+    }
+    // Templates are settings-class data (same gate as submit/sync).
+    try {
+      await requireRole('admin')
+    } catch (err) {
+      return toErrorResponse(err)
     }
     const supabase = await createClient()
     const {

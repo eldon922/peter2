@@ -5,6 +5,8 @@ import { Loader2, MessageSquare, Pencil, Plus, Trash2, Zap } from "lucide-react"
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { GatedButton } from "@/components/ui/gated-button";
+import { useCan } from "@/hooks/use-can";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -43,6 +45,7 @@ function emptyDraft(): DraftState {
 }
 
 export function QuickRepliesManager() {
+  const canEdit = useCan("send-messages");
   const [items, setItems] = useState<QuickReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -129,10 +132,14 @@ export function QuickRepliesManager() {
         title="Quick replies"
         description="Reusable snippets — plain text or a saved interactive message — that agents can insert from the inbox composer."
         action={
-          <Button onClick={openCreate}>
+          <GatedButton
+            canAct={canEdit}
+            gateReason="manage quick replies"
+            onClick={openCreate}
+          >
             <Plus className="mr-1 h-4 w-4" />
             New quick reply
-          </Button>
+          </GatedButton>
         }
       />
 
@@ -164,6 +171,7 @@ export function QuickRepliesManager() {
                     : qr.content_text}
                 </p>
               </div>
+              {canEdit && (
               <div className="flex shrink-0 gap-1">
                 <Button variant="ghost" size="icon-sm" onClick={() => openEdit(qr)}>
                   <Pencil className="h-4 w-4" />
@@ -177,6 +185,7 @@ export function QuickRepliesManager() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
+              )}
             </li>
           ))}
         </ul>

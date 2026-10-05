@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
+import { useCan } from "@/hooks/use-can";
 
 // ------------------------------------------------------------
 // Account AI status is the same for every conversation, so cache it per
@@ -80,6 +81,7 @@ export function AiThreadBanner({
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
+  const canAct = useCan("send-messages");
   const [autoReplyOn, setAutoReplyOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
@@ -149,7 +151,7 @@ export function AiThreadBanner({
             </p>
           )}
         </div>
-        <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
+        <BannerButton onClick={() => toggle(false)} busy={busy || !canAct} icon={Undo2}>
           {t("resume")}
         </BannerButton>
       </Banner>
@@ -168,7 +170,7 @@ export function AiThreadBanner({
           {t("activeText")}
         </span>
       </div>
-      <BannerButton onClick={() => toggle(true)} busy={busy} icon={Hand}>
+      <BannerButton onClick={() => toggle(true)} busy={busy || !canAct} icon={Hand}>
         {t("takeOver")}
       </BannerButton>
     </Banner>
