@@ -12,6 +12,7 @@ import {
   Pencil,
   RotateCcw,
   Upload,
+  Eye,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -125,6 +126,8 @@ export function TemplateManager() {
   // submit handler from POST /submit to PATCH /[id] and changes the
   // dialog title + CTA. Set to the template id to pre-fill from a row.
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Deleted-on-Meta templates open read-only: there is nothing to edit.
+  const [viewOnly, setViewOnly] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Template selected for the confirm-delete dialog. The destructive
   // action goes through this two-step so a slip on the trash icon
@@ -235,6 +238,11 @@ export function TemplateManager() {
       buttons: template.buttons ?? [],
     });
     setDialogOpen(true);
+  }
+
+  function openView(template: MessageTemplate) {
+    openEdit(template);
+    setViewOnly(true);
   }
 
   function openCreate() {
@@ -589,6 +597,19 @@ export function TemplateManager() {
                   </div>
                   {canEdit && (
                   <div className="flex items-center gap-1 shrink-0 ml-2">
+                    {statusKey === 'DELETED' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openView(template)}
+                        title={t('showTitle')}
+                        aria-label={t('showLabel')}
+                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
+                      >
+                        <Eye className="size-3.5" />
+                        {t('show')}
+                      </Button>
+                    )}
                     {statusKey === 'APPROVED' && (
                       <Button
                         variant="ghost"
@@ -653,6 +674,7 @@ export function TemplateManager() {
           setDialogOpen(open);
           if (!open) {
             setEditingId(null);
+            setViewOnly(false);
             setForm(emptyForm);
           }
         }}
@@ -660,12 +682,18 @@ export function TemplateManager() {
         <DialogContent className="bg-popover border-border sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">
-              {editingId ? t('dialogEditTitle') : t('dialogNewTitle')}
+              {viewOnly
+                ? t('dialogViewTitle')
+                : editingId
+                  ? t('dialogEditTitle')
+                  : t('dialogNewTitle')}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              {editingId
-                ? t('dialogEditDesc')
-                : t('dialogNewDesc')}
+              {viewOnly
+                ? t('dialogViewDesc')
+                : editingId
+                  ? t('dialogEditDesc')
+                  : t('dialogNewDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -676,7 +704,7 @@ export function TemplateManager() {
             </div>
           )}
 
-          <div className="space-y-4 py-2">
+          <fieldset disabled={viewOnly} className="min-w-0 space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-muted-foreground">{t('templateName')}</Label>
               <Input
@@ -1084,7 +1112,7 @@ export function TemplateManager() {
                 </div>
               )}
             </div>
-          </div>
+          </fieldset>
 
           <DialogFooter className="bg-popover border-border">
             <Button
@@ -1092,8 +1120,9 @@ export function TemplateManager() {
               onClick={() => setDialogOpen(false)}
               className="border-border text-muted-foreground hover:bg-muted"
             >
-              {t('cancel')}
+              {viewOnly ? t('close') : t('cancel')}
             </Button>
+            {!viewOnly && (
             <Button
               onClick={handleSubmit}
               disabled={submitting || form.category === 'Authentication'}
@@ -1110,6 +1139,7 @@ export function TemplateManager() {
                 t('submitApproval')
               )}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1577,7 +1577,13 @@
       "uploadFile": "파일 업로드",
       "toastInvalidMediaFile": "{kind}은(는) 다음 중 하나여야 합니다: {types}.",
       "toastMediaTooLarge": "{kind} 크기가 {size}MB입니다 — 제한은 {limit}MB입니다.",
-      "toastSyncDeleted": "Meta에서 삭제된 템플릿 {count}개를 '삭제됨'으로 표시했습니다."
+      "toastSyncDeleted": "Meta에서 삭제된 템플릿 {count}개를 '삭제됨'으로 표시했습니다.",
+      "show": "보기",
+      "showTitle": "이 템플릿 보기 (Meta에서 삭제됨, 읽기 전용)",
+      "showLabel": "삭제된 템플릿 보기",
+      "dialogViewTitle": "삭제된 템플릿",
+      "dialogViewDesc": "이 템플릿은 Meta에서 삭제되어 수정하거나 사용할 수 없습니다. 마지막으로 동기화된 버전입니다.",
+      "close": "닫기"
     },
     "roles": {
       "admin": "관리자",

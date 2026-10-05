@@ -1577,7 +1577,13 @@
       "uploadFile": "Upload file",
       "toastInvalidMediaFile": "{kind} must be one of: {types}.",
       "toastMediaTooLarge": "{kind} is {size} MB — the limit is {limit} MB.",
-      "toastSyncDeleted": "{count, plural, =1 {# template was} other {# templates were}} deleted on Meta and marked as Deleted."
+      "toastSyncDeleted": "{count, plural, =1 {# template was} other {# templates were}} deleted on Meta and marked as Deleted.",
+      "show": "Show",
+      "showTitle": "View this template (deleted on Meta, read-only)",
+      "showLabel": "Show deleted template",
+      "dialogViewTitle": "Deleted Template",
+      "dialogViewDesc": "This template was deleted on Meta, so it can't be edited or used. This is the last version that was synced.",
+      "close": "Close"
     },
     "roles": {
       "admin": "Admin",

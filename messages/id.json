@@ -1567,7 +1567,13 @@
       "uploadFile": "Unggah file",
       "toastInvalidMediaFile": "{kind} harus salah satu dari: {types}.",
       "toastMediaTooLarge": "{kind} berukuran {size} MB — batasnya {limit} MB.",
-      "toastSyncDeleted": "{count} template sudah dihapus di Meta dan ditandai Dihapus."
+      "toastSyncDeleted": "{count} template sudah dihapus di Meta dan ditandai Dihapus.",
+      "show": "Lihat",
+      "showTitle": "Lihat template ini (dihapus di Meta, hanya baca)",
+      "showLabel": "Lihat template yang dihapus",
+      "dialogViewTitle": "Template yang Dihapus",
+      "dialogViewDesc": "Template ini dihapus di Meta sehingga tidak dapat diedit atau digunakan. Ini adalah versi terakhir yang disinkronkan.",
+      "close": "Tutup"
     },
     "roles": {
       "admin": "Admin",
