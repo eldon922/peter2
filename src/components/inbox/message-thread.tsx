@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCan } from "@/hooks/use-can";
+import { useSessionInfo } from "@/hooks/use-session-info";
 import { contactDisplayName } from "@/lib/contacts/display-name";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
@@ -195,7 +196,6 @@ export function MessageThread({
   onShowContactPanel,
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
-  const tTimer = useTranslations("Inbox.sessionTimer");
   const tQuote = useTranslations("Inbox.replyQuote");
 
   const { user } = useAuth();
@@ -263,31 +263,7 @@ export function MessageThread({
   );
 
   // 24-hour session timer
-  const sessionInfo = useMemo(() => {
-    if (!messages.length) return { expired: false, remaining: "" };
-
-    // Find last customer message
-    const lastCustomerMsg = [...messages]
-      .reverse()
-      .find((m) => m.sender_type === "customer");
-
-    if (!lastCustomerMsg) return { expired: true, remaining: "No customer messages" };
-
-    const hoursSince = differenceInHours(new Date(), new Date(lastCustomerMsg.created_at));
-    const expired = hoursSince >= 24;
-
-    if (expired) {
-      return { expired: true, remaining: tTimer("expired") };
-    }
-
-    const hoursLeft = 24 - hoursSince;
-    const remaining =
-      hoursLeft >= 1
-        ? tTimer("xhRemaining", { hours: Math.floor(hoursLeft) })
-        : tTimer("xmRemaining", { minutes: Math.floor(hoursLeft * 60) });
-
-    return { expired, remaining };
-  }, [messages, tTimer]);
+  const sessionInfo = useSessionInfo(messages);
 
   // Store latest callback in a ref so fetchMessages doesn't need to
   // depend on `onMessagesLoaded` — otherwise parent re-renders cause

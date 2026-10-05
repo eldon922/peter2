@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackLayer } from "@/hooks/use-back-layer";
+import { useSessionInfo } from "@/hooks/use-session-info";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
@@ -621,6 +622,8 @@ function InboxPageInner() {
     [activeConversation]
   );
 
+  const sessionInfo = useSessionInfo(messages);
+
   // On mobile (<lg) we show a SINGLE pane — either the list or the
   // thread — rather than cramming both side-by-side. Selecting a
   // conversation slides the thread in; the thread's back button pops
@@ -715,7 +718,7 @@ function InboxPageInner() {
           // is untouched by this, so the manual toggle's setting is still
           // there when the window is widened back out.
           <div className="hidden xl:block">
-            <ContactSidebar contact={activeContact} />
+            <ContactSidebar contact={activeContact} session={sessionInfo} />
           </div>
         )}
       </div>
@@ -736,6 +739,7 @@ function InboxPageInner() {
           </SheetTitle>
           <ContactSidebar
             contact={activeContact}
+            session={sessionInfo}
             className="w-full border-l-0"
           />
         </SheetContent>

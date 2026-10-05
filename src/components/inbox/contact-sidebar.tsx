@@ -17,6 +17,7 @@ import {
   DollarSign,
   StickyNote,
   Plus,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,9 +33,11 @@ interface ContactSidebarProps {
    * border would both be wrong.
    */
   className?: string;
+  /** The open thread's 24-hour reply window, shown where the header can't. */
+  session?: { expired: boolean; remaining: string };
 }
 
-export function ContactSidebar({ contact, className }: ContactSidebarProps) {
+export function ContactSidebar({ contact, className, session }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
@@ -162,6 +165,20 @@ export function ContactSidebar({ contact, className }: ContactSidebarProps) {
             </h3>
             {contact.company && (
               <p className="text-xs text-muted-foreground">{contact.company}</p>
+            )}
+            {/* The thread header shows this timer when it has room. It
+                doesn't below sm or between lg and xl, so show it here
+                (the contact sheet) at exactly those widths. */}
+            {session?.remaining && (
+              <span
+                className={cn(
+                  "mt-2 hidden items-center gap-1 text-xs whitespace-nowrap max-sm:inline-flex lg:max-xl:inline-flex",
+                  session.expired ? "text-red-400" : "text-primary",
+                )}
+              >
+                <Clock className="h-3 w-3" />
+                {session.remaining}
+              </span>
             )}
           </div>
 
