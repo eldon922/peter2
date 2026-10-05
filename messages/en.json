@@ -1813,5 +1813,8 @@
       "reindexTooltip": "Re-embed all documents (e.g. after adding an embeddings key)",
       "loading": "Loading…"
     }
+  },
+  "LanguageToggle": {
+    "label": "Change language"
   }
 }

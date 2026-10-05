@@ -1813,5 +1813,8 @@
       "reindexTooltip": "모든 문서를 다시 임베딩합니다 (예: 임베딩 키 추가 후)",
       "loading": "불러오는 중…"
     }
+  },
+  "LanguageToggle": {
+    "label": "언어 변경"
   }
 }

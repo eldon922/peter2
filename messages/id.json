@@ -1801,5 +1801,8 @@
       "reindexTooltip": "Meng-embed ulang semua dokumen (mis. setelah menambahkan kunci embeddings)",
       "loading": "Memuat…"
     }
+  },
+  "LanguageToggle": {
+    "label": "Ganti bahasa"
   }
 }
