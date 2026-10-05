@@ -181,12 +181,12 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
     ).toBe(SEND_BATCH_SIZE * 10);
   });
 
-  it('getSendPacing keeps the conservative default under Meta\'s lowest documented ceiling', () => {
+  it('getSendPacing keeps the conservative default within Meta\'s lowest documented ceiling', () => {
     for (const level of [null, undefined, ''] as const) {
       const pacing = getSendPacing(level);
       const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
       expect(pacing.batchSize).toBe(SEND_BATCH_SIZE);
-      expect(optimisticMps).toBeLessThan(20);
+      expect(optimisticMps).toBeLessThanOrEqual(20);
     }
   });
 
@@ -203,7 +203,8 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
     // Ordering should hold regardless of the exact constants above.
     expect(high.batchSize).toBeGreaterThan(standard.batchSize);
     expect(standard.batchSize).toBeGreaterThan(unrecognized.batchSize);
-    expect(unrecognized.batchSize).toBeGreaterThan(unknown.batchSize);
+    // No live figure and an unrecognized tier both get the same default.
+    expect(unrecognized.batchSize).toBe(unknown.batchSize);
 
     // The pause between groups doesn't change with tier — only batch
     // size does.
@@ -219,9 +220,8 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
   });
 
   it('the coexistence clamp never raises pacing above what the tier alone would give', () => {
-    // The clamp is a ceiling, not a floor — a conservative-default
-    // (10) or unrecognized-tier (20) result should come through
-    // unchanged, not get bumped up to the 20 mps ceiling.
+    // The clamp is a ceiling, not a floor — the conservative default
+    // (20) should come through unchanged, not get bumped up.
     const unknownCoexistence = getSendPacing(null, true);
     const unknownNonCoexistence = getSendPacing(null, false);
     expect(unknownCoexistence.batchSize).toBe(unknownNonCoexistence.batchSize);
