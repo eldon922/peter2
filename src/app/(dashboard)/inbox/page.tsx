@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  appendCachedMessage,
+  getCachedMessages,
+  setCachedMessages,
+} from "@/lib/inbox/message-cache";
 import { contactDisplayName } from "@/lib/contacts/display-name";
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -258,6 +263,9 @@ function InboxPageInner() {
           });
         }
 
+        // Keep any cached copy of the thread current.
+        appendCachedMessage(newMsg.conversation_id, newMsg);
+
         // Add to messages if it belongs to active conversation
         if (
           activeConversation &&
@@ -468,7 +476,7 @@ function InboxPageInner() {
         if (match) {
           setActiveConversation(match);
           setActiveContact(match.contact ?? null);
-          setMessages([]);
+          setMessages(getCachedMessages(match.id) ?? []);
           // Mirror the optimistic unread reset that handleSelectConversation
           // does — the user just deep-linked into this conv, treat that the
           // same as a click. Leaves activeConversation.unread_count alone so
@@ -495,7 +503,7 @@ function InboxPageInner() {
       if (activeConversation?.id === conv.id) return;
       setActiveConversation(conv);
       setActiveContact(conv.contact ?? null);
-      setMessages([]);
+      setMessages(getCachedMessages(conv.id) ?? []);
       // Optimistically clear the unread badge for this conv. The
       // server-side reset is fired by the unread-reset effect inside
       // MessageThread (which reads activeConversation.unread_count, not
@@ -545,6 +553,14 @@ function InboxPageInner() {
   const handleMessagesLoaded = useCallback((loaded: Message[]) => {
     setMessages(loaded);
   }, []);
+
+  // Keep the cache in step with optimistic sends, status updates and edits
+  // to the open thread (an empty list is never worth caching).
+  useEffect(() => {
+    if (activeConversation && messages.length > 0) {
+      setCachedMessages(activeConversation.id, messages);
+    }
+  }, [activeConversation, messages]);
 
   const handleNewMessage = useCallback((msg: Message) => {
     setMessages((prev) => {

@@ -49,6 +49,7 @@ import {
   type SendMediaPayload,
 } from "./message-composer";
 import { deleteAccountMedia } from "@/lib/storage/upload-media";
+import { getCachedMessages, setCachedMessages } from "@/lib/inbox/message-cache";
 import { TemplatePicker } from "./template-picker";
 import { AiThreadBanner } from "./ai-thread-banner";
 import { buildReplyPreview } from "./reply-quote";
@@ -314,7 +315,8 @@ export function MessageThread({
     let cancelled = false;
 
     (async () => {
-      setLoading(true);
+      // Already have this thread cached → show it now and refresh quietly.
+      setLoading(!getCachedMessages(conversationId));
 
       const { data, error } = await supabase
         .from("messages")
@@ -327,6 +329,7 @@ export function MessageThread({
       if (error) {
         console.error("Failed to fetch messages:", error);
       } else {
+        setCachedMessages(conversationId, data ?? []);
         onMessagesLoadedRef.current(data ?? []);
       }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { clearMediaCache } from "@/lib/inbox/media-cache";
+import { clearMessageCache } from "@/lib/inbox/message-cache";
 import {
   createContext,
   useContext,
@@ -353,6 +355,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    // Cached chats and media belong to this session only.
+    clearMessageCache();
+    clearMediaCache();
     setUser(null);
     setProfile(null);
     setAccount(null);

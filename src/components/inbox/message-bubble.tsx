@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { Message, MessageReaction } from "@/types";
 import {
@@ -18,6 +18,7 @@ import {
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { FormattedText } from "./formatted-text";
+import { getMediaObjectUrl, peekMediaObjectUrl } from "@/lib/inbox/media-cache";
 import { MessageReactions } from "./message-reactions";
 import { InteractivePreview } from "@/components/interactive/interactive-preview";
 import { useTranslations } from "next-intl";
@@ -58,43 +59,27 @@ function MediaUnavailable({ label, t }: { label: string, t: ReturnType<typeof us
 }
 
 function MediaImage({ url, alt }: { url: string; alt: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const loadImage = useCallback(async () => {
-    if (!url) return;
-
-    // Proxy URLs need auth fetch to create blob URL
-    if (url.startsWith("/api/whatsapp/media/")) {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to load media");
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        setSrc(blobUrl);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setSrc(url);
-      setLoading(false);
-    }
-  }, [url]);
+  // Proxy URLs need the session, so they go through the shared media cache.
+  const isProxy = url.startsWith("/api/whatsapp/media/");
+  const [loaded, setLoaded] = useState<{ url: string; src: string | null } | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
-    loadImage();
+    if (!isProxy) return;
+    let cancelled = false;
+    getMediaObjectUrl(url)
+      .then((src) => !cancelled && setLoaded({ url, src }))
+      .catch(() => !cancelled && setLoaded({ url, src: null }));
     return () => {
-      if (src?.startsWith("blob:")) {
-        URL.revokeObjectURL(src);
-      }
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadImage]);
+  }, [url, isProxy]);
 
-  if (error) {
+  const current = loaded?.url === url ? loaded : null;
+  const src = isProxy ? (peekMediaObjectUrl(url) ?? current?.src ?? null) : url;
+  const failed = imgError || (isProxy && current !== null && current.src === null);
+
+  if (failed) {
     return (
       <div className="flex h-40 w-60 items-center justify-center rounded-lg bg-muted">
         <ImageOff className="h-8 w-8 text-muted-foreground" />
@@ -102,7 +87,7 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
     );
   }
 
-  if (loading) {
+  if (!src) {
     return (
       <div className="flex h-40 w-60 items-center justify-center rounded-lg bg-muted">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -112,10 +97,10 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
 
   return (
     <img
-      src={src ?? ""}
+      src={src}
       alt={alt}
       className="max-h-64 max-w-60 rounded-lg object-cover"
-      onError={() => setError(true)}
+      onError={() => setImgError(true)}
     />
   );
 }
