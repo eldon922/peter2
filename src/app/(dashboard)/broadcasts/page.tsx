@@ -222,9 +222,10 @@ export default function BroadcastsPage() {
                     don't claim. It matters most below sm, where Name and
                     Status are the only two columns left and the name
                     would otherwise sit in a narrow strip with the rest of
-                    the row empty. */}
-                <TableHead className="w-full text-muted-foreground">{t('table.name')}</TableHead>
-                <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.template')}</TableHead>
+                    the row empty. `min-w-48` keeps it readable on a
+                    narrow desktop, where Template is what gives way. */}
+                <TableHead className="w-full min-w-48 text-muted-foreground md:w-[40%]">{t('table.name')}</TableHead>
+                <TableHead className="hidden min-w-28 text-muted-foreground md:table-cell">{t('table.template')}</TableHead>
                 <TableHead className="hidden text-right text-muted-foreground sm:table-cell">
                   {t('table.recipients')}
                 </TableHead>
@@ -252,10 +253,12 @@ export default function BroadcastsPage() {
                         truncates: without `max-w-0` the auto layout sizes
                         the column to the longest name and `truncate`
                         never engages. */}
-                    <TableCell className="w-full max-w-0 truncate font-medium text-foreground">
+                    <TableCell className="w-full min-w-48 max-w-0 truncate font-medium text-foreground md:w-[40%]">
                       {broadcast.name}
                     </TableCell>
-                    <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
+                    {/* `max-w-0` lets this column shrink and truncate
+                        instead of claiming its full text width. */}
+                    <TableCell className="hidden min-w-28 max-w-0 truncate text-muted-foreground md:table-cell">
                       {broadcast.template_name}
                     </TableCell>
                     <TableCell className="hidden text-right text-muted-foreground tabular-nums sm:table-cell">
