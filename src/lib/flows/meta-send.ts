@@ -10,7 +10,7 @@ import {
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import {
-  sanitizePhoneForMeta,
+  toMetaPhone,
   isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
@@ -77,7 +77,7 @@ export async function engineSendText(
     throw new Error('contact not found for this account')
   }
 
-  const sanitized = sanitizePhoneForMeta(contact.phone)
+  const sanitized = toMetaPhone(contact.phone)
   if (!isValidE164(sanitized)) {
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
@@ -187,7 +187,7 @@ export async function engineSendMedia(
     throw new Error('contact not found for this account')
   }
 
-  const sanitized = sanitizePhoneForMeta(contact.phone)
+  const sanitized = toMetaPhone(contact.phone)
   if (!isValidE164(sanitized)) {
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
@@ -339,7 +339,7 @@ async function sendInteractiveViaMeta(
     throw new Error('contact not found for this account')
   }
 
-  const sanitized = sanitizePhoneForMeta(contact.phone)
+  const sanitized = toMetaPhone(contact.phone)
   if (!isValidE164(sanitized)) {
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }

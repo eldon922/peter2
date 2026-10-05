@@ -33,6 +33,7 @@ import {
 } from '@/lib/whatsapp/broadcast-limits';
 import {
   sanitizePhoneForMeta,
+  toMetaPhone,
   isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
@@ -1118,7 +1119,7 @@ export async function deliverBroadcast(
       await sleep(pacing.batchDelayMs);
     }
 
-    const variants = phoneVariants(recipient.phone);
+    const variants = phoneVariants(toMetaPhone(recipient.phone));
     let sentMessageId: string | null = null;
     let lastError: string | null = null;
     // The number we actually dialled — a trunk-prefix variant may win,

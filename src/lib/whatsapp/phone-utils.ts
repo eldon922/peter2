@@ -9,6 +9,26 @@ export function sanitizePhoneForMeta(phone: string): string {
 }
 
 /**
+ * Country code assumed for numbers saved in domestic format (see
+ * `toMetaPhone`). Set DEFAULT_COUNTRY_CODE to change it.
+ */
+const DEFAULT_COUNTRY_CODE = (process.env.DEFAULT_COUNTRY_CODE ?? '62').replace(/\D/g, '')
+
+/**
+ * The number to hand to Meta. Like `sanitizePhoneForMeta`, plus it fixes
+ * numbers saved in domestic format: "0812…" → "62812…" (a leading 0 is
+ * the local trunk prefix, never part of an international number) and a
+ * "00" international prefix is dropped. Use this when sending; the plain
+ * digits form stays the key for matching and dedupe.
+ */
+export function toMetaPhone(phone: string): string {
+  const digits = sanitizePhoneForMeta(phone)
+  if (digits.startsWith('00')) return digits.slice(2)
+  if (digits.startsWith('0')) return DEFAULT_COUNTRY_CODE + digits.slice(1)
+  return digits
+}
+
+/**
  * Normalize phone number by removing all non-digit characters.
  * Used for comparing phone numbers in different formats.
  */

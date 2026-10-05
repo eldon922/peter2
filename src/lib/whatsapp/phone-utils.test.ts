@@ -6,6 +6,7 @@ import {
   phoneVariants,
   phonesMatch,
   sanitizePhoneForMeta,
+  toMetaPhone,
 } from "./phone-utils";
 
 describe("sanitizePhoneForMeta", () => {
@@ -24,6 +25,23 @@ describe("sanitizePhoneForMeta", () => {
   it("is idempotent on already-sanitized input", () => {
     const cleaned = "14155551212";
     expect(sanitizePhoneForMeta(cleaned)).toBe(cleaned);
+  });
+});
+
+describe("toMetaPhone", () => {
+  it("turns a domestic 08 number into an international one", () => {
+    expect(toMetaPhone("0812-3456-7890")).toBe("6281234567890");
+    expect(toMetaPhone("08123456789")).toBe("628123456789");
+  });
+
+  it("drops a 00 international prefix", () => {
+    expect(toMetaPhone("0062 812 3456 7890")).toBe("6281234567890");
+  });
+
+  it("leaves international numbers alone", () => {
+    expect(toMetaPhone("+62 812 3456 7890")).toBe("6281234567890");
+    expect(toMetaPhone("+1 (415) 555-1212")).toBe("14155551212");
+    expect(toMetaPhone("")).toBe("");
   });
 });
 
