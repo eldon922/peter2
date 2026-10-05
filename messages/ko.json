@@ -339,7 +339,8 @@
       "deleteByTagConfirmLabel": "확인하려면 “{name}”을(를) 입력하세요",
       "deleteUntaggedChip": "태그 없음",
       "deleteUntaggedDesc": "태그가 없는 모든 연락처를 삭제합니다. 현재 페이지뿐 아니라 모든 페이지가 대상입니다. 해당 연락처의 대화, 메시지, 메모도 함께 삭제됩니다. 되돌릴 수 없습니다.",
-      "deleteUntaggedCount": "{count}개의 연락처에 태그가 없습니다."
+      "deleteUntaggedCount": "{count}개의 연락처에 태그가 없습니다.",
+      "fieldsAndTagsBtn": "필드 및 태그"
     },
     "form": {
       "addTitle": "연락처 추가",
@@ -536,8 +537,7 @@
       "toastRenameFailed": "필드 이름을 변경할 수 없습니다.",
       "toastDeleteFailed": "필드를 삭제할 수 없습니다.",
       "toastDeleted": "\"{name}\"을(를) 삭제했습니다."
-    },
-    "fieldsAndTagsBtn": "필드 및 태그"
+    }
   },
   "Pipelines": {
     "page": {

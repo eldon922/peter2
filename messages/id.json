@@ -338,7 +338,8 @@
       "toastFailedDelete": "Gagal menghapus kontak",
       "toastDeleted": "Kontak dihapus",
       "toastBulkFailedDelete": "Gagal menghapus kontak",
-      "toastBulkDeleted": "{count} kontak dihapus"
+      "toastBulkDeleted": "{count} kontak dihapus",
+      "fieldsAndTagsBtn": "Kolom & tag"
     },
     "form": {
       "addTitle": "Tambah Kontak",
@@ -535,8 +536,7 @@
       "toastRenameFailed": "Tidak dapat mengganti nama bidang.",
       "toastDeleteFailed": "Tidak dapat menghapus bidang.",
       "toastDeleted": "\"{name}\" dihapus."
-    },
-    "fieldsAndTagsBtn": "Kolom & tag"
+    }
   },
   "Pipelines": {
     "page": {
