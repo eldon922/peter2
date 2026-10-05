@@ -922,7 +922,9 @@
         "showMore": "Tampilkan {count} lagi",
         "failed": "Gagal memuat kontak."
       },
-      "applyFormatting": "Terapkan format"
+      "applyFormatting": "Terapkan format",
+      "formattingInfoLabel": "Tentang terapkan format",
+      "formattingInfo": "Format yang Anda tulis di pesan (seperti *tebal* atau _miring_) selalu dikirim ke WhatsApp. Sakelar ini hanya mengubah tampilan pratinjau. Sakelar ini tidak mengubah pesan yang dikirim."
     }
   },
   "Automations": {
