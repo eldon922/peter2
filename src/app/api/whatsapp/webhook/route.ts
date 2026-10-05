@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
+import { applyInboundEdit } from '@/lib/whatsapp/inbound-edit'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
@@ -58,6 +59,8 @@ interface WhatsAppMessage {
   image?: { id: string; mime_type: string; caption?: string }
   video?: { id: string; mime_type: string; caption?: string }
   document?: { id: string; mime_type: string; filename?: string; caption?: string }
+  /** Set on `type: 'edit'` — the customer edited a message they sent. */
+  edit?: unknown
   audio?: { id: string; mime_type: string }
   sticker?: { id: string; mime_type: string }
   location?: { latitude: number; longitude: number; name?: string; address?: string }
@@ -1062,6 +1065,19 @@ async function processMessage(
       configOwnerUserId,
       senderPhone
     )
+    return
+  }
+
+  // An edit changes a message we already have. It is not a new message, so
+  // it must not create a contact, bump unread or trigger flows/AI replies.
+  if (message.type === 'edit') {
+    const outcome = await applyInboundEdit(
+      supabaseAdmin(),
+      accountId,
+      senderPhone,
+      message
+    )
+    log.info('customer edit', { outcome })
     return
   }
 

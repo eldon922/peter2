@@ -1,0 +1,111 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { findExistingContact } from '@/lib/contacts/dedupe'
+
+/**
+ * A customer editing a message they already sent.
+ *
+ * Meta delivers it on the normal `messages` webhook as a message of
+ * `type: "edit"`, which points back at the original and carries the new
+ * content as a nested message:
+ *
+ *   { type: "edit", edit: { original_message_id: "wamid…",
+ *       message: { type: "text", text: { body: "new text" } } } }
+ *
+ * For media the new caption sits under the media key
+ * (`image` / `video` / `document`). Anything that doesn't fit this shape
+ * is ignored rather than guessed at.
+ */
+export interface InboundEdit {
+  originalMessageId: string
+  /** New text, or the new caption for a media message. May be empty. */
+  text: string
+}
+
+const MEDIA_KEYS = ['image', 'video', 'document'] as const
+
+export function parseInboundEdit(message: { edit?: unknown }): InboundEdit | null {
+  const edit = message.edit as
+    | { original_message_id?: unknown; message?: Record<string, unknown> }
+    | undefined
+  const originalId = edit?.original_message_id
+  const inner = edit?.message
+  if (typeof originalId !== 'string' || !originalId || !inner) return null
+
+  const textBody = (inner.text as { body?: unknown } | undefined)?.body
+  if (typeof textBody === 'string') {
+    return { originalMessageId: originalId, text: textBody }
+  }
+
+  for (const key of MEDIA_KEYS) {
+    const media = inner[key] as { caption?: unknown } | undefined
+    if (media && typeof media === 'object') {
+      return {
+        originalMessageId: originalId,
+        text: typeof media.caption === 'string' ? media.caption : '',
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Apply a customer's edit to the stored message.
+ *
+ * Looked up inside the sender's own conversation and only for messages
+ * they sent, so an edit can never touch someone else's thread or one of
+ * our outbound messages. Creates nothing: an edit for a message we never
+ * stored is dropped.
+ */
+export async function applyInboundEdit(
+  db: SupabaseClient,
+  accountId: string,
+  senderPhone: string,
+  message: { edit?: unknown }
+): Promise<'updated' | 'ignored'> {
+  const edit = parseInboundEdit(message)
+  if (!edit) return 'ignored'
+
+  const contact = await findExistingContact(db, accountId, senderPhone)
+  if (!contact) return 'ignored'
+
+  const { data: convRows } = await db
+    .from('conversations')
+    .select('id, last_message_text')
+    .eq('account_id', accountId)
+    .eq('contact_id', contact.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+  const conversation = convRows?.[0]
+  if (!conversation) return 'ignored'
+
+  const { data: original } = await db
+    .from('messages')
+    .select('id, content_text, sender_type')
+    .eq('message_id', edit.originalMessageId)
+    .eq('conversation_id', conversation.id)
+    .maybeSingle()
+  if (!original || original.sender_type !== 'customer') return 'ignored'
+
+  const { error } = await db
+    .from('messages')
+    .update({ content_text: edit.text || null })
+    .eq('id', original.id)
+  if (error) {
+    console.error('[webhook] failed to apply message edit:', error.message)
+    return 'ignored'
+  }
+
+  // The inbox list previews the latest message — keep it in step when the
+  // edited one is that message.
+  if (
+    conversation.last_message_text &&
+    conversation.last_message_text === original.content_text
+  ) {
+    await db
+      .from('conversations')
+      .update({ last_message_text: edit.text || conversation.last_message_text })
+      .eq('id', conversation.id)
+  }
+  return 'updated'
+}
