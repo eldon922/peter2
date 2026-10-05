@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
+import { FormattedText } from "./formatted-text";
 import { MessageReactions } from "./message-reactions";
 import { InteractivePreview } from "@/components/interactive/interactive-preview";
 import { useTranslations } from "next-intl";
@@ -162,7 +163,7 @@ function MessageContent({
     case "text":
       return (
         <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          {message.content_text}
+          <FormattedText text={message.content_text ?? ""} />
           {trailing}
         </p>
       );
@@ -177,7 +178,7 @@ function MessageContent({
           )}
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              {message.content_text}
+              <FormattedText text={message.content_text ?? ""} />
               {trailing}
             </p>
           )}
@@ -198,7 +199,7 @@ function MessageContent({
           )}
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              {message.content_text}
+              <FormattedText text={message.content_text ?? ""} />
               {trailing}
             </p>
           )}
@@ -243,7 +244,7 @@ function MessageContent({
           </span>
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              {message.content_text}
+              <FormattedText text={message.content_text ?? ""} />
               {trailing}
             </p>
           )}
@@ -279,7 +280,7 @@ function MessageContent({
               {t("buttonReply")}
             </span>
             <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-              {message.content_text || t("interactiveReply")}
+              <FormattedText text={message.content_text || t("interactiveReply")} />
               {trailing}
             </p>
           </div>
@@ -287,7 +288,7 @@ function MessageContent({
       }
       return (
         <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          {message.content_text || t("interactiveReply")}
+          <FormattedText text={message.content_text || t("interactiveReply")} />
           {trailing}
         </p>
       );
@@ -296,7 +297,7 @@ function MessageContent({
     default:
       return (
         <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          {message.content_text || t("unsupported")}
+          <FormattedText text={message.content_text || t("unsupported")} />
           {trailing}
         </p>
       );
