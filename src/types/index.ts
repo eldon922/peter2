@@ -112,6 +112,8 @@ export interface Contact {
    *  and unique per account. Read-only. */
   phone_normalized?: string;
   name?: string;
+  /** Name on the customer's own WhatsApp profile (never overwrites `name`). */
+  profile_name?: string | null;
   email?: string;
   company?: string;
   avatar_url?: string;

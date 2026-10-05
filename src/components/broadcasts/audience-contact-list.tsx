@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 import {
   AUDIENCE_PAGE_SIZE,
   fetchAudiencePage,
@@ -83,7 +84,7 @@ export function AudienceContactList({
               className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm"
             >
               <span className="min-w-0 truncate text-foreground">
-                {c.name || t('noName')}
+                {c.name || c.profile_name ? contactDisplayName(c) : t('noName')}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">{c.phone}</span>
             </li>

@@ -28,6 +28,7 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
 import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
 import { TagChips } from '@/components/broadcasts/tag-chips';
@@ -125,7 +126,7 @@ export function Step4ScheduleSend({
   }, [template.body_text, variables, sampleContact, sample?.custom]);
   const previewLabel = sampleContact
     ? t('scheduleSend.previewFor', {
-        name: sampleContact.name || sampleContact.phone,
+        name: contactDisplayName(sampleContact),
       })
     : t('personalize.previewSample');
 

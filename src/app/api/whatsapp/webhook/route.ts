@@ -1484,12 +1484,14 @@ async function findOrCreateContact(
   )
 
   if (existingContact) {
-    // Update name if it changed
-    if (name && name !== existingContact.name) {
+    // Keep the customer's WhatsApp profile name in its own column. `name`
+    // is whatever the CRM set and must not be overwritten by it.
+    if (name && name !== existingContact.profile_name) {
       await supabaseAdmin()
         .from('contacts')
-        .update({ name, updated_at: new Date().toISOString() })
+        .update({ profile_name: name, updated_at: new Date().toISOString() })
         .eq('id', existingContact.id)
+      existingContact.profile_name = name
     }
     return { contact: existingContact, wasCreated: false }
   }
@@ -1505,6 +1507,7 @@ async function findOrCreateContact(
       user_id: configOwnerUserId,
       phone,
       name: name || phone,
+      profile_name: name || null,
     })
     .select()
     .single()

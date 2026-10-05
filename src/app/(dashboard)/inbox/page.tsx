@@ -1,5 +1,6 @@
 "use client";
 
+import { contactDisplayName } from "@/lib/contacts/display-name";
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -704,7 +705,7 @@ function InboxPageInner() {
           {/* The panel renders its own name + avatar, so the accessible
               title is here for screen readers only. */}
           <SheetTitle className="sr-only">
-            {activeContact?.name || activeContact?.phone || t("contactDetails")}
+            {activeContact ? contactDisplayName(activeContact) : t("contactDetails")}
           </SheetTitle>
           <ContactSidebar
             contact={activeContact}

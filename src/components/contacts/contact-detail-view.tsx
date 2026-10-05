@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Phone,
@@ -439,7 +440,7 @@ export function ContactDetailView({
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <SheetTitle className="text-popover-foreground truncate">
-                    {contact.name || t('unnamed')}
+                    {contact.name || contact.profile_name ? contactDisplayName(contact) : t('unnamed')}
                   </SheetTitle>
                   <SheetDescription className="text-muted-foreground text-xs mt-0.5">
                     {t('contactDetailsDesc')}

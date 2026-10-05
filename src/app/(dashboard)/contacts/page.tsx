@@ -62,6 +62,7 @@ import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { TagPickerList } from '@/components/ui/tag-multi-select';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 import { useTranslations } from 'next-intl';
 
 const PAGE_SIZE = 25;
@@ -837,7 +838,7 @@ export default function ContactsPage() {
                     <Checkbox
                       checked={selected.has(contact.id)}
                       onCheckedChange={() => toggleSelect(contact.id)}
-                      aria-label={`Select ${contact.name || contact.phone}`}
+                      aria-label={`Select ${contactDisplayName(contact)}`}
                     />
                   </TableCell>
                   {/* Absolute position in the result set, not the page —
@@ -847,7 +848,7 @@ export default function ContactsPage() {
                     {page * PAGE_SIZE + index + 1}
                   </TableCell>
                   <TableCell className="text-foreground font-medium">
-                    {contact.name || <span className="text-muted-foreground italic">{t('unnamed')}</span>}
+                    {contact.name || contact.profile_name ? contactDisplayName(contact) : <span className="text-muted-foreground italic">{t('unnamed')}</span>}
                   </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">
                     {contact.phone}
@@ -1027,7 +1028,7 @@ export default function ContactsPage() {
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">{t('deleteContactTitle')}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              {t('deleteContactDesc', { name: deleteTarget?.name || deleteTarget?.phone || '' })}
+              {t('deleteContactDesc', { name: deleteTarget ? contactDisplayName(deleteTarget) : '' })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="bg-popover border-border">

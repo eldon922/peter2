@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useCan } from "@/hooks/use-can";
+import { contactDisplayName } from "@/lib/contacts/display-name";
 import { usePresence } from "@/hooks/use-presence";
 import { PresenceDot } from "@/components/presence/presence-dot";
 import { presenceLabel } from "@/lib/presence";
@@ -763,7 +764,7 @@ export function MessageThread({
     return map;
   }, [reactions]);
 
-  const contactDisplayName = contact?.name || contact?.phone || "Customer";
+  const customerLabel = contact ? contactDisplayName(contact) : "Customer";
 
   // Author label for a quoted message: "You" when we sent the parent,
   // contact name when the customer sent it.
@@ -771,9 +772,9 @@ export function MessageThread({
     (m: Message): string => {
       const isAgentMsg =
         m.sender_type === "agent" || m.sender_type === "bot";
-      return isAgentMsg ? "You" : contactDisplayName;
+      return isAgentMsg ? "You" : customerLabel;
     },
-    [contactDisplayName],
+    [customerLabel],
   );
 
   const handleStartReply = useCallback(
@@ -891,7 +892,7 @@ export function MessageThread({
     );
   }
 
-  const displayName = contact.name || contact.phone;
+  const displayName = contactDisplayName(contact);
   // Rendered inside two differently-gated buttons in the header, so it
   // lives here rather than being written out twice.
   const contactIdentity = (
@@ -1176,7 +1177,7 @@ export function MessageThread({
                           authorLabel:
                             parent.sender_type === "agent" || parent.sender_type === "bot"
                               ? t("me") 
-                              : contact?.name || contact?.phone || "Unknown",
+                              : contact ? contactDisplayName(contact) : "Unknown",
                           preview: buildReplyPreview(parent, tQuote),
                         }
                       : null;

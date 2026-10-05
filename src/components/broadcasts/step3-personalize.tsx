@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { bodyPlaceholderKeys, isValidHttpUrl } from '@/lib/broadcasts/variables';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -339,7 +340,7 @@ export function Step3Personalize({
   ]);
 
   const previewLabel = firstContact
-    ? firstContact.name || firstContact.phone
+    ? contactDisplayName(firstContact)
     : t('personalize.previewSample');
 
   return (

@@ -54,6 +54,7 @@ import {
 } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
+import { contactDisplayName } from '@/lib/contacts/display-name';
 
 interface StatCardProps {
   label: string;
@@ -1314,7 +1315,7 @@ export default function BroadcastDetailPage() {
                   return (
                     <TableRow key={recipient.id} className="border-border">
                       <TableCell className="max-w-[9rem] truncate font-medium text-foreground sm:max-w-xs">
-                        {recipient.contact?.name ?? 'Unknown'}
+                        {recipient.contact ? contactDisplayName(recipient.contact) : 'Unknown'}
                         <span className="mt-0.5 block whitespace-normal text-xs font-normal text-muted-foreground sm:hidden">
                           {phoneBlock}
                         </span>

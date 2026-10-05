@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { contactDisplayName } from '@/lib/contacts/display-name';
 import { chunkIds, fetchAllRows } from '@/lib/supabase/batching';
 
 export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
@@ -30,6 +31,7 @@ export interface AudienceConfig {
 export interface AudienceContact {
   id: string;
   name: string | null;
+  profile_name?: string | null;
   phone: string;
 }
 
@@ -157,7 +159,7 @@ export async function fetchAudiencePage(
   if (resolved.kind === 'all') {
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, name, phone')
+      .select('id, name, profile_name, phone')
       .order('name', { nullsFirst: false })
       .order('id')
       .range(offset, offset + limit - 1);
@@ -170,12 +172,12 @@ export async function fetchAudiencePage(
   for (const chunk of chunkIds(slice)) {
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, name, phone')
+      .select('id, name, profile_name, phone')
       .in('id', chunk);
     if (error) throw new Error(error.message);
     rows.push(...((data ?? []) as AudienceContact[]));
   }
   return rows.sort((a, b) =>
-    (a.name || a.phone).localeCompare(b.name || b.phone),
+    contactDisplayName(a).localeCompare(contactDisplayName(b)),
   );
 }
