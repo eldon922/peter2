@@ -773,7 +773,13 @@
         "errorLoadTags": "Gagal memuat tag",
         "errorLoadFields": "Gagal memuat bidang khusus",
         "errorCsvParse": "Tidak dapat membaca berkas CSV.",
-        "errorCsvMissingPhone": "CSV harus memiliki kolom 'phone'."
+        "errorCsvMissingPhone": "CSV harus memiliki kolom 'phone'.",
+        "summary": "Ringkasan Audiens",
+        "calculating": "Menghitung…",
+        "estimatedRecipients": "perkiraan penerima",
+        "selectToEstimate": "Pilih jenis audiens untuk melihat perkiraan.",
+        "noMatch": "Tidak ada kontak yang cocok dengan audiens ini. Ubah pilihan untuk melanjutkan.",
+        "estimateFailed": "Gagal menghitung audiens. Coba ubah pilihan."
       },
       "personalize": {
         "title": "Personalisasi Variabel",

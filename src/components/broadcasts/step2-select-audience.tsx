@@ -81,7 +81,11 @@ export function Step2SelectAudience({
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
   const [loadingFields, setLoadingFields] = useState(false);
-  const { count: estimatedCount, loading: loadingCount } = useAudience(audience);
+  const {
+    count: estimatedCount,
+    loading: loadingCount,
+    failed: estimateFailed,
+  } = useAudience(audience);
   // Infinity until the server answers — matches
   // use-broadcast-sending.ts's fallback, so a still-loading or failed
   // lookup never shows a false warning. Same route as the send-time
@@ -167,15 +171,9 @@ export function Step2SelectAudience({
     onUpdate({ ...audience, customField: { ...prev, ...patch } });
   }
 
-  const isValid =
-    audience.type === 'all' ||
-    (audience.type === 'tags' && audience.tagIds && audience.tagIds.length > 0) ||
-    (audience.type === 'custom_field' &&
-      !!audience.customField?.fieldId &&
-      audience.customField.value.length > 0) ||
-    (audience.type === 'csv' &&
-      audience.csvContacts &&
-      audience.csvContacts.length > 0);
+  // The estimate is the source of truth: it already covers partially
+  // configured audiences (null) and exclusions that empty the list (0).
+  const isValid = !loadingCount && (estimatedCount ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -327,11 +325,11 @@ export function Step2SelectAudience({
 
       {/* Audience Summary */}
       <div className="rounded-xl border border-border bg-card/50 p-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Audience Summary</p>
+        <p className="mb-2 text-sm font-medium text-foreground">{t('selectAudience.summary')}</p>
         {loadingCount ? (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">Calculating…</span>
+            <span className="text-xs text-muted-foreground">{t('selectAudience.calculating')}</span>
           </div>
         ) : estimatedCount !== null ? (
           <div className="flex items-center gap-2">
@@ -339,12 +337,17 @@ export function Step2SelectAudience({
             <span className="text-sm text-foreground">
               {estimatedCount.toLocaleString()}
             </span>
-            <span className="text-xs text-muted-foreground">estimated recipients</span>
+            <span className="text-xs text-muted-foreground">{t('selectAudience.estimatedRecipients')}</span>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Select an audience type to see the estimate.
+            {estimateFailed
+              ? t('selectAudience.estimateFailed')
+              : t('selectAudience.selectToEstimate')}
           </p>
+        )}
+        {!loadingCount && estimatedCount === 0 && (
+          <p className="mt-2 text-xs text-amber-500">{t('selectAudience.noMatch')}</p>
         )}
         {!loadingCount && estimatedCount !== null && estimatedCount > recipientLimit && (
           <p className="mt-2 text-xs text-amber-500">

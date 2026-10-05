@@ -774,7 +774,13 @@
         "errorLoadTags": "태그를 불러오지 못했습니다",
         "errorLoadFields": "커스텀 필드를 불러오지 못했습니다",
         "errorCsvParse": "CSV 파일을 파싱할 수 없습니다.",
-        "errorCsvMissingPhone": "CSV에 'phone' 열이 있어야 합니다."
+        "errorCsvMissingPhone": "CSV에 'phone' 열이 있어야 합니다.",
+        "summary": "대상 요약",
+        "calculating": "계산 중…",
+        "estimatedRecipients": "예상 수신자",
+        "selectToEstimate": "예상 수치를 보려면 대상 유형을 선택하세요.",
+        "noMatch": "이 대상과 일치하는 연락처가 없습니다. 계속하려면 선택을 변경하세요.",
+        "estimateFailed": "대상을 계산하지 못했습니다. 선택을 변경해 보세요."
       },
       "personalize": {
         "title": "변수 개인화",

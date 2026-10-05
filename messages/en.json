@@ -773,7 +773,13 @@
         "errorLoadTags": "Failed to load tags",
         "errorLoadFields": "Failed to load custom fields",
         "errorCsvParse": "Could not parse CSV file.",
-        "errorCsvMissingPhone": "CSV must have a 'phone' column."
+        "errorCsvMissingPhone": "CSV must have a 'phone' column.",
+        "summary": "Audience Summary",
+        "calculating": "Calculating…",
+        "estimatedRecipients": "estimated recipients",
+        "selectToEstimate": "Select an audience type to see the estimate.",
+        "noMatch": "No contacts match this audience. Change the selection to continue.",
+        "estimateFailed": "Couldn't calculate the audience. Try changing the selection."
       },
       "personalize": {
         "title": "Personalize Variables",
