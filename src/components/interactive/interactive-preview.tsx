@@ -30,17 +30,17 @@ export function InteractivePreview({
     >
       <div className="px-3 py-2">
         {payload.header ? (
-          <p className="mb-1 break-words text-sm font-semibold">
+          <p className="mb-1 wrap-anywhere text-sm font-semibold">
             {payload.header}
           </p>
         ) : null}
-        <p className="whitespace-pre-wrap break-words text-sm">
+        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
           {payload.body || (
             <span className="text-muted-foreground">Message body…</span>
           )}
         </p>
         {payload.footer ? (
-          <p className="mt-1 break-words text-[11px] text-muted-foreground">
+          <p className="mt-1 wrap-anywhere text-[11px] text-muted-foreground">
             {payload.footer}
           </p>
         ) : null}

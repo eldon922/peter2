@@ -161,7 +161,7 @@ function MessageContent({
   switch (message.content_type) {
     case "text":
       return (
-        <p className="whitespace-pre-wrap break-words text-sm">
+        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
           {message.content_text}
           {trailing}
         </p>
@@ -176,7 +176,7 @@ function MessageContent({
             <MediaUnavailable label={t("photo")} t={t} />
           )}
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
               {message.content_text}
               {trailing}
             </p>
@@ -197,7 +197,7 @@ function MessageContent({
             <MediaUnavailable label={t("video")} t={t} />
           )}
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
               {message.content_text}
               {trailing}
             </p>
@@ -242,7 +242,7 @@ function MessageContent({
             {t("template")}
           </span>
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
               {message.content_text}
               {trailing}
             </p>
@@ -278,7 +278,7 @@ function MessageContent({
               <CornerDownLeft className="h-3 w-3" />
               {t("buttonReply")}
             </span>
-            <p className="whitespace-pre-wrap break-words text-sm">
+            <p className="whitespace-pre-wrap wrap-anywhere text-sm">
               {message.content_text || t("interactiveReply")}
               {trailing}
             </p>
@@ -286,7 +286,7 @@ function MessageContent({
         );
       }
       return (
-        <p className="whitespace-pre-wrap break-words text-sm">
+        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
           {message.content_text || t("interactiveReply")}
           {trailing}
         </p>
@@ -295,7 +295,7 @@ function MessageContent({
 
     default:
       return (
-        <p className="whitespace-pre-wrap break-words text-sm">
+        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
           {message.content_text || t("unsupported")}
           {trailing}
         </p>
