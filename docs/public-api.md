@@ -315,6 +315,8 @@ rejected retry never consumes the failures it declined to send:
 | `422` | `params_unrecoverable` | Created before per-recipient template values were stored, so the original personalization can't be reproduced. Create a new broadcast for these recipients instead. |
 | `422` | `template_missing` | The template is no longer in this account, so the message can't be rebuilt. Run "Sync from Meta", then retry. |
 | `422` | `header_media_required` | A media-header broadcast predating stored media URLs — see below. |
+| `422` | `header_media_expired` | The media uploaded to WhatsApp for this broadcast is over 29 days old and no source URL was kept. Supply the media again — see below. |
+| `502` | `media_upload_failed` | The media could not be fetched from its URL or uploaded to WhatsApp. Check the URL is public and the file is within WhatsApp's size limit, then retry. |
 
 #### Supplying media for an older broadcast
 
@@ -330,8 +332,9 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts/$ID/retry \
   -d '{ "header_media_url": "https://cdn.example.com/july-promo.jpg" }'
 ```
 
-The URL must be `http(s)` and is saved onto the broadcast, so you are
-only asked once. Broadcasts sent since media URLs started being recorded
+You can also send a WhatsApp media id as `{ "header_media_id": "…" }`
+instead of a URL. The URL must be `http(s)`. Either one is saved onto the
+broadcast, so you are only asked once. Broadcasts sent since media URLs started being recorded
 never hit this.
 
 ## Pagination
