@@ -239,6 +239,9 @@ export default function NewBroadcastPage() {
               onNameChange={setName}
               template={template}
               audience={audience}
+              variables={variables}
+              headerMediaUrl={headerMediaUrl}
+              headerMediaId={headerMediaId}
               onSend={handleSend}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}

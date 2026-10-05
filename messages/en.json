@@ -843,7 +843,27 @@
         "sending": "Sending...",
         "preparing": "Preparing...",
         "progressDesc": "Processing {current} of {total} recipients...",
-        "toastFailedPreview": "Failed to load preview data"
+        "toastFailedPreview": "Failed to load preview data",
+        "language": "Language",
+        "estimatedReach": "Estimated reach",
+        "excluding": "Excluding",
+        "headerMedia": "Header media",
+        "mediaUploaded": "Uploaded file",
+        "messagePreview": "Message preview",
+        "previewFor": "Preview for {name}",
+        "confirmTitle": "Confirm Broadcast",
+        "confirmDesc": "Check the details below before sending.",
+        "recipients": "Recipients",
+        "recipientCount": "{count, plural, one {# contact} other {# contacts}}",
+        "cannotUndo": "This action cannot be undone.",
+        "sendTo": "Send to {count, plural, one {# contact} other {# contacts}}"
+      },
+      "contactList": {
+        "title": "Recipients",
+        "noName": "No name",
+        "showing": "Showing {shown} of {total}",
+        "showMore": "Show {count} more",
+        "failed": "Couldn't load contacts."
       }
     }
   },

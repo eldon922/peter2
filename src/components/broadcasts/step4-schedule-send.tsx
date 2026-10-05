@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { MessageTemplate } from '@/types';
+import { Contact, MessageTemplate, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,18 +16,29 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
-interface AudienceConfig {
-  type: string;
-  tagIds?: string[];
-  csvContacts?: { phone: string; name?: string }[];
-}
+import { useAudience } from '@/hooks/use-audience';
+import {
+  fetchAudiencePage,
+  type AudienceConfig,
+  type ResolvedAudience,
+} from '@/lib/broadcasts/audience';
+import {
+  fetchCustomValueIndex,
+  resolveVariables,
+  type VariableMapping,
+} from '@/lib/broadcasts/variables';
+import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
+import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
+import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
 
 interface Step4Props {
   name: string;
   onNameChange: (name: string) => void;
   template: MessageTemplate;
   audience: AudienceConfig;
+  variables: Record<string, VariableMapping>;
+  headerMediaUrl: string;
+  headerMediaId: string;
   onSend: () => void;
   onSaveDraft?: () => void;
   onBack: () => void;
@@ -35,11 +46,34 @@ interface Step4Props {
   progress: number;
 }
 
+function TagChips({ tags, danger }: { tags: Tag[]; danger?: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span
+          key={tag.id}
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+            danger
+              ? 'border-red-500/30 bg-red-500/10 text-red-300'
+              : 'border-primary/30 bg-primary/10 text-primary'
+          }`}
+        >
+          <span className="size-2 rounded-full" style={{ backgroundColor: tag.color }} />
+          {tag.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function Step4ScheduleSend({
   name,
   onNameChange,
   template,
   audience,
+  variables,
+  headerMediaUrl,
+  headerMediaId,
   onSend,
   onSaveDraft,
   onBack,
@@ -48,40 +82,71 @@ export function Step4ScheduleSend({
 }: Step4Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
-  const [estimatedReach, setEstimatedReach] = useState<number>(0);
-  const [loadingReach, setLoadingReach] = useState(true);
+  const { resolved, count, loading: loadingReach } = useAudience(audience);
+  const reach = count ?? 0;
 
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   useEffect(() => {
-    async function calculateReach() {
-      setLoadingReach(true);
-      try {
-        const supabase = createClient();
+    createClient()
+      .from('tags')
+      .select('*')
+      .then(({ data }) => setAllTags((data ?? []) as Tag[]));
+  }, []);
+  const includeTags = allTags.filter((tag) => audience.tagIds?.includes(tag.id));
+  const excludeTags = allTags.filter((tag) =>
+    audience.excludeTagIds?.includes(tag.id),
+  );
 
-        if (audience.type === 'all') {
-          const { count } = await supabase
-            .from('contacts')
-            .select('*', { count: 'exact', head: true });
-          setEstimatedReach(count ?? 0);
-        } else if (audience.type === 'tags' && audience.tagIds && audience.tagIds.length > 0) {
-          const { data: contactTags } = await supabase
-            .from('contact_tags')
-            .select('contact_id')
-            .in('tag_id', audience.tagIds);
-
-          const uniqueIds = new Set((contactTags ?? []).map((ct) => ct.contact_id));
-          setEstimatedReach(uniqueIds.size);
-        } else if (audience.type === 'csv' && audience.csvContacts) {
-          setEstimatedReach(audience.csvContacts.length);
-        } else {
-          setEstimatedReach(0);
+  // The first recipient stands in for the message every contact gets, run
+  // through the same variable resolution the real send uses.
+  const [sample, setSample] = useState<{
+    source: ResolvedAudience;
+    contact: Contact | null;
+    custom?: Map<string, string>;
+  } | null>(null);
+  useEffect(() => {
+    if (!resolved) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = createClient();
+      const [first] = await fetchAudiencePage(supabase, resolved, 0, 1);
+      let contact: Contact | null = null;
+      let custom: Map<string, string> | undefined;
+      if (first && resolved.kind === 'csv') {
+        contact = { phone: first.phone, name: first.name ?? undefined } as Contact;
+      } else if (first) {
+        const { data } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('id', first.id)
+          .maybeSingle();
+        contact = (data as Contact | null) ?? null;
+        if (contact) {
+          custom = (await fetchCustomValueIndex(supabase, [contact.id])).get(
+            contact.id,
+          );
         }
-      } finally {
-        setLoadingReach(false);
       }
-    }
+      if (!cancelled) setSample({ source: resolved, contact, custom });
+    })().catch(() => {
+      if (!cancelled) setSample({ source: resolved, contact: null });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolved]);
 
-    calculateReach();
-  }, [audience]);
+  const sampleContact = sample?.source === resolved ? sample.contact : null;
+  const previewBody = useMemo(() => {
+    if (!sampleContact) return template.body_text;
+    const params = resolveVariables(variables, sampleContact, sample?.custom);
+    return renderTemplateBody(template.body_text, params) ?? '';
+  }, [template.body_text, variables, sampleContact, sample?.custom]);
+  const previewLabel = sampleContact
+    ? t('scheduleSend.previewFor', {
+        name: sampleContact.name || sampleContact.phone,
+      })
+    : t('personalize.previewSample');
 
   const audienceLabel =
     audience.type === 'all'
@@ -91,6 +156,24 @@ export function Step4ScheduleSend({
         : audience.type === 'csv'
           ? t('scheduleSend.audienceCsv')
           : t('scheduleSend.audienceField');
+
+  const mappedVariables = Object.keys(variables).length;
+  const headerMedia = headerMediaId
+    ? t('scheduleSend.mediaUploaded')
+    : headerMediaUrl || null;
+
+  const audienceBlock = (
+    <div className="space-y-1.5">
+      <p className="text-foreground">{audienceLabel}</p>
+      {includeTags.length > 0 && <TagChips tags={includeTags} />}
+      {excludeTags.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">{t('scheduleSend.excluding')}</p>
+          <TagChips tags={excludeTags} danger />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -118,31 +201,64 @@ export function Step4ScheduleSend({
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">{t('scheduleSend.template')}</p>
-            <p className="text-foreground">{template.name}</p>
+            <p className="break-words text-foreground">{template.name}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{t('scheduleSend.language')}</p>
+            <p className="text-foreground">{template.language ?? 'en_US'}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{t('scheduleSend.audience')}</p>
-            <p className="text-foreground">{audienceLabel}</p>
+            {audienceBlock}
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Estimated Reach</p>
+            <p className="text-xs text-muted-foreground">{t('scheduleSend.estimatedReach')}</p>
             <div className="flex items-center gap-1.5">
               {loadingReach ? (
                 <Loader2 className="h-3 w-3 animate-spin text-primary" />
               ) : (
                 <>
                   <Users className="h-3.5 w-3.5 text-primary" />
-                  <p className="font-medium text-foreground">{estimatedReach.toLocaleString()}</p>
+                  <p className="font-medium text-foreground">{reach.toLocaleString()}</p>
                 </>
               )}
             </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Language</p>
-            <p className="text-foreground">{template.language ?? 'en_US'}</p>
+            <p className="text-xs text-muted-foreground">{t('scheduleSend.variables')}</p>
+            <p className="text-foreground">
+              {t('scheduleSend.variablesMapped', { count: mappedVariables })}
+            </p>
           </div>
+          {headerMedia && (
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">{t('scheduleSend.headerMedia')}</p>
+              <p className="truncate text-foreground">{headerMedia}</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Message preview */}
+      <div className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium text-foreground">{t('scheduleSend.messagePreview')}</p>
+          <span className="text-xs text-muted-foreground">({previewLabel})</span>
+        </div>
+        <BroadcastMessagePreview
+          template={template}
+          bodyText={previewBody}
+          mediaUrl={headerMediaUrl}
+        />
+      </div>
+
+      {/* Recipients */}
+      {resolved && reach > 0 && (
+        <div className="rounded-xl border border-border bg-card/50 p-4 space-y-2">
+          <p className="text-sm font-medium text-foreground">{t('contactList.title')}</p>
+          <AudienceContactList resolved={resolved} />
+        </div>
+      )}
 
       {/* Processing overlay */}
       {isProcessing && (
@@ -191,7 +307,7 @@ export function Step4ScheduleSend({
           <DialogTrigger
             render={
               <Button
-                disabled={!name.trim() || isProcessing}
+                disabled={!name.trim() || isProcessing || loadingReach || reach === 0}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               />
             }
@@ -199,17 +315,50 @@ export function Step4ScheduleSend({
             <Send className="h-4 w-4" />
             {t('scheduleSend.sendNow')}
           </DialogTrigger>
-          <DialogContent className="border-border bg-popover sm:max-w-md">
+          <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-popover sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-popover-foreground">Confirm Broadcast</DialogTitle>
+              <DialogTitle className="text-popover-foreground">{t('scheduleSend.confirmTitle')}</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                You are about to send this broadcast to{' '}
-                <span className="font-medium text-popover-foreground">{estimatedReach.toLocaleString()}</span>{' '}
-                contacts using the{' '}
-                <span className="font-medium text-popover-foreground">{template.name}</span> template.
-                This action cannot be undone.
+                {t('scheduleSend.confirmDesc')}
               </DialogDescription>
             </DialogHeader>
+
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{t('scheduleSend.broadcastName')}</p>
+                  <p className="break-words text-popover-foreground">{name}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{t('scheduleSend.template')}</p>
+                  <p className="break-words text-popover-foreground">
+                    {template.name} · {template.language ?? 'en_US'}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{t('scheduleSend.audience')}</p>
+                  {audienceBlock}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t('scheduleSend.recipients')}</p>
+                  <p className="font-medium text-popover-foreground">
+                    {t('scheduleSend.recipientCount', { count: reach })}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {t('scheduleSend.messagePreview')} ({previewLabel})
+                </p>
+                <BroadcastMessagePreview
+                  template={template}
+                  bodyText={previewBody}
+                  mediaUrl={headerMediaUrl}
+                />
+              </div>
+              <p className="text-xs text-amber-500">{t('scheduleSend.cannotUndo')}</p>
+            </div>
+
             <DialogFooter>
               <Button
                 variant="outline"
@@ -226,7 +375,7 @@ export function Step4ScheduleSend({
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Send className="h-4 w-4" />
-                {t('scheduleSend.sendNow')}
+                {t('scheduleSend.sendTo', { count: reach })}
               </Button>
             </DialogFooter>
           </DialogContent>

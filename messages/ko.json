@@ -844,7 +844,27 @@
         "sending": "전송 중...",
         "preparing": "준비 중...",
         "progressDesc": "수신자 {total}명 중 {current}명 처리 중...",
-        "toastFailedPreview": "미리보기 데이터를 불러오지 못했습니다"
+        "toastFailedPreview": "미리보기 데이터를 불러오지 못했습니다",
+        "language": "언어",
+        "estimatedReach": "예상 도달 수",
+        "excluding": "제외",
+        "headerMedia": "헤더 미디어",
+        "mediaUploaded": "업로드한 파일",
+        "messagePreview": "메시지 미리보기",
+        "previewFor": "{name}님에게 보낼 미리보기",
+        "confirmTitle": "브로드캐스트 확인",
+        "confirmDesc": "보내기 전에 아래 내용을 확인하세요.",
+        "recipients": "수신자",
+        "recipientCount": "{count}명",
+        "cannotUndo": "이 작업은 되돌릴 수 없습니다.",
+        "sendTo": "{count}명에게 보내기"
+      },
+      "contactList": {
+        "title": "수신자",
+        "noName": "이름 없음",
+        "showing": "{total}명 중 {shown}명 표시",
+        "showMore": "{count}명 더 보기",
+        "failed": "연락처를 불러오지 못했습니다."
       }
     }
   },

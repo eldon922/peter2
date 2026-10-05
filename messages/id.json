@@ -843,7 +843,27 @@
         "sending": "Mengirim...",
         "preparing": "Menyiapkan...",
         "progressDesc": "Memproses {current} dari {total} penerima...",
-        "toastFailedPreview": "Gagal memuat data pratinjau"
+        "toastFailedPreview": "Gagal memuat data pratinjau",
+        "language": "Bahasa",
+        "estimatedReach": "Perkiraan jangkauan",
+        "excluding": "Mengecualikan",
+        "headerMedia": "Media header",
+        "mediaUploaded": "File terunggah",
+        "messagePreview": "Pratinjau pesan",
+        "previewFor": "Pratinjau untuk {name}",
+        "confirmTitle": "Konfirmasi Siaran",
+        "confirmDesc": "Periksa detail di bawah sebelum mengirim.",
+        "recipients": "Penerima",
+        "recipientCount": "{count} kontak",
+        "cannotUndo": "Tindakan ini tidak dapat dibatalkan.",
+        "sendTo": "Kirim ke {count} kontak"
+      },
+      "contactList": {
+        "title": "Penerima",
+        "noName": "Tanpa nama",
+        "showing": "Menampilkan {shown} dari {total}",
+        "showMore": "Tampilkan {count} lagi",
+        "failed": "Gagal memuat kontak."
       }
     }
   },

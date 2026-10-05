@@ -11,6 +11,7 @@ import type {
 } from '@/lib/broadcasts/audience';
 import { Button } from '@/components/ui/button';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
+import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
 import {
   Users,
   Tags,
@@ -82,6 +83,7 @@ export function Step2SelectAudience({
   const [loadingTags, setLoadingTags] = useState(false);
   const [loadingFields, setLoadingFields] = useState(false);
   const {
+    resolved,
     count: estimatedCount,
     loading: loadingCount,
     failed: estimateFailed,
@@ -348,6 +350,14 @@ export function Step2SelectAudience({
         )}
         {!loadingCount && estimatedCount === 0 && (
           <p className="mt-2 text-xs text-amber-500">{t('selectAudience.noMatch')}</p>
+        )}
+        {!loadingCount && resolved && (estimatedCount ?? 0) > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t('contactList.title')}
+            </p>
+            <AudienceContactList resolved={resolved} />
+          </div>
         )}
         {!loadingCount && estimatedCount !== null && estimatedCount > recipientLimit && (
           <p className="mt-2 text-xs text-amber-500">
