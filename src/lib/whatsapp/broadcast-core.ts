@@ -143,15 +143,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Load the per-account send context: Meta credentials plus the local
- * template row used to build header/button components.
- *
- * Shared by createBroadcast and planBroadcastRetry — loading it once
- * per broadcast rather than per recipient avoids an N+1, and guarding
- * a malformed local row here fails loudly once instead of producing N
- * identical opaque TypeErrors inside the send loop.
- */
-/**
  * Every broadcast sends its media header by Meta media id, never by
  * link: an id is uploaded once and Meta reuses it, whereas a link makes
  * Meta re-download the same file for every single recipient. When the
@@ -179,6 +170,15 @@ async function uploadHeaderMediaOrThrow(
   }
 }
 
+/**
+ * Load the per-account send context: Meta credentials plus the local
+ * template row used to build header/button components.
+ *
+ * Shared by createBroadcast and planBroadcastRetry — loading it once
+ * per broadcast rather than per recipient avoids an N+1, and guarding
+ * a malformed local row here fails loudly once instead of producing N
+ * identical opaque TypeErrors inside the send loop.
+ */
 async function loadSendContext(
   db: SupabaseClient,
   accountId: string,

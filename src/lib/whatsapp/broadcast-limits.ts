@@ -187,7 +187,7 @@ export function maxDeliverableRecipients(
 const RECIPIENTS_BY_TIER = {
   TIER_50: 50,
   TIER_250: 250,
-  TIER_1K: 1_000,      // alias some API versions/webhooks use for TIER_2K
+  TIER_1K: 1_000,
   TIER_2K: 2_000,
   TIER_10K: 10_000,
   TIER_100K: 100_000,
