@@ -525,7 +525,12 @@ export function WhatsAppConfig() {
         title={t("title")}
         description={t("description")}
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      {/* Sized by the panel's own width, not the viewport: the app sidebar
+          and the settings rail leave a small desktop with far less room
+          than its screen width suggests, so the guide drops below the form
+          until there is space for both side by side. */}
+      <div className="@container">
+      <div className="grid gap-6 @[54rem]:grid-cols-[minmax(0,1fr)_380px]">
       {/* Main config form */}
       <div className="space-y-6">
         {/* Embedded Signup — renders itself as null unless the instance
@@ -1339,6 +1344,7 @@ export function WhatsAppConfig() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
 
     {/* One-time PIN confirmation — shown after ANY successful
