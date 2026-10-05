@@ -42,6 +42,7 @@ import {
   FileIcon,
   Upload,
   Zap,
+  Square,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -246,6 +247,7 @@ export default function BroadcastDetailPage() {
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [stopping, setStopping] = useState(false);
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
   /**
@@ -565,6 +567,28 @@ export default function BroadcastDetailPage() {
     }
   }
 
+  async function handleStop() {
+    setStopping(true);
+    try {
+      const res = await fetch(`/api/broadcasts/${broadcastId}/stop`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(t('toastStopFailed', { error: data.error ?? 'Unknown error' }));
+        return;
+      }
+      toast.success(t('toastStopped'));
+      await refresh();
+    } catch (err) {
+      toast.error(
+        t('toastStopFailed', {
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }),
+      );
+    } finally {
+      setStopping(false);
+    }
+  }
+
   function handleExport() {
     if (!broadcast) return;
     const header = [
@@ -715,6 +739,26 @@ export default function BroadcastDetailPage() {
         </span>
 
         <div className="flex items-center gap-2">
+        {/* Stop — unsent recipients become failed, so Retry resumes them. */}
+        {broadcast.status === 'sending' && (
+          <GatedButton
+            canAct={canSend}
+            gateReason="stop broadcasts"
+            variant="outline"
+            size="sm"
+            disabled={stopping}
+            onClick={handleStop}
+            title={t('stopHover')}
+            className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+          >
+            {stopping ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Square className="h-3.5 w-3.5" />
+            )}
+            {stopping ? t('stopping') : t('stop')}
+          </GatedButton>
+        )}
         {/* Retry failed — re-sends only the failed rows, folding the
             results back into this broadcast's funnel. Disabled while a
             fan-out is live so we never race the in-flight send. */}

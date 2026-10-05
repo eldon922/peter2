@@ -6,6 +6,7 @@ import {
   planBroadcastRetry,
   planBroadcastSend,
   deliverBroadcast,
+  stopBroadcast,
   BroadcastError,
   type BroadcastPlan,
 } from './broadcast-core';
@@ -1544,5 +1545,79 @@ describe('deliverBroadcast deadline guard', () => {
       status: 'failed',
       error_message: 'Send window elapsed — retry again',
     });
+  });
+});
+
+describe('stopBroadcast', () => {
+  it('fails the unsent rows so retry can resume them, then closes the broadcast', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ id: 'b-1', status: 'sending', sent_count: 3 }] },
+    });
+
+    await stopBroadcast(db, 'acct-1', 'b-1');
+
+    const recipients = writes.find((w) => w.table === 'broadcast_recipients');
+    expect(recipients!.values).toMatchObject({
+      status: 'failed',
+      error_message: 'Stopped — retry to resume',
+    });
+    expect(recipients!.filters).toEqual(
+      expect.arrayContaining([
+        ['broadcast_id', 'b-1'],
+        ['status', 'pending'],
+      ])
+    );
+    const closed = writes.find((w) => w.table === 'broadcasts');
+    expect(closed!.values.status).toBe('sent');
+  });
+
+  it('refuses a broadcast that is not sending', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [{ id: 'b-1', status: 'sent', sent_count: 3 }] },
+    });
+    await expect(stopBroadcast(db, 'acct-1', 'b-1')).rejects.toMatchObject({
+      code: 'conflict',
+      status: 409,
+    });
+  });
+
+  it('404s on an unknown broadcast', async () => {
+    const { db } = makeDb({ broadcasts: { rows: [] } });
+    await expect(stopBroadcast(db, 'acct-1', 'b-1')).rejects.toMatchObject({
+      code: 'not_found',
+      status: 404,
+    });
+  });
+});
+
+describe('deliverBroadcast stop check', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('stops sending once the broadcast is no longer sending', async () => {
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    sendTemplateMessage.mockImplementation(async () => {
+      now += 3_000;
+      return { messageId: 'wamid.x' };
+    });
+
+    const { db } = makeDb({
+      broadcasts: { rows: [{ status: 'failed', sent_count: 1 }] },
+    });
+    await deliverBroadcast(db, {
+      broadcastId: 'b-1',
+      templateName: 'promo',
+      templateLanguage: 'en_US',
+      phoneNumberId: 'pn-1',
+      accessToken: 'tok',
+      templateRow: null,
+      planned: [
+        { recipientRowId: 'rec-1', phone: '14155550123', params: [] },
+        { recipientRowId: 'rec-2', phone: '14155550124', params: [] },
+      ],
+      rejected: 0,
+    });
+
+    expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
   });
 });

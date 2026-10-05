@@ -712,7 +712,12 @@
       "mediaPromptHint": "We won't guess — reusing the template's current media could send different content than the original. This is saved on the broadcast, so you'll only be asked once.",
       "mediaPromptLabel": "Media URL",
       "mediaPromptInvalid": "Enter a valid http(s) URL.",
-      "mediaPromptPreviewAlt": "Media preview"
+      "mediaPromptPreviewAlt": "Media preview",
+      "stop": "Stop",
+      "stopping": "Stopping…",
+      "stopHover": "Stop sending. Unsent recipients are marked failed — click Retry to resume.",
+      "toastStopped": "Broadcast stopped. Click Retry to resume.",
+      "toastStopFailed": "Couldn't stop the broadcast: {error}"
     },
     "new": {
       "title": "New Broadcast",

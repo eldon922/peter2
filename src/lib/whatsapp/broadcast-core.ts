@@ -967,6 +967,61 @@ export async function planBroadcastSend(
   };
 }
 
+const STOP_CHECK_INTERVAL_MS = 2000;
+
+/** True once something other than a running fan-out moved the broadcast off 'sending'. */
+async function wasStopped(db: SupabaseClient, broadcastId: string): Promise<boolean> {
+  const { data } = await db
+    .from('broadcasts')
+    .select('status')
+    .eq('id', broadcastId)
+    .maybeSingle();
+  return typeof data?.status === 'string' && data.status !== 'sending';
+}
+
+/**
+ * Stop a running broadcast. Recipients not yet sent become 'failed' so
+ * the normal retry resumes them; the running fan-out notices the status
+ * change within a couple of seconds and stops sending.
+ */
+export async function stopBroadcast(
+  db: SupabaseClient,
+  accountId: string,
+  broadcastId: string
+): Promise<void> {
+  const { data: broadcast, error } = await db
+    .from('broadcasts')
+    .select('id, status')
+    .eq('id', broadcastId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  if (error) {
+    console.error('[broadcast-core] stop read broadcast error:', error);
+    throw new BroadcastError('internal', 'Failed to read broadcast', 500);
+  }
+  if (!broadcast) {
+    throw new BroadcastError('not_found', 'Broadcast not found', 404);
+  }
+  if (broadcast.status !== 'sending') {
+    throw new BroadcastError('conflict', 'This broadcast is not sending.', 409);
+  }
+
+  const { error: updateError } = await db
+    .from('broadcast_recipients')
+    .update({
+      status: 'failed',
+      error_message: 'Stopped — retry to resume',
+    })
+    .eq('broadcast_id', broadcastId)
+    .eq('status', 'pending');
+  if (updateError) {
+    console.error('[broadcast-core] stop recipients error:', updateError);
+    throw new BroadcastError('internal', 'Failed to stop broadcast', 500);
+  }
+
+  await finalizeBroadcastStatus(db, broadcastId, 0, true);
+}
+
 /**
  * Fan out a {@link BroadcastPlan}: send each recipient's template
  * (phone-variant retry) and stamp its `broadcast_recipients` row.
@@ -992,6 +1047,7 @@ export async function deliverBroadcast(
 ): Promise<void> {
   let sentCount = 0;
   const startedAt = Date.now();
+  let lastStopCheck = startedAt;
   const throughput = await getPhoneNumberThroughput({
     phoneNumberId: plan.phoneNumberId,
     accessToken: plan.accessToken,
@@ -1041,6 +1097,16 @@ export async function deliverBroadcast(
           .eq('id', pending.recipientRowId);
       }
       break;
+    }
+
+    // Stop button: the stop endpoint moves the broadcast off 'sending'.
+    // Polled on a timer rather than per recipient to keep reads cheap.
+    if (Date.now() - lastStopCheck >= STOP_CHECK_INTERVAL_MS) {
+      lastStopCheck = Date.now();
+      if (await wasStopped(db, plan.broadcastId)) {
+        log.info('fan-out stopped', { broadcast: plan.broadcastId });
+        break;
+      }
     }
 
     // Batch pacing, mirroring use-broadcast-sending: nothing throttles
