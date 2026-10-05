@@ -27,6 +27,10 @@ export function FormattingToggle({
       {/* Outside the label so tapping it doesn't flip the switch. */}
       <Popover>
         <PopoverTrigger
+          // Opens on hover; a tap still opens it on touch screens.
+          openOnHover
+          delay={100}
+          closeDelay={150}
           aria-label={t('formattingInfoLabel')}
           className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
         >
