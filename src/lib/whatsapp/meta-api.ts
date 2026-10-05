@@ -127,6 +127,9 @@ export async function getPhoneNumberThroughput(
     const url = `${META_API_BASE}/${phoneNumberId}?fields=throughput`
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      // Runs before the first message goes out, so a slow answer must
+      // not hold the whole broadcast up.
+      signal: AbortSignal.timeout(5_000),
     })
     if (!response.ok) return null
     const data = (await response.json()) as {
