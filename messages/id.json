@@ -714,7 +714,8 @@
         "timestamps": "Waktu",
         "error": "Kesalahan",
         "attempts": "Percobaan",
-        "phoneAttempted": "Nomor yang Dicoba"
+        "phoneAttempted": "Nomor yang Dicoba",
+        "tags": "Tag"
       },
       "stats": {
         "totalRecipients": "Total Penerima",

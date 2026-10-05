@@ -402,9 +402,13 @@ export default function BroadcastDetailPage() {
       // return rows in physical heap order, and an UPDATE writes a new
       // row version elsewhere in the heap — which is why a retried row
       // used to jump position for no visible reason.
+      // Each recipient's tags are only needed when the broadcast was aimed
+      // at tags (they're what the Tags column shows).
+      const aimedAtTags =
+        ((bc.audience_filter as { tagIds?: string[] } | null)?.tagIds?.length ?? 0) > 0;
       const { data: recs, error: recsError } = await supabase
         .from('broadcast_recipients')
-        .select('*, contact:contacts(*)')
+        .select(aimedAtTags ? '*, contact:contacts(*, contact_tags(tag_id))' : '*, contact:contacts(*)')
         .eq('broadcast_id', broadcastId)
         .order('sent_at', { ascending: false, nullsFirst: false })
         .order('id', { ascending: true });
@@ -600,11 +604,25 @@ export default function BroadcastDetailPage() {
     }
   }
 
+  // The tags the broadcast was aimed at, and which of them each recipient
+  // carries — i.e. why they're on the list. Empty unless it targeted tags.
+  const targetTagIds =
+    (broadcast?.audience_filter as { tagIds?: string[] } | undefined)?.tagIds ?? [];
+  const showTagsColumn = targetTagIds.length > 0;
+  function recipientTags(recipient: BroadcastRecipient): Tag[] {
+    const carried = (recipient.contact as { contact_tags?: { tag_id: string }[] } | undefined)
+      ?.contact_tags;
+    return tags.filter(
+      (tag) => targetTagIds.includes(tag.id) && carried?.some((ct) => ct.tag_id === tag.id),
+    );
+  }
+
   function handleExport() {
     if (!broadcast) return;
     const header = [
       t('table.contact'),
       t('table.phone'),
+      ...(showTagsColumn ? [t('table.tags')] : []),
       t('table.phoneAttempted'),
       t('table.status'),
       t('table.attempts'),
@@ -616,6 +634,7 @@ export default function BroadcastDetailPage() {
     const rows = recipients.map((r) => [
       r.contact?.name ?? '',
       r.contact?.phone ?? '',
+      ...(showTagsColumn ? [recipientTags(r).map((tag) => tag.name).join('; ')] : []),
       r.phone_attempted ?? '',
       r.status,
       String(r.attempt_count ?? 1),
@@ -1241,6 +1260,9 @@ export default function BroadcastDetailPage() {
                       that stay. */}
                   <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
                   <TableHead className="hidden text-muted-foreground sm:table-cell">{t('table.phone')}</TableHead>
+                  {showTagsColumn && (
+                    <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.tags')}</TableHead>
+                  )}
                   <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
                   {/* Cells here only ever hold "×2", so the word
                       "Attempts" was setting this column's width by
@@ -1324,6 +1346,11 @@ export default function BroadcastDetailPage() {
                       <TableCell className="hidden text-muted-foreground sm:table-cell">
                         {phoneBlock}
                       </TableCell>
+                      {showTagsColumn && (
+                        <TableCell className="hidden whitespace-normal md:table-cell">
+                          <TagChips tags={recipientTags(recipient)} />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <span
                           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}

@@ -714,7 +714,8 @@
         "timestamps": "Time",
         "error": "Error",
         "attempts": "Attempts",
-        "phoneAttempted": "Attempted Number"
+        "phoneAttempted": "Attempted Number",
+        "tags": "Tags"
       },
       "stats": {
         "totalRecipients": "Total Recipients",

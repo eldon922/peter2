@@ -35,7 +35,13 @@ and polish.
   open in new tab and download for images; hours remaining shown in the
   contact detail where the header has no room; messages and images are
   cached in the browser.
-- **Templates deleted on Meta** are marked *Deleted* after a sync.
+- **Templates deleted on Meta** are marked *Deleted* after a sync, with a
+  *Show* button that opens the last synced version read-only.
+- **Broadcast wizard:** a switch to apply WhatsApp formatting in the
+  message previews, and a confirmation before leaving with unfinished work
+  (closing the tab, links, the Back button).
+- **Broadcast details:** a Tags column in the recipients table (and the CSV
+  export) when the broadcast was aimed at tags.
 
 - **Customer message edits** are applied to the stored message, marked
   *Edited* in the inbox, and the earlier versions are kept (click *Edited*

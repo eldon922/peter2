@@ -715,7 +715,8 @@
         "timestamps": "시간",
         "error": "오류",
         "attempts": "시도",
-        "phoneAttempted": "시도한 번호"
+        "phoneAttempted": "시도한 번호",
+        "tags": "태그"
       },
       "stats": {
         "totalRecipients": "전체 수신자",
