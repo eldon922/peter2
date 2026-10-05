@@ -9,6 +9,56 @@ Versions follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0, `MINOR` bumps cover new modules; `PATCH` bumps cover bug fixes
 and polish.
 
+## [Unreleased]
+
+> **Migrations required:** apply `supabase/migrations/048_template_deleted_status.sql`
+> (adds the `DELETED` template status) and
+> `supabase/migrations/049_contact_profile_name.sql` (adds
+> `contacts.profile_name`).
+
+### Added
+
+- **Language switcher** in the header, beside the light/dark toggle.
+- **Broadcast Stop button.** Unsent recipients are marked failed, so
+  Retry resumes where it stopped.
+- **Searchable multi-select tag picker** (audience tags, contact form,
+  contact detail, contacts filter).
+- **Recipient list and a detailed confirmation** (audience, tags,
+  message preview) in the broadcast wizard; target tags and recipient
+  count on the broadcast details page.
+- **Live progress with remaining counts** for contact imports and
+  broadcast sending, and a **detailed per-row import report** (added,
+  updated, skipped with the reason, failed).
+- **Inbox:** WhatsApp text formatting and clickable links; open image,
+  open in new tab and download for images; hours remaining shown in the
+  contact detail where the header has no room; messages and images are
+  cached in the browser.
+- **Templates deleted on Meta** are marked *Deleted* after a sync.
+
+### Changed
+
+- A customer's WhatsApp profile name is stored in `contacts.profile_name`
+  and no longer overwrites the contact name; it shows as
+  "Name (Profile name)".
+- Tags and custom fields are managed from the Contacts page instead of
+  Settings.
+- The WhatsApp setup guide drops below the form on small desktops.
+- Broadcast audience defaults to *Filter by tags*, and Next stays
+  disabled until the estimate is above zero.
+- The browser Back button closes an open chat (mobile) or dialog/sheet.
+- Numbers saved as `08…` are sent as `628…`. Set `DEFAULT_COUNTRY_CODE`
+  to change the assumed country code (default `62`).
+
+### Fixed
+
+- Viewers can no longer use quick replies, chat actions, template or
+  broadcast actions (the template edit/delete API is now admin-only).
+- Very long unbroken messages no longer overflow the chat on mobile.
+- A broadcast image now shows in the inbox after the customer reacts.
+- Tapping tags quickly no longer leaves a stale audience estimate.
+- Broadcast list: the name column keeps a minimum width on narrow
+  desktops and the template column truncates instead.
+
 ## [0.8.1] — 2026-07-10
 
 Fixes inbound chats fragmenting into multiple threads for the same
