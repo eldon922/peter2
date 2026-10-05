@@ -10,6 +10,7 @@ import type {
   CustomFieldOperator,
 } from '@/lib/broadcasts/audience';
 import { Button } from '@/components/ui/button';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import {
   Users,
   Tags,
@@ -243,28 +244,12 @@ export function Step2SelectAudience({
               {t('selectAudience.noTagsFound')}
             </p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => {
-                const isSelected = audience.tagIds?.includes(tag.id);
-                return (
-                  <button
-                    key={tag.id}
-                    onClick={() => toggleTag(tag.id)}
-                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                      isSelected
-                        ? 'border-primary/30 bg-primary/10 text-primary'
-                        : 'border-border bg-muted text-muted-foreground hover:border-border'
-                    }`}
-                  >
-                    <span
-                      className="mr-1.5 h-2 w-2 rounded-full"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    {tag.name}
-                  </button>
-                );
-              })}
-            </div>
+            <TagMultiSelect
+              tags={tags}
+              value={audience.tagIds ?? []}
+              onToggle={toggleTag}
+              onClear={() => onUpdate({ ...audience, tagIds: [] })}
+            />
           )}
         </div>
       )}
@@ -330,28 +315,13 @@ export function Step2SelectAudience({
         {tags.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t('selectAudience.noTagsFound')}</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => {
-              const isExcluded = audience.excludeTagIds?.includes(tag.id);
-              return (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleExcludeTag(tag.id)}
-                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                    isExcluded
-                      ? 'border-red-500/30 bg-red-500/10 text-red-300'
-                      : 'border-border bg-muted text-muted-foreground hover:border-border'
-                  }`}
-                >
-                  <span
-                    className="mr-1.5 h-2 w-2 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                  />
-                  {tag.name}
-                </button>
-              );
-            })}
-          </div>
+          <TagMultiSelect
+            tags={tags}
+            value={audience.excludeTagIds ?? []}
+            onToggle={toggleExcludeTag}
+            onClear={() => onUpdate({ ...audience, excludeTagIds: [] })}
+            variant="danger"
+          />
         )}
       </div>
 

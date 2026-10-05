@@ -61,6 +61,7 @@ import { ImportModal } from '@/components/contacts/import-modal';
 import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
+import { TagPickerList } from '@/components/ui/tag-multi-select';
 import { useTranslations } from 'next-intl';
 
 const PAGE_SIZE = 25;
@@ -655,27 +656,11 @@ export default function ContactsPage() {
                   {t('noTagsYet')}
                 </p>
               ) : (
-                <div className="max-h-64 overflow-y-auto py-1">
-                  {allTags.map((tag) => (
-                    <label
-                      key={tag.id}
-                      className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-muted/50"
-                    >
-                      <Checkbox
-                        checked={selectedTagIds.includes(tag.id)}
-                        onCheckedChange={() => toggleTagFilter(tag.id)}
-                        aria-label={`Filter by ${tag.name}`}
-                      />
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      <span className="truncate text-sm whitespace-nowrap text-popover-foreground">
-                        {tag.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <TagPickerList
+                  tags={allTags}
+                  value={selectedTagIds}
+                  onToggle={toggleTagFilter}
+                />
               )}
             </PopoverContent>
           </Popover>

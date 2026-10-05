@@ -1804,5 +1804,13 @@
   },
   "LanguageToggle": {
     "label": "Ganti bahasa"
+  },
+  "TagPicker": {
+    "search": "Cari tag...",
+    "noMatch": "Tidak ada tag yang cocok.",
+    "placeholder": "Pilih tag",
+    "add": "Tambah",
+    "clear": "Hapus semua",
+    "remove": "Hapus {name}"
   }
 }

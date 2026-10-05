@@ -1816,5 +1816,13 @@
   },
   "LanguageToggle": {
     "label": "언어 변경"
+  },
+  "TagPicker": {
+    "search": "태그 검색...",
+    "noMatch": "일치하는 태그가 없습니다.",
+    "placeholder": "태그 선택",
+    "add": "추가",
+    "clear": "모두 지우기",
+    "remove": "{name} 제거"
   }
 }

@@ -1816,5 +1816,13 @@
   },
   "LanguageToggle": {
     "label": "Change language"
+  },
+  "TagPicker": {
+    "search": "Search tags...",
+    "noMatch": "No tags match.",
+    "placeholder": "Select tags",
+    "add": "Add",
+    "clear": "Clear all",
+    "remove": "Remove {name}"
   }
 }

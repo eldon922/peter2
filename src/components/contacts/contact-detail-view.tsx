@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Phone,
@@ -614,30 +615,12 @@ export function ContactDetailView({
                       {t('tagsTab.noTagsAvailable')}
                     </p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {allTags.map((tag) => {
-                        const selected = contactTagIds.includes(tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={() => toggleTag(tag.id)}
-                            disabled={savingTags}
-                            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer ${
-                              selected
-                                ? 'ring-2 ring-primary ring-offset-1 ring-offset-border'
-                                : 'opacity-50 hover:opacity-80'
-                            }`}
-                            style={{
-                              backgroundColor: tag.color + '20',
-                              color: tag.color,
-                            }}
-                          >
-                            {selected && <Check className="size-3 mr-1" />}
-                            {tag.name}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <TagMultiSelect
+                      tags={allTags}
+                      value={contactTagIds}
+                      onToggle={toggleTag}
+                      disabled={savingTags}
+                    />
                   )}
                 </div>
               </TabsContent>
