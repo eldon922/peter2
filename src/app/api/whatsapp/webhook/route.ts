@@ -2,7 +2,7 @@ import { NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption'
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
-import { applyInboundEdit } from '@/lib/whatsapp/inbound-edit'
+import { applyMessageEdit } from '@/lib/whatsapp/inbound-edit'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
@@ -965,6 +965,20 @@ async function handleMessageEchoes(value: SmbMessageEchoValue) {
       continue
     }
 
+    // The owner edited a message on their phone. Update the stored one
+    // instead of filing the edit event as a new message.
+    if (echo.type === 'edit') {
+      const outcome = await applyMessageEdit(
+        supabaseAdmin(),
+        config.account_id,
+        normalizePhone(echo.to),
+        echo,
+        ['agent', 'bot']
+      )
+      log.info('business edit echo', { outcome })
+      continue
+    }
+
     const contactOutcome = await findOrCreateContact(
       config.account_id,
       config.user_id,
@@ -1071,11 +1085,12 @@ async function processMessage(
   // An edit changes a message we already have. It is not a new message, so
   // it must not create a contact, bump unread or trigger flows/AI replies.
   if (message.type === 'edit') {
-    const outcome = await applyInboundEdit(
+    const outcome = await applyMessageEdit(
       supabaseAdmin(),
       accountId,
       senderPhone,
-      message
+      message,
+      ['customer']
     )
     log.info('customer edit', { outcome })
     return

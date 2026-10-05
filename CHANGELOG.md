@@ -43,7 +43,8 @@ and polish.
 - **Broadcast details:** a Tags column in the recipients table (and the CSV
   export) when the broadcast was aimed at tags.
 
-- **Customer message edits** are applied to the stored message, marked
+- **Message edits** (by the customer, or by you on the WhatsApp Business
+  app in coexistence mode) are applied to the stored message, marked
   *Edited* in the inbox, and the earlier versions are kept (click *Edited*
   to see them). Previously an edit showed up as an "Unsupported message
   type" message.

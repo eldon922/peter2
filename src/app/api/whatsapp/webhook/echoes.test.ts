@@ -220,6 +220,26 @@ describe('smb_message_echoes webhook', () => {
     expect(conversationUpdates).toHaveLength(0)
   })
 
+  it('applies an edit echo to the stored message instead of storing the event', async () => {
+    storedMetaIds = ['wamid.ORIGINAL']
+    await postEchoes([
+      {
+        ...TEXT_ECHO,
+        id: 'wamid.EDIT_1',
+        type: 'edit',
+        text: undefined,
+        edit: {
+          original_message_id: 'wamid.ORIGINAL',
+          message: { type: 'text', text: { body: 'Fixed on my phone' } },
+        },
+      },
+    ])
+
+    // No "[Unsupported message type: edit]" message, no preview rewrite
+    // from the event itself.
+    expect(messageInserts).toHaveLength(0)
+  })
+
   it('skips an echo with no recipient instead of guessing a thread', async () => {
     await postEchoes([{ ...TEXT_ECHO, to: undefined }])
 

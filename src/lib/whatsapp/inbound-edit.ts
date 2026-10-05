@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { findExistingContact } from '@/lib/contacts/dedupe'
 
 /**
- * A customer editing a message they already sent.
+ * A message edited on WhatsApp: by the customer, or by the business owner
+ * on their phone in coexistence mode (delivered as a message echo).
  *
  * Meta delivers it on the normal `messages` webhook as a message of
  * `type: "edit"`, which points back at the original and carries the new
@@ -50,23 +51,26 @@ export function parseInboundEdit(message: { edit?: unknown }): InboundEdit | nul
 }
 
 /**
- * Apply a customer's edit to the stored message.
+ * Apply an edit to the stored message.
  *
- * Looked up inside the sender's own conversation and only for messages
- * they sent, so an edit can never touch someone else's thread or one of
- * our outbound messages. Creates nothing: an edit for a message we never
+ * `phone` is the customer's number (the sender of an inbound edit, the
+ * recipient of an echoed one). The message is looked up inside that
+ * customer's conversation and only if its `sender_type` is one of
+ * `senders`, so an edit can never touch someone else's thread or a message
+ * from the other side. Creates nothing: an edit for a message we never
  * stored is dropped.
  */
-export async function applyInboundEdit(
+export async function applyMessageEdit(
   db: SupabaseClient,
   accountId: string,
-  senderPhone: string,
-  message: { edit?: unknown; timestamp?: string }
+  phone: string,
+  message: { edit?: unknown; timestamp?: string },
+  senders: string[]
 ): Promise<'updated' | 'ignored'> {
   const edit = parseInboundEdit(message)
   if (!edit) return 'ignored'
 
-  const contact = await findExistingContact(db, accountId, senderPhone)
+  const contact = await findExistingContact(db, accountId, phone)
   if (!contact) return 'ignored'
 
   const { data: convRows } = await db
@@ -85,7 +89,7 @@ export async function applyInboundEdit(
     .eq('message_id', edit.originalMessageId)
     .eq('conversation_id', conversation.id)
     .maybeSingle()
-  if (!original || original.sender_type !== 'customer') return 'ignored'
+  if (!original || !senders.includes(original.sender_type)) return 'ignored'
 
   // The edit's own timestamp is when the customer edited, not when we heard.
   const seconds = Number(message.timestamp)

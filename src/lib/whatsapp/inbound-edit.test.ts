@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { applyInboundEdit, parseInboundEdit } from './inbound-edit'
+import { applyMessageEdit, parseInboundEdit } from './inbound-edit'
 
 describe('parseInboundEdit', () => {
   it('reads the original id and new text', () => {
@@ -91,7 +91,7 @@ const EDIT = {
 }
 const CONTACT = { id: 'c1', phone: '+628123456789' }
 
-describe('applyInboundEdit', () => {
+describe('applyMessageEdit', () => {
   it("updates the customer's own message and the list preview", async () => {
     const { db, updates, messageFilters } = makeDb({
       contacts: [CONTACT],
@@ -100,7 +100,7 @@ describe('applyInboundEdit', () => {
     })
 
     expect(
-      await applyInboundEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' })
+      await applyMessageEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' }, ['customer'])
     ).toBe('updated')
     expect(messageFilters).toContainEqual(['conversation_id', 'conv1'])
     expect(updates).toEqual([
@@ -132,7 +132,7 @@ describe('applyInboundEdit', () => {
         edit_history: [{ text: 'v1', at: '2025-10-09T08:00:00.000Z' }],
       },
     })
-    await applyInboundEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' })
+    await applyMessageEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' }, ['customer'])
     const history = (updates[0].values.edit_history as { text: string }[]).map((h) => h.text)
     expect(history).toEqual(['v1', 'v2'])
   })
@@ -143,8 +143,18 @@ describe('applyInboundEdit', () => {
       conversation: { id: 'conv1', last_message_text: 'something newer' },
       message: { id: 'm1', content_text: 'old text', sender_type: 'customer' },
     })
-    await applyInboundEdit(db, 'acct', '628123456789', EDIT)
+    await applyMessageEdit(db, 'acct', '628123456789', EDIT, ['customer'])
     expect(updates.map((u) => u.table)).toEqual(['messages'])
+  })
+
+  it("edits the business's own message for an echoed edit", async () => {
+    const { db, updates } = makeDb({
+      contacts: [CONTACT],
+      conversation: { id: 'conv1', last_message_text: 'old text' },
+      message: { id: 'm1', content_text: 'old text', sender_type: 'agent' },
+    })
+    expect(await applyMessageEdit(db, 'acct', '628123456789', EDIT, ['agent', 'bot'])).toBe('updated')
+    expect(updates[0].values.content_text).toBe('new text')
   })
 
   it('never edits a message we sent', async () => {
@@ -153,7 +163,7 @@ describe('applyInboundEdit', () => {
       conversation: { id: 'conv1', last_message_text: 'x' },
       message: { id: 'm1', content_text: 'x', sender_type: 'agent' },
     })
-    expect(await applyInboundEdit(db, 'acct', '628123456789', EDIT)).toBe('ignored')
+    expect(await applyMessageEdit(db, 'acct', '628123456789', EDIT, ['customer'])).toBe('ignored')
     expect(updates).toEqual([])
   })
 
@@ -163,10 +173,10 @@ describe('applyInboundEdit', () => {
       conversation: { id: 'conv1', last_message_text: 'x' },
       message: null,
     })
-    expect(await applyInboundEdit(noMessage.db, 'acct', '628123456789', EDIT)).toBe('ignored')
+    expect(await applyMessageEdit(noMessage.db, 'acct', '628123456789', EDIT, ['customer'])).toBe('ignored')
 
     const noContact = makeDb({ contacts: [] })
-    expect(await applyInboundEdit(noContact.db, 'acct', '628123456789', EDIT)).toBe('ignored')
+    expect(await applyMessageEdit(noContact.db, 'acct', '628123456789', EDIT, ['customer'])).toBe('ignored')
     expect(noContact.updates).toEqual([])
   })
 })
