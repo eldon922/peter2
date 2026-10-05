@@ -44,7 +44,11 @@ describe('renderTemplateBody', () => {
 interface Script {
   recipient?: Record<string, unknown> | null
   recipientError?: { message: string } | null
-  template?: { body_text: string | null } | null
+  template?: {
+    body_text: string | null
+    header_type?: string | null
+    header_media_url?: string | null
+  } | null
 }
 
 function makeDb(script: Script): { db: SupabaseClient; filters: [string, unknown][] } {
@@ -83,6 +87,7 @@ const BROADCAST = {
   template_name: 'order_update',
   template_language: 'en_US',
   header_media_url: null,
+  header_media_id: null,
 }
 
 describe('findBroadcastSentMessage', () => {
@@ -103,6 +108,7 @@ describe('findBroadcastSentMessage', () => {
       templateName: 'order_update',
       bodyText: 'Hi Ann, order A-9 is on its way',
       mediaUrl: null,
+      mediaType: null,
       status: 'delivered',
       sentAt: '2026-08-01T10:00:00Z',
     })
@@ -197,5 +203,66 @@ describe('findBroadcastSentMessage', () => {
     expect((await findBroadcastSentMessage(db, 'acct-1', 'wamid.X'))?.mediaUrl).toBe(
       'https://cdn.test/a.jpg',
     )
+  })
+
+  it('points at the media proxy when the header was sent by Meta media id', async () => {
+    // Broadcasts always send an uploaded media id, so there may be no URL
+    // at all — the image still has to show up in the inbox.
+    const { db } = makeDb({
+      recipient: {
+        contact_id: 'contact-1',
+        template_params: [],
+        status: 'sent',
+        sent_at: null,
+        broadcast: { ...BROADCAST, header_media_id: '1234567890' },
+      },
+      template: { body_text: 'Look', header_type: 'image' },
+    })
+
+    const result = await findBroadcastSentMessage(db, 'acct-1', 'wamid.X')
+    expect(result?.mediaUrl).toBe('/api/whatsapp/media/1234567890')
+    expect(result?.mediaType).toBe('image')
+  })
+
+  it("falls back to the template's own media when the broadcast recorded none", async () => {
+    const { db } = makeDb({
+      recipient: {
+        contact_id: 'contact-1',
+        template_params: [],
+        status: 'sent',
+        sent_at: null,
+        broadcast: BROADCAST,
+      },
+      template: {
+        body_text: 'Look',
+        header_type: 'video',
+        header_media_url: 'https://cdn.test/v.mp4',
+      },
+    })
+
+    const result = await findBroadcastSentMessage(db, 'acct-1', 'wamid.X')
+    expect(result?.mediaUrl).toBe('https://cdn.test/v.mp4')
+    expect(result?.mediaType).toBe('video')
+  })
+
+  it('ignores a template default when the template has no media header', async () => {
+    const { db } = makeDb({
+      recipient: {
+        contact_id: 'contact-1',
+        template_params: [],
+        status: 'sent',
+        sent_at: null,
+        broadcast: BROADCAST,
+      },
+      template: {
+        body_text: 'Hi',
+        header_type: 'text',
+        header_media_url: 'https://cdn.test/stale.jpg',
+      },
+    })
+
+    const result = await findBroadcastSentMessage(db, 'acct-1', 'wamid.X')
+    expect(result?.mediaUrl).toBeNull()
+    expect(result?.mediaType).toBeNull()
   })
 })

@@ -50,6 +50,16 @@ function StatusIcon({ status }: { status: Message["status"] }) {
   }
 }
 
+/** Marks a message that was sent from a template (e.g. a broadcast). */
+function TemplateBadge({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+      <LayoutTemplate className="h-3 w-3" />
+      {t("template")}
+    </span>
+  );
+}
+
 function MediaUnavailable({ label, t }: { label: string, t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -133,10 +143,11 @@ function endsInText(message: Message): boolean {
     case "video":
     case "template":
       return Boolean(message.content_text);
+    case "document":
+      return Boolean(message.template_name && message.content_text);
     case "interactive":
       return !message.interactive_payload;
     case "audio":
-    case "document":
     case "location":
       return false;
     default:
@@ -170,6 +181,7 @@ function MessageContent({
     case "image":
       return (
         <div>
+          {message.template_name && <TemplateBadge t={t} />}
           {message.media_url ? (
             <MediaImage url={message.media_url} alt="Shared image" />
           ) : (
@@ -187,6 +199,7 @@ function MessageContent({
     case "video":
       return (
         <div>
+          {message.template_name && <TemplateBadge t={t} />}
           {message.media_url ? (
             <video
               src={message.media_url}
@@ -216,31 +229,40 @@ function MessageContent({
         </div>
       );
 
-    case "document":
-      if (!message.media_url) {
-        return <MediaUnavailable label={message.content_text || t("document")} t={t} />;
-      }
+    case "document": {
+      // A template's body is its caption, not the file name.
+      const fromTemplate = Boolean(message.template_name);
+      const fileLabel = fromTemplate ? t("document") : message.content_text || t("document");
       return (
-        <a
-          href={message.media_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
-        >
-          <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <span className="truncate">
-            {message.content_text || t("document")}
-          </span>
-        </a>
+        <div>
+          {fromTemplate && <TemplateBadge t={t} />}
+          {message.media_url ? (
+            <a
+              href={message.media_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
+            >
+              <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{fileLabel}</span>
+            </a>
+          ) : (
+            <MediaUnavailable label={fileLabel} t={t} />
+          )}
+          {fromTemplate && message.content_text && (
+            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
+              <FormattedText text={message.content_text} />
+              {trailing}
+            </p>
+          )}
+        </div>
       );
+    }
 
     case "template":
       return (
         <div>
-          <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-            <LayoutTemplate className="h-3 w-3" />
-            {t("template")}
-          </span>
+          <TemplateBadge t={t} />
           {message.content_text && (
             <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
               <FormattedText text={message.content_text ?? ""} />

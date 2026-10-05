@@ -28,8 +28,14 @@ export interface BroadcastSentMessage {
   templateName: string
   /** Body with placeholders substituted, or null if the template is gone. */
   bodyText: string | null
-  /** Media header URL, when the template had one. */
+  /**
+   * Where the inbox can load the header media from, when the template had
+   * one: the broadcast's own URL, else the proxy route for the Meta media
+   * id it was sent with, else the template's default.
+   */
   mediaUrl: string | null
+  /** Kind of that media, so the bubble renders it as an image/video/file. */
+  mediaType: 'image' | 'video' | 'document' | null
   /** Mapped onto the `messages.status` domain. */
   status: 'sent' | 'delivered' | 'read'
   sentAt: string | null
@@ -86,6 +92,11 @@ interface BroadcastRef {
   template_name: string
   template_language: string | null
   header_media_url: string | null
+  header_media_id: string | null
+}
+
+function isMediaType(value: unknown): value is 'image' | 'video' | 'document' {
+  return value === 'image' || value === 'video' || value === 'document'
 }
 
 interface RecipientRow {
@@ -107,7 +118,7 @@ export async function findBroadcastSentMessage(
     .from('broadcast_recipients')
     .select(
       'contact_id, template_params, status, sent_at, ' +
-        'broadcast:broadcasts!inner(account_id, template_name, template_language, header_media_url)',
+        'broadcast:broadcasts!inner(account_id, template_name, template_language, header_media_url, header_media_id)',
     )
     .eq('whatsapp_message_id', wamid)
     .eq('broadcast.account_id', accountId)
@@ -132,17 +143,30 @@ export async function findBroadcastSentMessage(
   // still anchors the reaction and still shows which template it was.
   const { data: template } = await db
     .from('message_templates')
-    .select('body_text')
+    .select('body_text, header_type, header_media_url')
     .eq('account_id', accountId)
     .eq('name', broadcast.template_name)
     .eq('language', broadcast.template_language ?? 'en_US')
     .maybeSingle()
 
+  const templateMediaType = isMediaType(template?.header_type)
+    ? template.header_type
+    : null
+  const mediaUrl =
+    broadcast.header_media_url ||
+    (broadcast.header_media_id
+      ? `/api/whatsapp/media/${broadcast.header_media_id}`
+      : null) ||
+    (templateMediaType ? template?.header_media_url || null : null)
+
   return {
     contactId: row.contact_id,
     templateName: broadcast.template_name,
     bodyText: renderTemplateBody(template?.body_text, params),
-    mediaUrl: broadcast.header_media_url ?? null,
+    mediaUrl,
+    // The template may be gone; media with no known kind is most likely
+    // an image.
+    mediaType: mediaUrl ? (templateMediaType ?? 'image') : null,
     status: toMessageStatus(row.status),
     sentAt: row.sent_at ?? null,
   }

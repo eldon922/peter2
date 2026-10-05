@@ -747,7 +747,9 @@ async function materializeBroadcastMessage(
     .insert({
       conversation_id: conversationId,
       sender_type: 'agent',
-      content_type: 'template',
+      // A media header is stored as the media type, so the inbox renders
+      // the image/video/file with the body as its caption.
+      content_type: sent.mediaType ?? 'template',
       content_text: sent.bodyText,
       media_url: sent.mediaUrl,
       template_name: sent.templateName,
