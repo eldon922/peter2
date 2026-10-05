@@ -27,6 +27,40 @@ const SPECS: Record<BroadcastMediaKind, { maxBytes: number; allowedTypes: string
 
 const FETCH_TIMEOUT_MS = 30_000
 
+/** Read a body, giving up as soon as it grows past `maxBytes`. */
+async function readCapped(
+  res: Response,
+  kind: BroadcastMediaKind,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  const reader = res.body?.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (reader) {
+    let chunk: ReadableStreamReadResult<Uint8Array>
+    try {
+      chunk = await reader.read()
+    } catch {
+      throw new Error(`Could not fetch the ${kind} URL. Make sure it is publicly reachable.`)
+    }
+    if (chunk.done) break
+    total += chunk.value.byteLength
+    if (total > maxBytes) {
+      void reader.cancel()
+      throw new Error(`The ${kind} is over the ${(maxBytes / 1024 / 1024).toFixed(0)} MB limit.`)
+    }
+    chunks.push(chunk.value)
+  }
+
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
+}
+
 export async function uploadMediaFromUrl(args: {
   url: string
   kind: BroadcastMediaKind
@@ -64,13 +98,8 @@ export async function uploadMediaFromUrl(args: {
   }
   const mimeType = spec.allowedTypes.includes(contentType) ? contentType : spec.allowedTypes[0]
 
-  const bytes = new Uint8Array(await res.arrayBuffer())
+  const bytes = await readCapped(res, kind, spec.maxBytes)
   if (bytes.byteLength === 0) throw new Error(`The ${kind} is empty.`)
-  if (bytes.byteLength > spec.maxBytes) {
-    throw new Error(
-      `The ${kind} is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB — the limit is ${(spec.maxBytes / 1024 / 1024).toFixed(0)} MB.`,
-    )
-  }
 
   return uploadPhoneMedia({
     phoneNumberId,

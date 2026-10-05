@@ -75,7 +75,24 @@ describe('uploadMediaFromUrl', () => {
     fetchMock.mockResolvedValueOnce(
       respond(new Uint8Array(5 * 1024 * 1024 + 1), { type: 'image/jpeg' })
     )
-    await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/limit is 5 MB/)
+    await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/5 MB limit/)
+    expect(uploadPhoneMedia).not.toHaveBeenCalled()
+  })
+
+  it('stops reading a download as soon as it passes the size limit', async () => {
+    let pulls = 0
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1
+        controller.enqueue(new Uint8Array(1024 * 1024))
+        if (pulls >= 50) controller.close()
+      },
+    })
+    fetchMock.mockResolvedValue(
+      new Response(stream, { status: 200, headers: { 'content-type': 'image/jpeg' } })
+    )
+    await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/5 MB limit/)
+    expect(pulls).toBeLessThan(10)
     expect(uploadPhoneMedia).not.toHaveBeenCalled()
   })
 
