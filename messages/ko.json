@@ -920,7 +920,8 @@
         "showing": "{total}명 중 {shown}명 표시",
         "showMore": "{count}명 더 보기",
         "failed": "연락처를 불러오지 못했습니다."
-      }
+      },
+      "applyFormatting": "서식 적용"
     }
   },
   "Automations": {

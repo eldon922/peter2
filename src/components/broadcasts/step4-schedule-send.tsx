@@ -33,6 +33,7 @@ import { contactDisplayName } from '@/lib/contacts/display-name';
 import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
 import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
 import { TagChips } from '@/components/broadcasts/tag-chips';
+import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 
 interface Step4Props {
   name: string;
@@ -69,6 +70,7 @@ export function Step4ScheduleSend({
 }: Step4Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [formatted, setFormatted] = useState(true);
   const { resolved, count, loading: loadingReach } = useAudience(audience);
   const reach = count ?? 0;
 
@@ -228,14 +230,18 @@ export function Step4ScheduleSend({
 
       {/* Message preview */}
       <div className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-foreground">{t('scheduleSend.messagePreview')}</p>
-          <span className="text-xs text-muted-foreground">({previewLabel})</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium text-foreground">{t('scheduleSend.messagePreview')}</p>
+            <span className="text-xs text-muted-foreground">({previewLabel})</span>
+          </div>
+          <FormattingToggle checked={formatted} onCheckedChange={setFormatted} />
         </div>
         <BroadcastMessagePreview
           template={template}
           bodyText={previewBody}
           mediaUrl={headerMediaUrl}
+          formatted={formatted}
         />
       </div>
 
@@ -345,13 +351,17 @@ export function Step4ScheduleSend({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">
-                  {t('scheduleSend.messagePreview')} ({previewLabel})
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {t('scheduleSend.messagePreview')} ({previewLabel})
+                  </p>
+                  <FormattingToggle checked={formatted} onCheckedChange={setFormatted} />
+                </div>
                 <BroadcastMessagePreview
                   template={template}
                   bodyText={previewBody}
                   mediaUrl={headerMediaUrl}
+                  formatted={formatted}
                 />
               </div>
               <p className="text-xs text-amber-500">{t('scheduleSend.cannotUndo')}</p>

@@ -919,7 +919,8 @@
         "showing": "Menampilkan {shown} dari {total}",
         "showMore": "Tampilkan {count} lagi",
         "failed": "Gagal memuat kontak."
-      }
+      },
+      "applyFormatting": "Terapkan format"
     }
   },
   "Automations": {

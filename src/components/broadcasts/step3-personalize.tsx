@@ -18,6 +18,8 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { bodyPlaceholderKeys, isValidHttpUrl } from '@/lib/broadcasts/variables';
 import { contactDisplayName } from '@/lib/contacts/display-name';
+import { FormattedText } from '@/components/inbox/formatted-text';
+import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -103,6 +105,7 @@ export function Step3Personalize({
     Map<string, string>
   >(new Map());
   const [loadingPreview, setLoadingPreview] = useState(true);
+  const [formatted, setFormatted] = useState(true);
   // 'upload' is the recommended default: Meta caches an uploaded media
   // id server-side, so a broadcast of thousands of recipients doesn't
   // make Meta re-fetch a link on every single send. Switches to 'url'
@@ -608,13 +611,16 @@ export function Step3Personalize({
       {/* Live Preview — rendered as a WhatsApp-style bubble so the user
           sees approximately what the recipient will see. */}
       <div className="rounded-xl border border-border bg-card/50 p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Eye className="h-4 w-4 text-primary" />
-          <p className="text-sm font-medium text-foreground">{t('personalize.preview')}</p>
-          <span className="text-xs text-muted-foreground">({previewLabel})</span>
-          {loadingPreview && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          )}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-primary" />
+            <p className="text-sm font-medium text-foreground">{t('personalize.preview')}</p>
+            <span className="text-xs text-muted-foreground">({previewLabel})</span>
+            {loadingPreview && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            )}
+          </div>
+          <FormattingToggle checked={formatted} onCheckedChange={setFormatted} />
         </div>
         {/* WhatsApp's own surface colours rather than app tokens: the
             point of this panel is to show what the recipient sees, and
@@ -626,7 +632,7 @@ export function Step3Personalize({
         <div className="rounded-lg bg-[#EFEAE2] p-3 dark:bg-[#0B141A]">
           <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-sm bg-[#D9FDD3] px-3 py-2 shadow-sm dark:bg-[#005C4B]">
             <p className="whitespace-pre-wrap break-words text-sm text-[#111B21] dark:text-[#E9EDEF]">
-              {previewText}
+              {formatted ? <FormattedText text={previewText} /> : previewText}
             </p>
             <div className="mt-1 flex items-center justify-end gap-1">
               <span className="text-[10px] text-[#667781] dark:text-[#E9EDEF]/60">

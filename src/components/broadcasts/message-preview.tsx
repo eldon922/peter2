@@ -1,6 +1,7 @@
 import { CheckCheck, FileIcon, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 
+import { FormattedText } from '@/components/inbox/formatted-text';
 import type { MessageTemplate } from '@/types';
 
 interface Props {
@@ -9,10 +10,17 @@ interface Props {
   bodyText: string;
   /** Media header link, when one was set for this broadcast. */
   mediaUrl?: string;
+  /** Render WhatsApp formatting (*bold*, _italic_…) in the body. Default on. */
+  formatted?: boolean;
 }
 
 // WhatsApp's own surface colours (see step 3), not app tokens.
-export function BroadcastMessagePreview({ template, bodyText, mediaUrl }: Props) {
+export function BroadcastMessagePreview({
+  template,
+  bodyText,
+  mediaUrl,
+  formatted = true,
+}: Props) {
   const headerType = template.header_type;
   const imageSrc =
     headerType === 'image' ? mediaUrl || template.header_media_url : undefined;
@@ -44,7 +52,7 @@ export function BroadcastMessagePreview({ template, bodyText, mediaUrl }: Props)
           )
         )}
         <p className="whitespace-pre-wrap break-words text-sm text-[#111B21] dark:text-[#E9EDEF]">
-          {bodyText}
+          {formatted ? <FormattedText text={bodyText} /> : bodyText}
         </p>
         {template.footer_text && (
           <p className="mt-1 break-words text-xs text-[#667781] dark:text-[#E9EDEF]/60">

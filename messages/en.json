@@ -919,7 +919,8 @@
         "showing": "Showing {shown} of {total}",
         "showMore": "Show {count} more",
         "failed": "Couldn't load contacts."
-      }
+      },
+      "applyFormatting": "Apply formatting"
     }
   },
   "Automations": {
