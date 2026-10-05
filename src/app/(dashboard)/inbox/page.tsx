@@ -23,6 +23,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBackLayer } from "@/hooks/use-back-layer";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
@@ -549,6 +551,15 @@ function InboxPageInner() {
     router.replace("/inbox", { scroll: false });
   }, [router]);
 
+  // Below lg an open chat fills the screen, so the browser Back button
+  // should return to the list (not leave the inbox). `closeChat` closes
+  // the same way, for the in-app back arrow.
+  const isNarrow = useMediaQuery("(max-width: 1023px)");
+  const closeChat = useBackLayer(
+    activeConversation !== null && isNarrow,
+    handleCloseConversation,
+  );
+
 
   const handleMessagesLoaded = useCallback((loaded: Message[]) => {
     setMessages(loaded);
@@ -681,7 +692,7 @@ function InboxPageInner() {
             onUpdateMessage={handleUpdateMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
-            onBack={handleCloseConversation}
+            onBack={closeChat}
             resyncToken={resyncToken}
             onRefresh={handleManualRefresh}
             contactPanelOpen={contactPanelOpen}

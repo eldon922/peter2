@@ -6,9 +6,16 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { useBackClosable } from "@/hooks/use-back-closable"
 
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({
+  open,
+  defaultOpen,
+  onOpenChange,
+  ...props
+}: SheetPrimitive.Root.Props) {
+  const backClosable = useBackClosable({ open, defaultOpen, onOpenChange })
+  return <SheetPrimitive.Root data-slot="sheet" {...backClosable} {...props} />
 }
 
 function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
