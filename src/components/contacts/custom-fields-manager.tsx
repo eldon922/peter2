@@ -5,48 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import type { CustomField } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-
-interface CustomFieldsManagerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-/**
- * Dialog wrapper around {@link CustomFieldsPanel}, used on the Contacts page.
- * The same panel is rendered inline under Settings → Custom Fields, so the
- * editing UI lives in one place. Radix unmounts the dialog content on close,
- * so the panel remounts (and refetches) on each open.
- */
-export function CustomFieldsManager({
-  open,
-  onOpenChange,
-}: CustomFieldsManagerProps) {
-  const t = useTranslations('Contacts.customFields');
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-popover text-popover-foreground sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-popover-foreground">{t('title')}</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            {t('desc')}
-          </DialogDescription>
-        </DialogHeader>
-        <CustomFieldsPanel />
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /**
  * Create / rename / delete account-wide custom contact field definitions.

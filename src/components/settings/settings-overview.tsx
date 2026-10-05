@@ -20,8 +20,6 @@ import { ROLE_META } from './role-meta';
 interface OverviewCounts {
   members: number | null;
   pendingInvites: number | null;
-  tags: number | null;
-  customFields: number | null;
 }
 
 interface WhatsAppStatus {
@@ -54,13 +52,12 @@ export function SettingsOverview({
     if (!user || !accountId) return;
     let cancelled = false;
     const supabase = createClient();
-    const userId = user.id;
     const acctId = accountId;
 
     // Cheap counts — resolve fast, render immediately.
     (async () => {
       setCountsLoading(true);
-      const [membersRes, invitesRes, tagsRes, fieldsRes] =
+      const [membersRes, invitesRes] =
         await Promise.allSettled([
           fetch('/api/account/members', { cache: 'no-store' }).then((r) => r.json()),
           canManageMembers
@@ -68,11 +65,6 @@ export function SettingsOverview({
                 r.json(),
               )
             : Promise.resolve(null),
-          supabase
-            .from('tags')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId),
-          supabase.from('custom_fields').select('id', { count: 'exact', head: true }),
         ]);
 
       if (cancelled) return;
@@ -91,9 +83,6 @@ export function SettingsOverview({
       setCounts({
         members,
         pendingInvites,
-        tags: tagsRes.status === 'fulfilled' ? tagsRes.value.count ?? null : null,
-        customFields:
-          fieldsRes.status === 'fulfilled' ? fieldsRes.value.count ?? null : null,
       });
       setCountsLoading(false);
     })();
@@ -171,16 +160,6 @@ export function SettingsOverview({
       section: 'deals',
       loading: false,
       subtitle: `${defaultCurrency} — ${currencyLabel}`,
-    },
-    {
-      section: 'fields',
-      loading: countsLoading,
-      subtitle:
-        counts?.tags == null && counts?.customFields == null
-          ? t('tagsAndFields')
-          : `${t('tagsCount', { count: counts?.tags ?? 0 })} · ${t('fieldsCount', {
-              count: counts?.customFields ?? 0,
-            })}`,
     },
     {
       section: 'appearance',

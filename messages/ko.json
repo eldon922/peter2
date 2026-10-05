@@ -293,7 +293,6 @@
       "title": "연락처",
       "subtitle": "연락처 목록을 관리하세요. 전체 연락처 {count}개.",
       "subtitleZero": "연락처 목록을 관리하세요.",
-      "customFieldsBtn": "커스텀 필드",
       "importBtn": "가져오기",
       "addContactBtn": "연락처 추가",
       "searchPlaceholder": "이름, 전화번호, 이메일로 검색...",
@@ -510,7 +509,8 @@
       "toastRenameFailed": "필드 이름을 변경할 수 없습니다.",
       "toastDeleteFailed": "필드를 삭제할 수 없습니다.",
       "toastDeleted": "\"{name}\"을(를) 삭제했습니다."
-    }
+    },
+    "fieldsAndTagsBtn": "필드 및 태그"
   },
   "Pipelines": {
     "page": {

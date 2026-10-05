@@ -5,7 +5,6 @@ import {
   Palette,
   PlugZap,
   Shield,
-  Tags,
   User,
   UsersRound,
   Zap,
@@ -27,7 +26,6 @@ export const SETTINGS_SECTIONS = [
   'appearance',
   'whatsapp',
   'quick-replies',
-  'fields',
   'deals',
   'members',
   'api',
@@ -52,7 +50,6 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   appearance: { id: 'appearance', label: 'Appearance', icon: Palette, group: 'account' },
   whatsapp: { id: 'whatsapp', label: 'WhatsApp', icon: PlugZap, group: 'workspace' },
   'quick-replies': { id: 'quick-replies', label: 'Quick replies', icon: Zap, group: 'workspace' },
-  fields: { id: 'fields', label: 'Fields & tags', icon: Tags, group: 'workspace' },
   deals: { id: 'deals', label: 'Deals & currency', icon: Coins, group: 'workspace' },
   members: { id: 'members', label: 'Team members', icon: UsersRound, group: 'workspace' },
   api: { id: 'api', label: 'API keys', icon: KeyRound, group: 'workspace' },
@@ -69,13 +66,15 @@ function isSection(value: string | null): value is SettingsSection {
 }
 
 /**
- * Resolve a raw `?tab=` value to a section. Legacy tabs from the old
- * flat layout collapse onto their new home (Tags + Custom fields → the
- * merged "Fields & tags" section). Anything unknown falls back to the
- * Overview landing.
+ * Resolve a raw `?tab=` value to a section. Anything unknown falls back to
+ * the Overview landing.
  */
 export function resolveSection(raw: string | null): SettingsSection {
-  if (raw === 'tags' || raw === 'custom-fields') return 'fields';
   if (isSection(raw)) return raw;
   return DEFAULT_SECTION;
+}
+
+/** Tabs that moved to the Contacts page (Fields & tags). */
+export function isMovedToContacts(raw: string | null): boolean {
+  return raw === 'fields' || raw === 'tags' || raw === 'custom-fields';
 }

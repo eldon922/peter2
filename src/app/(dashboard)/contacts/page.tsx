@@ -58,7 +58,7 @@ import { cn } from '@/lib/utils';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
 import { ImportModal } from '@/components/contacts/import-modal';
-import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager';
+import { FieldsAndTagsDialog } from '@/components/contacts/fields-and-tags-dialog';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { TagPickerList } from '@/components/ui/tag-multi-select';
@@ -143,7 +143,6 @@ export default function ContactsPage() {
   const t = useTranslations('Contacts.page');
   const supabase = createClient();
   const canEdit = useCan('send-messages');
-  const canEditSettings = useCan('edit-settings');
 
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +164,7 @@ export default function ContactsPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailContactId, setDetailContactId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [customFieldsOpen, setCustomFieldsOpen] = useState(false);
+  const [fieldsAndTagsOpen, setFieldsAndTagsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -549,16 +548,14 @@ export default function ContactsPage() {
             Wrapping them keeps every action reachable; `justify-end`
             keeps the wrapped rows aligned with the primary action. */}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {canEditSettings && (
-            <Button
-              variant="outline"
-              onClick={() => setCustomFieldsOpen(true)}
-              className="border-border text-muted-foreground hover:bg-muted"
-            >
-              <SlidersHorizontal className="size-4" />
-              {t('customFieldsBtn')}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            onClick={() => setFieldsAndTagsOpen(true)}
+            className="border-border text-muted-foreground hover:bg-muted"
+          >
+            <SlidersHorizontal className="size-4" />
+            {t('fieldsAndTagsBtn')}
+          </Button>
           <GatedButton
             variant="outline"
             canAct={canEdit}
@@ -1014,13 +1011,11 @@ export default function ContactsPage() {
         onImported={handleImported}
       />
 
-      {/* Custom Fields Manager (admin+) */}
-      {canEditSettings && (
-        <CustomFieldsManager
-          open={customFieldsOpen}
-          onOpenChange={setCustomFieldsOpen}
-        />
-      )}
+      {/* Tags + custom fields */}
+      <FieldsAndTagsDialog
+        open={fieldsAndTagsOpen}
+        onOpenChange={setFieldsAndTagsOpen}
+      />
 
       {/* Delete Confirmation */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

@@ -292,7 +292,6 @@
       "title": "Contacts",
       "subtitle": "Manage your contact list. {count} total contacts.",
       "subtitleZero": "Manage your contact list.",
-      "customFieldsBtn": "Custom fields",
       "importBtn": "Import",
       "addContactBtn": "Add Contact",
       "searchPlaceholder": "Search by name, phone, or email...",
@@ -509,7 +508,8 @@
       "toastRenameFailed": "Could not rename field.",
       "toastDeleteFailed": "Could not delete field.",
       "toastDeleted": "Deleted \"{name}\"."
-    }
+    },
+    "fieldsAndTagsBtn": "Fields & tags"
   },
   "Pipelines": {
     "page": {

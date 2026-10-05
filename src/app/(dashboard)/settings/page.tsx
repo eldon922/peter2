@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -13,11 +13,11 @@ import { SecurityPanel } from '@/components/settings/security-panel';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { QuickRepliesManager } from '@/components/settings/quick-replies-manager';
-import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import {
+  isMovedToContacts,
   resolveSection,
   type SettingsSection,
 } from '@/components/settings/settings-sections';
@@ -49,7 +49,14 @@ function SettingsPageInner() {
   // section — deep-linkable, and it keeps the existing links in the
   // app sidebar/header working. Legacy tab values (tags, custom-fields)
   // resolve onto their new home; unknown/empty → the Overview landing.
-  const section = resolveSection(searchParams.get('tab'));
+  const rawTab = searchParams.get('tab');
+  const section = resolveSection(rawTab);
+
+  // Tags and custom fields now live on the Contacts page.
+  const movedToContacts = isMovedToContacts(rawTab);
+  useEffect(() => {
+    if (movedToContacts) router.replace('/contacts');
+  }, [movedToContacts, router]);
 
   const go = (next: SettingsSection) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -75,7 +82,6 @@ function SettingsPageInner() {
     appearance: <AppearancePanel />,
     whatsapp: <WhatsAppConfig />,
     'quick-replies': <QuickRepliesManager />,
-    fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,

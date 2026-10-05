@@ -292,7 +292,6 @@
       "title": "Kontak",
       "subtitle": "Kelola daftar kontak Anda. Total {count} kontak.",
       "subtitleZero": "Kelola daftar kontak Anda.",
-      "customFieldsBtn": "Bidang khusus",
       "importBtn": "Impor",
       "addContactBtn": "Tambah Kontak",
       "searchPlaceholder": "Cari berdasarkan nama, telepon, atau email...",
@@ -509,7 +508,8 @@
       "toastRenameFailed": "Tidak dapat mengganti nama bidang.",
       "toastDeleteFailed": "Tidak dapat menghapus bidang.",
       "toastDeleted": "\"{name}\" dihapus."
-    }
+    },
+    "fieldsAndTagsBtn": "Kolom & tag"
   },
   "Pipelines": {
     "page": {
