@@ -70,14 +70,33 @@ export function chunkRows<T>(rows: T[]): T[][] {
 }
 
 /**
+ * True when a Supabase result carries a temporary failure worth retrying.
+ *
+ * supabase-js does not throw on a failed request — it hands back
+ * `{ data: null, error, status }`. A dropped connection has status 0;
+ * the rest are timeouts, rate limits and server errors. Everything else
+ * (e.g. 409 / 23505 duplicate) will fail the same way again, so it is
+ * returned straight away.
+ */
+function isTransientResult(result: unknown): boolean {
+  if (!result || typeof result !== 'object') return false;
+  const { error, status } = result as { error?: unknown; status?: number };
+  if (!error) return false;
+  const code = status ?? 0;
+  return code === 0 || code === 408 || code === 429 || code >= 500;
+}
+
+/**
  * Retry a request a few times with backoff.
  *
  * A large CSV import fires dozens to hundreds of sequential requests
  * (lookup chunks, insert chunks, per-row fallbacks, renames). Each one
  * individually is unlikely to fail, but across that many round trips a
  * single dropped connection, 429, or proxy hiccup becomes close to
- * certain — and without a retry, that one failure used to abort the
- * entire import. Retrying is safe here because every write in the
+ * certain. Retries both a thrown error and a Supabase result that
+ * carries a temporary error (see isTransientResult); after the last
+ * attempt the final result is returned as-is, so callers still read
+ * `error` themselves. Retrying is safe here because every write in the
  * import path is already idempotent (phone is unique per account, and
  * a 23505 on retry is treated as "already there", not an error).
  *
@@ -91,20 +110,17 @@ export async function withRetry<T>(
 ): Promise<T> {
   const attempts = opts.attempts ?? 3;
   const baseDelayMs = opts.baseDelayMs ?? 500;
-  let lastErr: unknown;
 
-  for (let i = 0; i < attempts; i++) {
+  for (let i = 0; ; i++) {
+    const last = i === attempts - 1;
     try {
-      return await fn();
+      const result = await fn();
+      if (last || !isTransientResult(result)) return result;
     } catch (err) {
-      lastErr = err;
-      if (i === attempts - 1) break;
-      await new Promise((resolve) =>
-        setTimeout(resolve, baseDelayMs * 2 ** i)
-      );
+      if (last) throw err;
     }
+    await new Promise((resolve) => setTimeout(resolve, baseDelayMs * 2 ** i));
   }
-  throw lastErr;
 }
 
 // ============================================================

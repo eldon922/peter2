@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fetchAllRows, READ_PAGE_SIZE } from './batching';
+import { fetchAllRows, READ_PAGE_SIZE, withRetry } from './batching';
 
 // A stand-in for PostgREST: serves `.range(from, to)` windows over a
 // table, but — like the real thing — never returns more than `maxRows`
@@ -91,5 +91,75 @@ describe('fetchAllRows', () => {
 
     expect(result.error).toEqual({ message: 'boom' });
     expect(result.rows).toEqual([{ id: 1 }]);
+  });
+});
+
+describe('withRetry', () => {
+  const fast = { baseDelayMs: 0 };
+
+  it('retries a returned network error until it succeeds', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      return calls < 3
+        ? { data: null, error: { message: 'TypeError: fetch failed' }, status: 0 }
+        : { data: [{ id: 1 }], error: null, status: 200 };
+    };
+
+    const result = await withRetry(fn, fast);
+
+    expect(calls).toBe(3);
+    expect(result.error).toBeNull();
+  });
+
+  it.each([429, 503])('retries a returned %i', async (status) => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      return calls < 2
+        ? { data: null, error: { message: 'busy' }, status }
+        : { data: [], error: null, status: 200 };
+    };
+
+    await withRetry(fn, fast);
+
+    expect(calls).toBe(2);
+  });
+
+  it('does not retry a duplicate-key error', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      return { data: null, error: { code: '23505', message: 'duplicate' }, status: 409 };
+    };
+
+    const result = await withRetry(fn, fast);
+
+    expect(calls).toBe(1);
+    expect(result.error?.code).toBe('23505');
+  });
+
+  it('returns the last error result after the final attempt', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      return { data: null, error: { message: 'down' }, status: 503 };
+    };
+
+    const result = await withRetry(fn, { attempts: 3, baseDelayMs: 0 });
+
+    expect(calls).toBe(3);
+    expect(result.error).toEqual({ message: 'down' });
+  });
+
+  it('retries a thrown error and rethrows after the final attempt', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      throw new Error('boom');
+    };
+
+    await expect(withRetry(fn, { attempts: 2, baseDelayMs: 0 })).rejects.toThrow('boom');
+    expect(calls).toBe(2);
   });
 });
