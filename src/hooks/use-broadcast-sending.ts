@@ -11,6 +11,11 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
+import type {
+  AudienceConfig,
+  CustomFieldFilter,
+  CustomFieldOperator,
+} from '@/lib/broadcasts/audience';
 
 // Re-exported so existing importers of this hook keep working. The
 // implementations moved to lib/broadcasts/variables so the server-side
@@ -18,22 +23,7 @@ import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
 // server code must not import from.
 export { resolveVariables, type VariableMapping };
 
-export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
-
-export interface CustomFieldFilter {
-  fieldId: string;
-  operator: CustomFieldOperator;
-  value: string;
-}
-
-export interface AudienceConfig {
-  type: 'all' | 'tags' | 'custom_field' | 'csv';
-  tagIds?: string[];
-  customField?: CustomFieldFilter;
-  csvContacts?: { phone: string; name?: string }[];
-  /** Contacts carrying any of these tags are subtracted from the result. */
-  excludeTagIds?: string[];
-}
+export type { AudienceConfig, CustomFieldFilter, CustomFieldOperator };
 
 interface BroadcastPayload {
   name: string;

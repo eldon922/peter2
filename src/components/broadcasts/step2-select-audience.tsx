@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
-import { fetchAllRows } from '@/lib/supabase/batching';
+import { useAudience } from '@/hooks/use-audience';
+import type {
+  AudienceConfig,
+  CustomFieldFilter,
+  CustomFieldOperator,
+} from '@/lib/broadcasts/audience';
 import { Button } from '@/components/ui/button';
 import {
   Users,
@@ -17,22 +22,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-type AudienceType = 'all' | 'tags' | 'custom_field' | 'csv';
-type CustomFieldOperator = 'is' | 'is_not' | 'contains';
-
-interface CustomFieldFilter {
-  fieldId: string;
-  operator: CustomFieldOperator;
-  value: string;
-}
-
-interface AudienceConfig {
-  type: AudienceType;
-  tagIds?: string[];
-  customField?: CustomFieldFilter;
-  csvContacts?: { phone: string; name?: string }[];
-  excludeTagIds?: string[];
-}
+type AudienceType = AudienceConfig['type'];
 
 interface Step2Props {
   audience: AudienceConfig;
@@ -90,8 +80,7 @@ export function Step2SelectAudience({
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
   const [loadingFields, setLoadingFields] = useState(false);
-  const [estimatedCount, setEstimatedCount] = useState<number | null>(null);
-  const [loadingCount, setLoadingCount] = useState(false);
+  const { count: estimatedCount, loading: loadingCount } = useAudience(audience);
   // Infinity until the server answers — matches
   // use-broadcast-sending.ts's fallback, so a still-loading or failed
   // lookup never shows a false warning. Same route as the send-time
@@ -151,119 +140,6 @@ export function Step2SelectAudience({
     }
     fetchFields();
   }, [audience.type]);
-
-  const fetchEstimatedCount = useCallback(async () => {
-    setLoadingCount(true);
-    try {
-      const supabase = createClient();
-
-      // Base query — produces the superset before exclude is applied.
-      let baseIds: Set<string> | null = null; // null means "all contacts"
-
-      if (audience.type === 'all') {
-        // Handled below — full-table count adjusted by excludes.
-      } else if (
-        audience.type === 'tags' &&
-        audience.tagIds &&
-        audience.tagIds.length > 0
-      ) {
-        // Paged: a single select is clipped to the server's `max_rows`
-        // (1,000 by default), which capped this estimate at 1,000.
-        const tagIds = audience.tagIds;
-        const { rows, error } = await fetchAllRows<{ contact_id: string }>(
-          (from, to) =>
-            supabase
-              .from('contact_tags')
-              .select('contact_id')
-              .in('tag_id', tagIds)
-              .order('id')
-              .range(from, to),
-        );
-        if (error) throw new Error(error.message);
-        baseIds = new Set(rows.map((r) => r.contact_id));
-      } else if (
-        audience.type === 'custom_field' &&
-        audience.customField?.fieldId &&
-        audience.customField.value
-      ) {
-        const { fieldId, operator, value } = audience.customField;
-        // A function so each page gets a fresh (mutable) query builder.
-        const buildQuery = () => {
-          let q = supabase
-            .from('contact_custom_values')
-            .select('contact_id')
-            .eq('custom_field_id', fieldId);
-          if (operator === 'is') q = q.eq('value', value);
-          else if (operator === 'is_not') q = q.neq('value', value);
-          else q = q.ilike('value', `%${value}%`);
-          return q;
-        };
-        const { rows, error } = await fetchAllRows<{ contact_id: string }>(
-          (from, to) => buildQuery().order('id').range(from, to),
-        );
-        if (error) throw new Error(error.message);
-        baseIds = new Set(rows.map((r) => r.contact_id));
-      } else if (
-        audience.type === 'csv' &&
-        audience.csvContacts &&
-        audience.csvContacts.length > 0
-      ) {
-        setEstimatedCount(audience.csvContacts.length);
-        return;
-      } else {
-        // Partially-configured audience — wait for the user to finish.
-        setEstimatedCount(null);
-        return;
-      }
-
-      // Apply exclude tags
-      let excludeSet: Set<string> | null = null;
-      if (audience.excludeTagIds && audience.excludeTagIds.length > 0) {
-        const excludeTagIds = audience.excludeTagIds;
-        const { rows: excludeRows, error } = await fetchAllRows<{
-          contact_id: string;
-        }>((from, to) =>
-          supabase
-            .from('contact_tags')
-            .select('contact_id')
-            .in('tag_id', excludeTagIds)
-            .order('id')
-            .range(from, to),
-        );
-        if (error) throw new Error(error.message);
-        excludeSet = new Set(excludeRows.map((r) => r.contact_id));
-      }
-
-      if (baseIds) {
-        const effective = [...baseIds].filter(
-          (id) => !excludeSet?.has(id),
-        );
-        setEstimatedCount(effective.length);
-      } else {
-        // "All" — fetch the total, then subtract exclude set if any.
-        const { count } = await supabase
-          .from('contacts')
-          .select('*', { count: 'exact', head: true });
-        const total = count ?? 0;
-        setEstimatedCount(excludeSet ? Math.max(0, total - excludeSet.size) : total);
-      }
-    } catch {
-      // A failed read must not leave a stale or misleading number up.
-      setEstimatedCount(null);
-    } finally {
-      setLoadingCount(false);
-    }
-  }, [
-    audience.type,
-    audience.tagIds,
-    audience.customField,
-    audience.csvContacts,
-    audience.excludeTagIds,
-  ]);
-
-  useEffect(() => {
-    fetchEstimatedCount();
-  }, [fetchEstimatedCount]);
 
   function toggleTag(tagId: string) {
     const current = audience.tagIds ?? [];
