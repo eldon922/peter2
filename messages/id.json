@@ -717,7 +717,13 @@
       "stopping": "Menghentikan…",
       "stopHover": "Hentikan pengiriman. Penerima yang belum dikirimi ditandai gagal — klik Ulangi untuk melanjutkan.",
       "toastStopped": "Siaran dihentikan. Klik Ulangi untuk melanjutkan.",
-      "toastStopFailed": "Gagal menghentikan siaran: {error}"
+      "toastStopFailed": "Gagal menghentikan siaran: {error}",
+      "target": "Target",
+      "targetAll": "Semua kontak",
+      "targetCustomField": "Kolom kustom",
+      "targetCsv": "Unggahan CSV",
+      "targetExcluding": "kecuali",
+      "targetRecipients": "{count} penerima"
     },
     "new": {
       "title": "Siaran Baru",

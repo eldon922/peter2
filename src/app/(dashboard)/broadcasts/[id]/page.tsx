@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Broadcast, BroadcastRecipient, RecipientStatus } from '@/types';
+import { Broadcast, BroadcastRecipient, RecipientStatus, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { GatedButton } from '@/components/ui/gated-button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ import {
   statusTextClass,
 } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
+import { TagChips } from '@/components/broadcasts/tag-chips';
 
 interface StatCardProps {
   label: string;
@@ -248,6 +249,7 @@ export default function BroadcastDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
   /**
@@ -418,6 +420,14 @@ export default function BroadcastDetailPage() {
   useEffect(() => {
     refresh();
   }, [broadcastId]);
+
+  // Tag names for the "Target" line under the title.
+  useEffect(() => {
+    createClient()
+      .from('tags')
+      .select('*')
+      .then(({ data }) => setTags((data ?? []) as Tag[]));
+  }, []);
 
   // Poll for as long as this page is open, not just while the fan-out is
   // running. The send is only the first half of a broadcast's life:
@@ -658,6 +668,21 @@ export default function BroadcastDetailPage() {
   }
 
   const status = getBroadcastStatus(broadcast.status);
+  const audienceFilter = (broadcast.audience_filter ?? {}) as {
+    type?: string;
+    tagIds?: string[];
+    excludeTagIds?: string[];
+  };
+  const targetTags = tags.filter((tag) => audienceFilter.tagIds?.includes(tag.id));
+  const excludedTags = tags.filter((tag) =>
+    audienceFilter.excludeTagIds?.includes(tag.id),
+  );
+  const targetLabel =
+    audienceFilter.type === 'custom_field'
+      ? t('targetCustomField')
+      : audienceFilter.type === 'csv'
+        ? t('targetCsv')
+        : t('targetAll');
   const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
 
   // Same 0–100 shape as the wizard's Step4ScheduleSend "Processing"
@@ -718,8 +743,26 @@ export default function BroadcastDetailPage() {
             <h1 className="text-2xl font-bold break-words text-foreground">
               {broadcast.name}
             </h1>
-            <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
               <span>{t('template', { name: broadcast.template_name })}</span>
+              <span>-</span>
+              <span className="flex flex-wrap items-center gap-1.5">
+                {t('target')}:
+                {targetTags.length > 0 ? (
+                  <TagChips tags={targetTags} />
+                ) : (
+                  <span>{targetLabel}</span>
+                )}
+                {excludedTags.length > 0 && (
+                  <>
+                    <span>{t('targetExcluding')}</span>
+                    <TagChips tags={excludedTags} danger />
+                  </>
+                )}
+                <span>
+                  · {t('targetRecipients', { count: broadcast.total_recipients })}
+                </span>
+              </span>
               <span>-</span>
               <span>
                 {t('createdAt', { date: new Date(broadcast.created_at).toLocaleDateString() })}

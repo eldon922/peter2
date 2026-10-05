@@ -718,7 +718,13 @@
       "stopping": "중지 중…",
       "stopHover": "발송을 중지합니다. 보내지 않은 수신자는 실패로 표시되며, 재시도를 눌러 재개할 수 있습니다.",
       "toastStopped": "브로드캐스트를 중지했습니다. 재시도를 눌러 재개하세요.",
-      "toastStopFailed": "브로드캐스트를 중지하지 못했습니다: {error}"
+      "toastStopFailed": "브로드캐스트를 중지하지 못했습니다: {error}",
+      "target": "대상",
+      "targetAll": "모든 연락처",
+      "targetCustomField": "사용자 정의 필드",
+      "targetCsv": "CSV 업로드",
+      "targetExcluding": "제외",
+      "targetRecipients": "수신자 {count}명"
     },
     "new": {
       "title": "새 브로드캐스트",

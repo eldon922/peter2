@@ -30,6 +30,7 @@ import {
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
 import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
 import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
+import { TagChips } from '@/components/broadcasts/tag-chips';
 
 interface Step4Props {
   name: string;
@@ -44,26 +45,6 @@ interface Step4Props {
   onBack: () => void;
   isProcessing: boolean;
   progress: number;
-}
-
-function TagChips({ tags, danger }: { tags: Tag[]; danger?: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {tags.map((tag) => (
-        <span
-          key={tag.id}
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
-            danger
-              ? 'border-red-500/30 bg-red-500/10 text-red-300'
-              : 'border-primary/30 bg-primary/10 text-primary'
-          }`}
-        >
-          <span className="size-2 rounded-full" style={{ backgroundColor: tag.color }} />
-          {tag.name}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 export function Step4ScheduleSend({

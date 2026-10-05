@@ -717,7 +717,13 @@
       "stopping": "Stopping…",
       "stopHover": "Stop sending. Unsent recipients are marked failed — click Retry to resume.",
       "toastStopped": "Broadcast stopped. Click Retry to resume.",
-      "toastStopFailed": "Couldn't stop the broadcast: {error}"
+      "toastStopFailed": "Couldn't stop the broadcast: {error}",
+      "target": "Target",
+      "targetAll": "All contacts",
+      "targetCustomField": "Custom field",
+      "targetCsv": "CSV upload",
+      "targetExcluding": "excluding",
+      "targetRecipients": "{count, plural, one {# recipient} other {# recipients}}"
     },
     "new": {
       "title": "New Broadcast",
