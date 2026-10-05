@@ -224,7 +224,12 @@
       "interactiveReply": "[Balasan interaktif]",
       "unsupported": "[Jenis pesan tidak didukung]",
       "aiBadge": "AI",
-      "aiBadgeTitle": "Dikirim otomatis oleh asisten AI"
+      "aiBadgeTitle": "Dikirim otomatis oleh asisten AI",
+      "openImage": "Buka gambar",
+      "imageViewer": "Gambar",
+      "openInNewTab": "Buka di tab baru",
+      "download": "Unduh",
+      "downloadFailed": "Gagal mengunduh gambar."
     },
     "actions": {
       "reply": "Balas",

@@ -18,6 +18,7 @@ import {
 import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { FormattedText } from "./formatted-text";
+import { ImageViewer } from "./image-viewer";
 import { getMediaObjectUrl, peekMediaObjectUrl } from "@/lib/inbox/media-cache";
 import { MessageReactions } from "./message-reactions";
 import { InteractivePreview } from "@/components/interactive/interactive-preview";
@@ -63,6 +64,8 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
   const isProxy = url.startsWith("/api/whatsapp/media/");
   const [loaded, setLoaded] = useState<{ url: string; src: string | null } | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const t = useTranslations("Inbox.bubble");
 
   useEffect(() => {
     if (!isProxy) return;
@@ -96,12 +99,23 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      className="max-h-64 max-w-60 rounded-lg object-cover"
-      onError={() => setImgError(true)}
-    />
+    <>
+      <button
+        type="button"
+        onClick={() => setViewerOpen(true)}
+        aria-label={t("openImage")}
+        title={t("openImage")}
+        className="block cursor-zoom-in"
+      >
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-64 max-w-60 rounded-lg object-cover"
+          onError={() => setImgError(true)}
+        />
+      </button>
+      <ImageViewer src={src} alt={alt} open={viewerOpen} onOpenChange={setViewerOpen} />
+    </>
   );
 }
 

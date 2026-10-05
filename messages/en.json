@@ -224,7 +224,12 @@
       "interactiveReply": "[Interactive reply]",
       "unsupported": "[Unsupported message type]",
       "aiBadge": "AI",
-      "aiBadgeTitle": "Sent automatically by the AI assistant"
+      "aiBadgeTitle": "Sent automatically by the AI assistant",
+      "openImage": "Open image",
+      "imageViewer": "Image",
+      "openInNewTab": "Open in new tab",
+      "download": "Download",
+      "downloadFailed": "Couldn't download the image."
     },
     "actions": {
       "reply": "Reply",
