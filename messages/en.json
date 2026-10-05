@@ -229,7 +229,10 @@
       "imageViewer": "Image",
       "openInNewTab": "Open in new tab",
       "download": "Download",
-      "downloadFailed": "Couldn't download the image."
+      "downloadFailed": "Couldn't download the image.",
+      "edited": "Edited",
+      "previousVersions": "Previous versions",
+      "noText": "(no text)"
     },
     "actions": {
       "reply": "Reply",

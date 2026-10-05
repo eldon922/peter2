@@ -230,7 +230,10 @@
       "imageViewer": "이미지",
       "openInNewTab": "새 탭에서 열기",
       "download": "다운로드",
-      "downloadFailed": "이미지를 다운로드하지 못했습니다."
+      "downloadFailed": "이미지를 다운로드하지 못했습니다.",
+      "edited": "수정됨",
+      "previousVersions": "이전 버전",
+      "noText": "(텍스트 없음)"
     },
     "actions": {
       "reply": "답장",

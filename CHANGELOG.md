@@ -14,7 +14,9 @@ and polish.
 > **Migrations required:** apply `supabase/migrations/048_template_deleted_status.sql`
 > (adds the `DELETED` template status) and
 > `supabase/migrations/049_contact_profile_name.sql` (adds
-> `contacts.profile_name`).
+> `contacts.profile_name`) and
+> `supabase/migrations/050_message_edits.sql` (adds `messages.edited_at`
+> and `messages.edit_history`).
 
 ### Added
 
@@ -34,6 +36,11 @@ and polish.
   contact detail where the header has no room; messages and images are
   cached in the browser.
 - **Templates deleted on Meta** are marked *Deleted* after a sync.
+
+- **Customer message edits** are applied to the stored message, marked
+  *Edited* in the inbox, and the earlier versions are kept (click *Edited*
+  to see them). Previously an edit showed up as an "Unsupported message
+  type" message.
 
 ### Changed
 

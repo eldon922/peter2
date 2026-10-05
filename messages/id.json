@@ -229,7 +229,10 @@
       "imageViewer": "Gambar",
       "openInNewTab": "Buka di tab baru",
       "download": "Unduh",
-      "downloadFailed": "Gagal mengunduh gambar."
+      "downloadFailed": "Gagal mengunduh gambar.",
+      "edited": "Diedit",
+      "previousVersions": "Versi sebelumnya",
+      "noText": "(tanpa teks)"
     },
     "actions": {
       "reply": "Balas",

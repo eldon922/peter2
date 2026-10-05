@@ -239,6 +239,10 @@ export interface Message {
   message_id?: string;
   status: MessageStatus;
   created_at: string;
+  /** When the customer last edited this message (migration 050). */
+  edited_at?: string | null;
+  /** Earlier versions of an edited message, oldest first. */
+  edit_history?: { text: string | null; at: string }[] | null;
   reply_to_message_id?: string;
   /**
    * Only set when `content_type === 'interactive'` — the stable id of

@@ -61,7 +61,7 @@ export async function applyInboundEdit(
   db: SupabaseClient,
   accountId: string,
   senderPhone: string,
-  message: { edit?: unknown }
+  message: { edit?: unknown; timestamp?: string }
 ): Promise<'updated' | 'ignored'> {
   const edit = parseInboundEdit(message)
   if (!edit) return 'ignored'
@@ -81,15 +81,29 @@ export async function applyInboundEdit(
 
   const { data: original } = await db
     .from('messages')
-    .select('id, content_text, sender_type')
+    .select('id, content_text, sender_type, edit_history')
     .eq('message_id', edit.originalMessageId)
     .eq('conversation_id', conversation.id)
     .maybeSingle()
   if (!original || original.sender_type !== 'customer') return 'ignored'
 
+  // The edit's own timestamp is when the customer edited, not when we heard.
+  const seconds = Number(message.timestamp)
+  const editedAt = Number.isFinite(seconds) && seconds > 0
+    ? new Date(seconds * 1000).toISOString()
+    : new Date().toISOString()
+
   const { error } = await db
     .from('messages')
-    .update({ content_text: edit.text || null })
+    .update({
+      content_text: edit.text || null,
+      edited_at: editedAt,
+      // Keep what this edit replaced.
+      edit_history: [
+        ...(Array.isArray(original.edit_history) ? original.edit_history : []),
+        { text: original.content_text ?? null, at: editedAt },
+      ],
+    })
     .eq('id', original.id)
   if (error) {
     console.error('[webhook] failed to apply message edit:', error.message)

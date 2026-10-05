@@ -99,16 +99,42 @@ describe('applyInboundEdit', () => {
       message: { id: 'm1', content_text: 'old text', sender_type: 'customer' },
     })
 
-    expect(await applyInboundEdit(db, 'acct', '628123456789', EDIT)).toBe('updated')
+    expect(
+      await applyInboundEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' })
+    ).toBe('updated')
     expect(messageFilters).toContainEqual(['conversation_id', 'conv1'])
     expect(updates).toEqual([
-      { table: 'messages', values: { content_text: 'new text' }, filters: [['id', 'm1']] },
+      {
+        table: 'messages',
+        values: {
+          content_text: 'new text',
+          edited_at: '2025-10-09T08:53:20.000Z',
+          edit_history: [{ text: 'old text', at: '2025-10-09T08:53:20.000Z' }],
+        },
+        filters: [['id', 'm1']],
+      },
       {
         table: 'conversations',
         values: { last_message_text: 'new text' },
         filters: [['id', 'conv1']],
       },
     ])
+  })
+
+  it('appends to the history on a second edit', async () => {
+    const { db, updates } = makeDb({
+      contacts: [CONTACT],
+      conversation: { id: 'conv1', last_message_text: 'v2' },
+      message: {
+        id: 'm1',
+        content_text: 'v2',
+        sender_type: 'customer',
+        edit_history: [{ text: 'v1', at: '2025-10-09T08:00:00.000Z' }],
+      },
+    })
+    await applyInboundEdit(db, 'acct', '628123456789', { ...EDIT, timestamp: '1760000000' })
+    const history = (updates[0].values.edit_history as { text: string }[]).map((h) => h.text)
+    expect(history).toEqual(['v1', 'v2'])
   })
 
   it('leaves the list preview alone when a different message is the latest', async () => {

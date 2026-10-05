@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { FormattedText } from "./formatted-text";
 import { ImageViewer } from "./image-viewer";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getMediaObjectUrl, peekMediaObjectUrl } from "@/lib/inbox/media-cache";
 import { MessageReactions } from "./message-reactions";
 import { InteractivePreview } from "@/components/interactive/interactive-preview";
@@ -57,6 +58,50 @@ function TemplateBadge({ t }: { t: ReturnType<typeof useTranslations> }) {
       <LayoutTemplate className="h-3 w-3" />
       {t("template")}
     </span>
+  );
+}
+
+/**
+ * "Edited" marker for a message the customer changed. With earlier
+ * versions on record it opens a list of them; the invisible spacer copy
+ * of the timestamp row passes no history so it renders plain text of the
+ * same width.
+ */
+function EditedLabel({
+  history,
+  className,
+}: {
+  history: { text: string | null; at: string }[];
+  className?: string;
+}) {
+  const t = useTranslations("Inbox.bubble");
+  const label = "text-[10px] italic leading-none";
+  if (history.length === 0) {
+    return <span className={cn(label, className)}>{t("edited")}</span>;
+  }
+  return (
+    <Popover>
+      <PopoverTrigger
+        className={cn(label, "underline decoration-dotted underline-offset-2", className)}
+      >
+        {t("edited")}
+      </PopoverTrigger>
+      <PopoverContent className="w-64 gap-2 p-3 text-popover-foreground">
+        <p className="text-xs font-medium">{t("previousVersions")}</p>
+        <ul className="space-y-2">
+          {[...history].reverse().map((h, i) => (
+            <li key={i} className="rounded-md bg-muted px-2 py-1.5">
+              <p className="whitespace-pre-wrap text-xs wrap-anywhere">
+                {h.text ? <FormattedText text={h.text} /> : t("noText")}
+              </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {format(new Date(h.at), "MMM d, HH:mm")}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -347,7 +392,7 @@ export function MessageBubble({
   // paragraph purely to reserve the matching run of inline space, which
   // is what makes the text wrap around it. Rendering the same markup for
   // both means the reservation is exact without measuring anything.
-  const meta = (
+  const renderMeta = (interactive: boolean) => (
     <span className="inline-flex items-center gap-1 align-bottom">
       {/* AI badge — only on replies the auto-reply bot generated
           (always outbound, so it sits on the primary fill). Lets
@@ -361,6 +406,12 @@ export function MessageBubble({
           <Sparkles className="h-2.5 w-2.5" />
           {t("aiBadge")}
         </span>
+      )}
+      {message.edited_at && (
+        <EditedLabel
+          history={interactive ? (message.edit_history ?? []) : []}
+          className={isAgent ? "text-primary-foreground/70" : "text-muted-foreground"}
+        />
       )}
       <span
         className={cn(
@@ -410,15 +461,15 @@ export function MessageBubble({
           trailing={
             inlineMeta ? (
               <span aria-hidden className="invisible inline-block pl-2">
-                {meta}
+                {renderMeta(false)}
               </span>
             ) : undefined
           }
         />
         {inlineMeta ? (
-          <span className="absolute bottom-2 right-3">{meta}</span>
+          <span className="absolute bottom-2 right-3">{renderMeta(true)}</span>
         ) : (
-          <div className="mt-1 flex justify-end">{meta}</div>
+          <div className="mt-1 flex justify-end">{renderMeta(true)}</div>
         )}
       </div>
       {reactions && reactions.length > 0 && onToggleReaction && (
