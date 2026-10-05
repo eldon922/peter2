@@ -38,7 +38,9 @@ const sendTemplateMessage = vi.hoisted(() => vi.fn());
 // Defaults to resolving `null` (lookup unknown/unavailable) so every
 // existing test keeps getting the conservative default pacing unless
 // it explicitly mocks a tier — matching getSendPacing's own fallback.
-const getPhoneNumberThroughput = vi.hoisted(() => vi.fn(async () => null));
+const getPhoneNumberThroughput = vi.hoisted(() =>
+  vi.fn(async (): Promise<{ level: string } | null> => null)
+);
 vi.mock('@/lib/whatsapp/meta-api', () => ({
   sendTemplateMessage,
   getPhoneNumberThroughput,

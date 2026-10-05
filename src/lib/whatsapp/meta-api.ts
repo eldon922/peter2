@@ -121,7 +121,7 @@ export async function verifyPhoneNumber(
  */
 export async function getPhoneNumberThroughput(
   args: VerifyPhoneNumberArgs
-): Promise<MetaThroughputLevel | null> {
+): Promise<{ level: MetaThroughputLevel } | null> {
   const { phoneNumberId, accessToken } = args
   try {
     const url = `${META_API_BASE}/${phoneNumberId}?fields=throughput`
@@ -129,7 +129,9 @@ export async function getPhoneNumberThroughput(
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!response.ok) return null
-    const data = (await response.json()) as { throughput?: MetaThroughputLevel }
+    const data = (await response.json()) as {
+      throughput?: { level: MetaThroughputLevel }
+    }
     return data.throughput ?? null
   } catch {
     return null
