@@ -96,6 +96,36 @@ describe('uploadMediaFromUrl', () => {
     expect(uploadPhoneMedia).not.toHaveBeenCalled()
   })
 
+  it('follows a redirect to another public URL', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: '/moved/header.png' } })
+      )
+      .mockResolvedValueOnce(respond(new Uint8Array([1]), { type: 'image/png' }))
+    await expect(uploadMediaFromUrl(ARGS)).resolves.toEqual({ id: 'meta-media-1' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1][0]).toBe('https://cdn.example.com/moved/header.png')
+    expect(isDeliverableUrl).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses a redirect that points at a private address', async () => {
+    isDeliverableUrl.mockImplementation(async (u: string) => !u.includes('internal.local'))
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { location: 'http://internal.local/x' } })
+    )
+    await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/publicly reachable/)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(uploadPhoneMedia).not.toHaveBeenCalled()
+  })
+
+  it('gives up after too many redirects', async () => {
+    fetchMock.mockImplementation(
+      async () => new Response(null, { status: 302, headers: { location: '/again' } })
+    )
+    await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/redirects too many times/)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
   it('falls back to the first allowed type when the server sends no content-type', async () => {
     fetchMock.mockResolvedValue(respond(new Uint8Array([1])))
     await uploadMediaFromUrl({ ...ARGS, kind: 'document' })

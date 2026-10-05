@@ -26,6 +26,50 @@ const SPECS: Record<BroadcastMediaKind, { maxBytes: number; allowedTypes: string
 }
 
 const FETCH_TIMEOUT_MS = 30_000
+const MAX_REDIRECTS = 3
+const REDIRECT_STATUSES = [301, 302, 303, 307, 308]
+
+function unreachable(kind: BroadcastMediaKind): Error {
+  return new Error(`Could not fetch the ${kind} URL. Make sure it is publicly reachable.`)
+}
+
+/**
+ * Fetch a public URL, following up to MAX_REDIRECTS redirects by hand.
+ *
+ * Every hop goes through the SSRF guard before it is requested, so a
+ * public URL can't 3xx-bounce to an internal address. Redirects stay
+ * manual for that reason — never `redirect: 'follow'`.
+ */
+async function fetchPublic(
+  startUrl: string,
+  kind: BroadcastMediaKind,
+  signal: AbortSignal,
+): Promise<Response> {
+  let url = startUrl
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!(await isDeliverableUrl(url))) throw unreachable(kind)
+
+    let res: Response
+    try {
+      res = await fetch(url, { redirect: 'manual', signal })
+    } catch {
+      throw unreachable(kind)
+    }
+
+    const location = res.headers.get('location')
+    if (!REDIRECT_STATUSES.includes(res.status) || !location) return res
+    void res.body?.cancel()
+
+    try {
+      const next = new URL(location, url)
+      if (next.protocol !== 'http:' && next.protocol !== 'https:') throw new Error()
+      url = next.toString()
+    } catch {
+      throw unreachable(kind)
+    }
+  }
+  throw new Error(`The ${kind} URL redirects too many times.`)
+}
 
 /** Read a body, giving up as soon as it grows past `maxBytes`. */
 async function readCapped(
@@ -41,7 +85,7 @@ async function readCapped(
     try {
       chunk = await reader.read()
     } catch {
-      throw new Error(`Could not fetch the ${kind} URL. Make sure it is publicly reachable.`)
+      throw unreachable(kind)
     }
     if (chunk.done) break
     total += chunk.value.byteLength
@@ -72,22 +116,9 @@ export async function uploadMediaFromUrl(args: {
 
   // SSRF guard: the URL can be caller-supplied and is fetched from the
   // server, so refuse anything that resolves to a private/loopback/
-  // link-local address (same guard as template-header-handle.ts).
-  if (!(await isDeliverableUrl(url))) {
-    throw new Error(`Could not fetch the ${kind} URL. Make sure it is publicly reachable.`)
-  }
-
-  let res: Response
-  try {
-    res = await fetch(url, {
-      // Never follow redirects: a public URL could 3xx-bounce to an
-      // internal address and defeat the guard above.
-      redirect: 'manual',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
-  } catch {
-    throw new Error(`Could not fetch the ${kind} URL. Make sure it is publicly reachable.`)
-  }
+  // link-local address (same guard as template-header-handle.ts) — on
+  // the first request and on every redirect hop.
+  const res = await fetchPublic(url, kind, AbortSignal.timeout(FETCH_TIMEOUT_MS))
   if (!res.ok) {
     throw new Error(`The ${kind} URL returned ${res.status}. It must be publicly reachable.`)
   }
