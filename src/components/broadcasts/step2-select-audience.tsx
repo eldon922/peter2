@@ -361,10 +361,10 @@ export function Step2SelectAudience({
         )}
         {!loadingCount && estimatedCount !== null && estimatedCount > recipientLimit && (
           <p className="mt-2 text-xs text-amber-500">
-            At this account&apos;s current sending speed, one broadcast reaches
-            about {recipientLimit.toLocaleString()} recipients per pass — the
-            rest will go out automatically over further retry passes, so this
-            audience will take a while to fully send.
+            This audience is above this account&apos;s limit of about{' '}
+            {recipientLimit.toLocaleString()} recipients. Some may not be sent
+            the first time — after it finishes, open the broadcast and press
+            Retry to send the rest.
           </p>
         )}
       </div>

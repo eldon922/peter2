@@ -88,7 +88,7 @@ async function fetchContactsByIds(
  * broadcast-limits.ts) is the source of `limit`.
  */
 function audienceTooLargeWarning(size: number, limit: number): string {
-  return `This audience has ${size.toLocaleString()} contacts. At this account's current sending speed, a single broadcast reaches about ${limit.toLocaleString()} per pass — the rest will go out automatically over further retry passes, so sending may take a while.`;
+  return `This audience has ${size.toLocaleString()} contacts, above this account's limit of about ${limit.toLocaleString()}. Some may not be sent the first time — after it finishes, open the broadcast and press Retry to send the rest.`;
 }
 
 /**
@@ -344,12 +344,12 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         throw new Error('No contacts found for this audience.');
       }
 
-      // Server-side sending no longer hard-caps a broadcast — a larger
-      // audience just takes more automatic retry passes to fully drain
+      // Server-side sending no longer hard-caps a broadcast — what one
+      // pass can't send is marked failed and has to be retried by hand
       // (see createBroadcast's comment in broadcast-core.ts), so this
       // is advisory only: it doesn't block or throw, it just lets the
-      // person sending know up front that it'll take a while instead
-      // of them assuming "sending" means "sent" a moment later. The
+      // person sending know up front that they may need to press Retry
+      // instead of assuming "sending" means "sent" a moment later. The
       // limit itself comes from the server (recipient-limit route),
       // which can ask Meta for this account's live messaging-limit
       // tier — something the browser can never do on its own.

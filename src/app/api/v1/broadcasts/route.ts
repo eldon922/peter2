@@ -8,9 +8,9 @@
 //     "template_name": "promo_july",        // required, approved template
 //     "template_language": "en_US",         // optional (default en_US)
 //     "recipients": [                        // required, non-empty array
-//                                            // (no hard cap — a large
-//                                            // audience spans multiple
-//                                            // automatic retry passes)
+//                                            // (no hard cap — what one
+//                                            // pass can't send is retried
+//                                            // via the retry endpoint)
 //       { "to": "+14155550123", "params": ["Jane"] },
 //       { "to": "+14155550124" }
 //     ]
@@ -35,7 +35,7 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // default so a modest batch isn't cut off mid-send. This is a bound,
 // not a guarantee: a large audience can still exceed it in one pass —
 // deliverBroadcast marks whatever's left as 'failed' rather than
-// stranding it, and the retry endpoint drains the rest automatically.
+// stranding it, and the retry endpoint sends the rest when called.
 // A durable queue/cron drain is the complete fix (follow-up).
 //
 // MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits

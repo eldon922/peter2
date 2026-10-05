@@ -242,10 +242,10 @@ curl -X POST https://your-crm.example.com/api/v1/broadcasts \
 ```
 
 There is no hard cap on `recipients` — a broadcast larger than one
-delivery pass can drain is accepted in full and finishes over however
-many automatic retry passes it takes (poll `GET
+delivery pass can drain is accepted in full. What one pass can't send is
+marked `failed` and is **not** retried automatically — poll `GET
 /api/v1/broadcasts/{id}` for progress, and call the retry endpoint
-below if any recipients are still outstanding once it settles). The
+below once it settles to send whatever is still outstanding. The
 account's own messaging limit with Meta — 250, 2,000, 10,000,
 100,000, or unlimited, depending on the account's tier — is the real
 ceiling on how many unique recipients can be messaged in a rolling

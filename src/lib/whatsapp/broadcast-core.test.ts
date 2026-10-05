@@ -279,8 +279,8 @@ describe('createBroadcast validation', () => {
 
   // There used to be a "rejects more recipients than one pass can
   // deliver" test here. That cap is gone: createBroadcast now accepts
-  // an audience of any size and lets it drain over however many
-  // automatic retry passes it takes (see the comment above
+  // an audience of any size; whatever one pass can't send is
+  // retried by hand, as many times as it takes (see the comment above
   // loadSendContext's call site) — see
   // "createBroadcast contact resolution > accepts an audience larger
   // than one pass can deliver" below for the coverage that replaced it.
@@ -319,7 +319,7 @@ describe('createBroadcast contact resolution', () => {
   it('accepts an audience larger than one pass can deliver instead of rejecting it', async () => {
     // There used to be a hard `recipients.length > recipientLimitForTier(...)`
     // 400 here. It's gone: a broadcast this size is now accepted in full
-    // and drains over however many automatic retry passes it takes
+    // and what one pass can't send is retried by hand
     // (deliverBroadcast marks whatever doesn't fit the time budget as
     // 'failed', and the retry endpoint picks those back up) — see the
     // comment above loadSendContext's call site in createBroadcast.
