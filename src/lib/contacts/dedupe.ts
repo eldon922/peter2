@@ -77,29 +77,33 @@ export function isUniqueViolation(error: unknown): boolean {
 /**
  * De-duplicate parsed CSV rows by normalized phone, keeping the first
  * occurrence of each. Rows with an empty normalized phone are dropped
- * (they can't be a valid contact). Returns the unique rows plus the
- * count removed as in-file duplicates.
+ * (they can't be a valid contact). Returns the unique rows, the count
+ * removed, and which rows were removed and why.
  */
 export function dedupeByPhone<T extends { phone: string }>(
   rows: T[],
-): { unique: T[]; duplicates: number } {
+): {
+  unique: T[];
+  duplicates: number;
+  dropped: { row: T; reason: "duplicate" | "no_phone" }[];
+} {
   const seen = new Set<string>();
   const unique: T[] = [];
-  let duplicates = 0;
+  const dropped: { row: T; reason: "duplicate" | "no_phone" }[] = [];
 
   for (const row of rows) {
     const key = normalizeKey(row.phone);
     if (!key) {
-      duplicates++;
+      dropped.push({ row, reason: "no_phone" });
       continue;
     }
     if (seen.has(key)) {
-      duplicates++;
+      dropped.push({ row, reason: "duplicate" });
       continue;
     }
     seen.add(key);
     unique.push(row);
   }
 
-  return { unique, duplicates };
+  return { unique, duplicates: dropped.length, dropped };
 }

@@ -18,6 +18,12 @@ import {
   type ContactTagAssignment,
 } from '@/lib/contacts/resolve-import-tags';
 import { planContactImport } from '@/lib/contacts/import-merge';
+import {
+  emptyReport,
+  type ImportReport,
+  type ReportRow,
+} from '@/lib/contacts/import-report';
+import { ImportReportDetails } from '@/components/contacts/import-report-details';
 import { chunkIds, withRetry } from '@/lib/supabase/batching';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -143,7 +149,7 @@ export function ImportModal({
    * they previously listed the raw CSV rows, so a file with the same
    * number twice showed (and offered to import) it twice.
    */
-  const [inFileDuplicates, setInFileDuplicates] = useState(0);
+  const [inFileDropped, setInFileDropped] = useState<ReportRow[]>([]);
   const [hasTagsColumn, setHasTagsColumn] = useState(false);
   const [hasCompanyColumn, setHasCompanyColumn] = useState(false);
   const [tagColorByKey, setTagColorByKey] = useState<Map<string, string>>(
@@ -151,11 +157,9 @@ export function ImportModal({
   );
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{
-    imported: number;
-    /** Existing contacts the file added tags to and/or renamed. */
-    updated: number;
-    skipped: number;
-    failed: number;
+    /** Row-by-row outcome. `updated` = existing contacts the file added
+     *  tags to and/or renamed. */
+    report: ImportReport;
     tagsAssigned: number;
     /** True when this summary reflects a run that was cut short by an
      *  error partway through, not a normal completion. */
@@ -163,16 +167,18 @@ export function ImportModal({
   } | null>(null);
   /** Rows attempted so far vs. total, so a large import (which can be
    *  hundreds of sequential requests) doesn't look stalled or wrong
-   *  while it's still working. */
+   *  while it's still working. `total` is absent for steps that are a
+   *  single request. */
   const [progress, setProgress] = useState<{
+    stage: 'checking' | 'tags' | 'adding' | 'updating' | 'linking';
     done: number;
-    total: number;
+    total?: number;
   } | null>(null);
 
   function reset() {
     setFile(null);
     setParsedRows([]);
-    setInFileDuplicates(0);
+    setInFileDropped([]);
     setHasTagsColumn(false);
     setHasCompanyColumn(false);
     setTagColorByKey(new Map());
@@ -203,7 +209,7 @@ export function ImportModal({
     if (rows.length === 0) {
       toast.error(t('toastNoValidRows'));
       setParsedRows([]);
-      setInFileDuplicates(0);
+      setInFileDropped([]);
       setHasTagsColumn(false);
       setHasCompanyColumn(false);
       setTagColorByKey(new Map());
@@ -212,9 +218,15 @@ export function ImportModal({
 
     // Collapse repeats of the same number now, so everything downstream —
     // preview, counts, insert — works from one list.
-    const { unique, duplicates } = dedupeByPhone(rows);
+    const { unique, dropped } = dedupeByPhone(rows);
     setParsedRows(unique);
-    setInFileDuplicates(duplicates);
+    setInFileDropped(
+      dropped.map(({ row, reason }) => ({
+        phone: row.phone,
+        name: row.name,
+        reason: reason === 'no_phone' ? 'no_phone' : 'file_duplicate',
+      }))
+    );
     setHasTagsColumn(csvHasTags);
     setHasCompanyColumn(csvHasCompany);
 
@@ -238,7 +250,7 @@ export function ImportModal({
   async function handleImport() {
     if (parsedRows.length === 0) return;
     setImporting(true);
-    setProgress(null);
+    setProgress({ stage: 'checking', done: 0, total: parsedRows.length });
 
     // Declared outside the try block on purpose: a large import is
     // dozens to hundreds of sequential requests, and if one fails
@@ -246,14 +258,22 @@ export function ImportModal({
     // what actually happened rather than lose it behind a generic
     // error toast — rows already written to the DB shouldn't vanish
     // from the summary just because a later request timed out.
-    let imported = 0;
     // In-file duplicates were already collapsed at parse time; they
     // still count as skipped in the summary.
-    let skipped = inFileDuplicates;
-    let updated = 0;
-    let failed = 0;
+    const report = emptyReport();
+    report.skipped.push(...inFileDropped);
     let tagsAssigned = 0;
     let skippedNames: string[] = [];
+    const toRow = (row: { phone: string; name?: string }): ReportRow => ({
+      phone: row.phone,
+      name: row.name,
+    });
+    const messageOf = (err: unknown): string =>
+      err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : t('toastError');
 
     try {
       const {
@@ -282,6 +302,7 @@ export function ImportModal({
         { id: string; name: string | null }
       >();
       const lookupChunks = chunkIds(importedKeys);
+      let checked = 0;
       for (let i = 0; i < lookupChunks.length; i++) {
         const slice = lookupChunks[i];
         const { data: existingRows, error } = await withRetry(() =>
@@ -310,16 +331,23 @@ export function ImportModal({
             existingByPhone.set(r.phone_normalized, { id: r.id, name: r.name });
           }
         }
+        checked += slice.length;
+        setProgress({ stage: 'checking', done: checked, total: importedKeys.length });
       }
 
       // A number already on file is no longer dropped on the floor. The
       // row is treated as newer information about a contact we already
       // have — see planContactImport for the rules.
-      const { toInsert, toMerge, duplicates } = planContactImport(
+      const { toInsert, toMerge, duplicateRows } = planContactImport(
         unique,
         existingByPhone
       );
-      skipped += duplicates;
+      report.skipped.push(
+        ...duplicateRows.map((row) => ({
+          ...toRow(row),
+          reason: 'nothing_new' as const,
+        }))
+      );
 
       // 2) Resolve tag names → ids (admin+ may auto-create missing tags).
       //    Skip the round-trip when the import carries no tag names.
@@ -330,6 +358,7 @@ export function ImportModal({
       ];
       let tagIdByKey = new Map<string, string>();
       if (allTagNames.length > 0) {
+        setProgress({ stage: 'tags', done: 0 });
         ({ tagIdByKey, skippedNames } = await withRetry(() =>
           resolveImportTagIds(supabase, {
             accountId,
@@ -348,7 +377,7 @@ export function ImportModal({
       // being stuck.
       const totalWork = toInsert.length + toMerge.length;
       let doneWork = 0;
-      setProgress({ done: 0, total: totalWork });
+      setProgress({ stage: 'adding', done: 0, total: totalWork });
 
       // 3) Batch insert the genuinely-new rows in chunks of 50. The DB
       //    unique index is the backstop: a 23505 (race, or a format
@@ -397,7 +426,7 @@ export function ImportModal({
             }
 
             if (!singleErr && singleData) {
-              imported++;
+              report.imported.push(toRow(source));
               if (source.tagNames.length > 0) {
                 tagAssignments.push({
                   contactId: singleData.id,
@@ -405,14 +434,14 @@ export function ImportModal({
                 });
               }
             } else if (isUniqueViolation(singleErr)) {
-              skipped++;
+              report.skipped.push({ ...toRow(source), reason: 'already_exists' });
             } else {
-              failed++;
+              report.failed.push({ ...toRow(source), error: messageOf(singleErr) });
             }
           }
         } else {
           const inserted = data ?? [];
-          imported += inserted.length;
+          report.imported.push(...chunk.slice(0, inserted.length).map(toRow));
           // inserted[j] ↔ chunk[j] only holds because a single INSERT
           // preserves RETURNING order. If this path is ever split into
           // parallel inserts, zip by phone or returned id instead.
@@ -427,8 +456,9 @@ export function ImportModal({
         }
 
         doneWork += chunk.length;
-        setProgress({ done: doneWork, total: totalWork });
+        setProgress({ stage: 'adding', done: doneWork, total: totalWork });
       }
+      setProgress({ stage: 'updating', done: doneWork, total: totalWork });
 
       // 3b) Apply the merge rows. Tags go through the same assignment
       //     path as new contacts — it upserts with ignoreDuplicates, so a
@@ -459,13 +489,17 @@ export function ImportModal({
           )
         );
         for (let k = 0; k < results.length; k++) {
-          if (results[k].error) {
-            failed++;
+          const renameError = results[k].error;
+          if (renameError) {
+            report.failed.push({
+              ...toRow(batch[k].row),
+              error: t('detailRenameFailed', { error: messageOf(renameError) }),
+            });
             renameFailures.add(batch[k].id);
           }
         }
         doneWork += batch.length;
-        setProgress({ done: doneWork, total: totalWork });
+        setProgress({ stage: 'updating', done: doneWork, total: totalWork });
       }
 
       for (const m of toMerge) {
@@ -476,18 +510,28 @@ export function ImportModal({
       // Merge rows that only needed tags (no rename) never went through
       // the rename loop above, so progress hasn't counted them yet.
       doneWork += toMerge.length - renames.length;
-      setProgress({ done: doneWork, total: totalWork });
+      setProgress({ stage: 'updating', done: doneWork, total: totalWork });
 
       // Counted once per row touched, whether it was renamed, re-tagged
       // or both — the summary reports rows, not writes. A row whose only
       // contribution was a rename that failed is reported as failed, not
       // updated, so the two counts never describe the same row.
-      updated = toMerge.filter(
-        (m) => !(renameFailures.has(m.id) && m.row.tagNames.length === 0)
-      ).length;
+      report.updated = toMerge
+        .filter(
+          (m) => !(renameFailures.has(m.id) && m.row.tagNames.length === 0)
+        )
+        .map((m) => ({
+          ...toRow(m.row),
+          rename:
+            m.rename && !renameFailures.has(m.id)
+              ? { from: m.previousName, to: m.rename }
+              : undefined,
+          tags: m.row.tagNames,
+        }));
 
       // 4) Wire tags onto the contacts we just created. Failure here must
       //    not mask a successful contact import.
+      setProgress({ stage: 'linking', done: 0 });
       try {
         tagsAssigned = await withRetry(() =>
           assignImportedContactTags(supabase, tagAssignments, tagIdByKey)
@@ -497,7 +541,12 @@ export function ImportModal({
       }
 
       setProgress(null);
-      setResult({ imported, updated, skipped, failed, tagsAssigned, partial: false });
+      report.skippedTags = skippedNames;
+      setResult({ report, tagsAssigned, partial: false });
+      const imported = report.imported.length;
+      const updated = report.updated.length;
+      const skipped = report.skipped.length;
+      const failed = report.failed.length;
       if (imported > 0) {
         toast.success(t('toastImported', { count: imported }));
       }
@@ -533,15 +582,15 @@ export function ImportModal({
       // so hiding them here would just make a partial import look like
       // a total failure. Show what happened and let the user re-run
       // the same file to pick up the rest.
-      if (imported > 0 || updated > 0 || skipped > 0 || failed > 0) {
-        setResult({
-          imported,
-          updated,
-          skipped,
-          failed,
-          tagsAssigned,
-          partial: true,
-        });
+      if (
+        report.imported.length +
+          report.updated.length +
+          report.skipped.length +
+          report.failed.length >
+        0
+      ) {
+        report.skippedTags = skippedNames;
+        setResult({ report, tagsAssigned, partial: true });
       }
     } finally {
       setProgress(null);
@@ -658,10 +707,10 @@ export function ImportModal({
                   {t('preview', { count: preview.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {inFileDuplicates > 0 && (
+                  {inFileDropped.length > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-md bg-muted/90 px-2 py-0.5 text-[11px] text-amber-500">
                       <AlertTriangle className="size-3" />
-                      {t('previewDuplicates', { count: inFileDuplicates })}
+                      {t('previewDuplicates', { count: inFileDropped.length })}
                     </span>
                   )}
                   {tagStats.rowsWithTags > 0 && (
@@ -756,14 +805,30 @@ export function ImportModal({
           )}
 
           {!result && importing && progress && (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <Loader2 className="text-primary size-5 animate-spin" />
-              <p className="text-sm text-muted-foreground">
-                {t('importingProgress', {
-                  done: progress.done,
-                  total: progress.total,
-                })}
+              <p className="text-sm font-medium text-popover-foreground">
+                {t(`stage.${progress.stage}`)}
               </p>
+              {progress.total !== undefined && progress.total > 0 && (
+                <div className="w-full max-w-sm space-y-1.5">
+                  <div className="h-1.5 w-full rounded-full bg-muted">
+                    <div
+                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, Math.round((progress.done / progress.total) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t('progressCounts', {
+                      done: progress.done,
+                      total: progress.total,
+                      remaining: Math.max(0, progress.total - progress.done),
+                    })}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -778,16 +843,16 @@ export function ImportModal({
                 </p>
               )}
               <div className="mt-3 flex flex-wrap gap-3">
-                {result.imported > 0 && (
+                {result.report.imported.length > 0 && (
                   <div className="text-primary flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
-                    {t('resultImported', { count: result.imported })}
+                    {t('resultImported', { count: result.report.imported.length })}
                   </div>
                 )}
-                {result.updated > 0 && (
+                {result.report.updated.length > 0 && (
                   <div className="text-primary flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
-                    {t('resultUpdated', { count: result.updated })}
+                    {t('resultUpdated', { count: result.report.updated.length })}
                   </div>
                 )}
                 {result.tagsAssigned > 0 && (
@@ -796,19 +861,20 @@ export function ImportModal({
                     {t('resultTags', { count: result.tagsAssigned })}
                   </div>
                 )}
-                {result.skipped > 0 && (
+                {result.report.skipped.length > 0 && (
                   <div className="flex items-center gap-1.5 text-sm text-amber-400">
                     <AlertTriangle className="size-4 shrink-0" />
-                    {t('resultSkipped', { count: result.skipped })}
+                    {t('resultSkipped', { count: result.report.skipped.length })}
                   </div>
                 )}
-                {result.failed > 0 && (
+                {result.report.failed.length > 0 && (
                   <div className="flex items-center gap-1.5 text-sm text-red-400">
                     <XCircle className="size-4 shrink-0" />
-                    {t('resultFailed', { count: result.failed })}
+                    {t('resultFailed', { count: result.report.failed.length })}
                   </div>
                 )}
               </div>
+              <ImportReportDetails report={result.report} />
             </div>
           )}
         </div>

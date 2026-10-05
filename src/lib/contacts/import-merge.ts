@@ -27,6 +27,8 @@ export interface MergeTarget {
   id: string;
   /** New name to store, or null to leave the stored one alone. */
   rename: string | null;
+  /** The name the contact has now (for reporting what changed). */
+  previousName: string | null;
 }
 
 export interface ImportPlan {
@@ -36,6 +38,8 @@ export interface ImportPlan {
   toMerge: MergeTarget[];
   /** Rows matching an existing contact with nothing new to contribute. */
   duplicates: number;
+  /** The same rows, for the import report. */
+  duplicateRows: ParsedContactRow[];
 }
 
 /**
@@ -61,7 +65,7 @@ export function planContactImport(
 ): ImportPlan {
   const toInsert: ParsedContactRow[] = [];
   const toMerge: MergeTarget[] = [];
-  let duplicates = 0;
+  const duplicateRows: ParsedContactRow[] = [];
 
   for (const row of rows) {
     const match = existingByPhone.get(normalizeKey(row.phone));
@@ -75,12 +79,12 @@ export function planContactImport(
       incoming && incoming !== (match.name ?? '').trim() ? incoming : null;
 
     if (!rename && row.tagNames.length === 0) {
-      duplicates++;
+      duplicateRows.push(row);
       continue;
     }
 
-    toMerge.push({ row, id: match.id, rename });
+    toMerge.push({ row, id: match.id, rename, previousName: match.name });
   }
 
-  return { toInsert, toMerge, duplicates };
+  return { toInsert, toMerge, duplicates: duplicateRows.length, duplicateRows };
 }

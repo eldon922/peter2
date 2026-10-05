@@ -56,6 +56,18 @@ describe("dedupeByPhone", () => {
     expect(duplicates).toBe(1);
   });
 
+  it("reports which rows were dropped and why", () => {
+    const { dropped } = dedupeByPhone([
+      { phone: "+1 555-1111", name: "A" },
+      { phone: "15551111", name: "B" },
+      { phone: "   ", name: "C" },
+    ]);
+    expect(dropped.map((d) => [d.row.name, d.reason])).toEqual([
+      ["B", "duplicate"],
+      ["C", "no_phone"],
+    ]);
+  });
+
   it("drops rows with no digits", () => {
     const { unique, duplicates } = dedupeByPhone([
       { phone: "   " },

@@ -484,12 +484,39 @@
       "toastImported_plural": "{count} contacts imported",
       "toastTagsAssigned": "{count} tag assignment applied",
       "toastTagsAssigned_plural": "{count} tag assignments applied",
-      "toastTagsSkipped": "Unknown tags skipped (create them in Settings first): {sample}{more}",
+      "toastTagsSkipped": "Unknown tags skipped (create them under Fields & tags first): {sample}{more}",
       "toastSkipped": "{count} duplicate skipped",
       "toastSkipped_plural": "{count} duplicates skipped",
       "toastFailed": "{count} contact failed to import",
       "toastFailed_plural": "{count} contacts failed to import",
-      "toastError": "Import failed"
+      "toastError": "Import failed",
+      "stage": {
+        "checking": "Checking which numbers are already saved…",
+        "tags": "Preparing tags…",
+        "adding": "Adding new contacts…",
+        "updating": "Updating existing contacts…",
+        "linking": "Assigning tags…"
+      },
+      "section": {
+        "imported": "Added ({count})",
+        "updated": "Updated ({count})",
+        "skipped": "Skipped ({count})",
+        "failed": "Failed ({count})"
+      },
+      "reason": {
+        "file_duplicate": "Same number appears earlier in the file",
+        "no_phone": "No valid phone number",
+        "nothing_new": "Already saved — nothing new in this row",
+        "already_exists": "Already saved — this number exists in your contacts"
+      },
+      "progressCounts": "{done} of {total} done · {remaining} remaining",
+      "reportTitle": "Detailed report",
+      "detailRenamed": "Name: {from} → {to}",
+      "detailNamed": "Name set to {to}",
+      "detailTags": "Tags: {tags}",
+      "detailRenameFailed": "Couldn't rename: {error}",
+      "reportShowMore": "Show {count} more",
+      "reportSkippedTags": "Tags not created (only admins can create tags): {names}"
     },
     "customFields": {
       "title": "Custom fields",

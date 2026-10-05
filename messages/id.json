@@ -484,12 +484,39 @@
       "toastImported_plural": "{count} kontak diimpor",
       "toastTagsAssigned": "{count} penetapan tag diterapkan",
       "toastTagsAssigned_plural": "{count} penetapan tag diterapkan",
-      "toastTagsSkipped": "Tag tidak dikenal dilewati (buat dulu di Pengaturan): {sample}{more}",
+      "toastTagsSkipped": "Tag yang tidak dikenal dilewati (buat dulu di Kolom & tag): {sample}{more}",
       "toastSkipped": "{count} duplikat dilewati",
       "toastSkipped_plural": "{count} duplikat dilewati",
       "toastFailed": "{count} kontak gagal diimpor",
       "toastFailed_plural": "{count} kontak gagal diimpor",
-      "toastError": "Impor gagal"
+      "toastError": "Impor gagal",
+      "stage": {
+        "checking": "Memeriksa nomor yang sudah tersimpan…",
+        "tags": "Menyiapkan tag…",
+        "adding": "Menambahkan kontak baru…",
+        "updating": "Memperbarui kontak yang ada…",
+        "linking": "Menetapkan tag…"
+      },
+      "section": {
+        "imported": "Ditambahkan ({count})",
+        "updated": "Diperbarui ({count})",
+        "skipped": "Dilewati ({count})",
+        "failed": "Gagal ({count})"
+      },
+      "reason": {
+        "file_duplicate": "Nomor yang sama muncul lebih awal di file",
+        "no_phone": "Tidak ada nomor telepon yang valid",
+        "nothing_new": "Sudah tersimpan — tidak ada yang baru di baris ini",
+        "already_exists": "Sudah tersimpan — nomor ini ada di kontak Anda"
+      },
+      "progressCounts": "{done} dari {total} selesai · {remaining} tersisa",
+      "reportTitle": "Laporan rinci",
+      "detailRenamed": "Nama: {from} → {to}",
+      "detailNamed": "Nama diatur menjadi {to}",
+      "detailTags": "Tag: {tags}",
+      "detailRenameFailed": "Gagal mengganti nama: {error}",
+      "reportShowMore": "Tampilkan {count} lagi",
+      "reportSkippedTags": "Tag tidak dibuat (hanya admin yang dapat membuat tag): {names}"
     },
     "customFields": {
       "title": "Bidang khusus",
