@@ -9,6 +9,7 @@ const ALLOWED: ReadonlyArray<MessageTemplateStatus> = [
   'DISABLED',
   'IN_APPEAL',
   'PENDING_DELETION',
+  'DELETED',
 ]
 
 /**

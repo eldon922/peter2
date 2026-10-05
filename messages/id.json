@@ -1520,7 +1520,8 @@
       "toastUploadFailed": "Gagal mengunggah.",
       "uploadFile": "Unggah file",
       "toastInvalidMediaFile": "{kind} harus salah satu dari: {types}.",
-      "toastMediaTooLarge": "{kind} berukuran {size} MB — batasnya {limit} MB."
+      "toastMediaTooLarge": "{kind} berukuran {size} MB — batasnya {limit} MB.",
+      "toastSyncDeleted": "{count} template sudah dihapus di Meta dan ditandai Dihapus."
     },
     "roles": {
       "admin": "Admin",

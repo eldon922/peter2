@@ -1530,7 +1530,8 @@
       "toastUploadFailed": "업로드에 실패했습니다.",
       "uploadFile": "파일 업로드",
       "toastInvalidMediaFile": "{kind}은(는) 다음 중 하나여야 합니다: {types}.",
-      "toastMediaTooLarge": "{kind} 크기가 {size}MB입니다 — 제한은 {limit}MB입니다."
+      "toastMediaTooLarge": "{kind} 크기가 {size}MB입니다 — 제한은 {limit}MB입니다.",
+      "toastSyncDeleted": "Meta에서 삭제된 템플릿 {count}개를 '삭제됨'으로 표시했습니다."
     },
     "roles": {
       "admin": "관리자",

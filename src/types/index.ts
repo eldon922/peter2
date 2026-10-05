@@ -345,7 +345,9 @@ export type MessageTemplateStatus =
   | 'PAUSED'
   | 'DISABLED'
   | 'IN_APPEAL'
-  | 'PENDING_DELETION';
+  | 'PENDING_DELETION'
+  // Local-only: the template no longer exists on Meta (set by sync).
+  | 'DELETED';
 
 export type TemplateButton =
   | { type: 'QUICK_REPLY'; text: string }

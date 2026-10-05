@@ -1530,7 +1530,8 @@
       "toastUploadFailed": "Upload failed.",
       "uploadFile": "Upload file",
       "toastInvalidMediaFile": "{kind} must be one of: {types}.",
-      "toastMediaTooLarge": "{kind} is {size} MB — the limit is {limit} MB."
+      "toastMediaTooLarge": "{kind} is {size} MB — the limit is {limit} MB.",
+      "toastSyncDeleted": "{count, plural, =1 {# template was} other {# templates were}} deleted on Meta and marked as Deleted."
     },
     "roles": {
       "admin": "Admin",

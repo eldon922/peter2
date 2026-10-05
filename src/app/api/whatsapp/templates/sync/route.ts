@@ -7,6 +7,7 @@ import {
 } from '@/lib/auth/account'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
+import { chunkIds } from '@/lib/supabase/batching'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
 /**
@@ -20,6 +21,9 @@ import type { TemplateButton, TemplateSampleValues } from '@/types'
  *
  * Locally-created templates (no Meta counterpart) are NOT deleted —
  * they remain visible so the user can notice drift and clean up.
+ * Templates that came from Meta but are no longer there (deleted on
+ * Meta) are kept and marked DELETED instead of silently lingering as
+ * APPROVED.
  */
 
 const META_API_VERSION = 'v21.0'
@@ -169,6 +173,7 @@ export async function POST() {
       | null = `${META_API_BASE}/${config.waba_id}/message_templates?limit=100&fields=id,name,language,status,category,components,quality_score`
     const PAGE_CAP = 20
     let pageCount = 0
+    let sawData = false
 
     while (nextUrl && pageCount < PAGE_CAP) {
       pageCount++
@@ -191,7 +196,10 @@ export async function POST() {
         data?: MetaTemplate[]
         paging?: { next?: string }
       } = await metaRes.json()
-      if (metaBody.data) metaTemplates.push(...metaBody.data)
+      if (metaBody.data) {
+        sawData = true
+        metaTemplates.push(...metaBody.data)
+      }
       nextUrl = metaBody.paging?.next ?? null
     }
 
@@ -286,13 +294,43 @@ export async function POST() {
       }
     }
 
+    // Mark templates Meta no longer lists. Only trusted when we read the
+    // whole catalog: a truncated or empty-bodied response would otherwise
+    // flag live templates as deleted.
+    const truncated = pageCount >= PAGE_CAP && nextUrl !== null
+    let deleted = 0
+    if (sawData && !truncated) {
+      const metaIds = new Set(metaTemplates.map((t) => t.id))
+      const { data: local } = await supabase
+        .from('message_templates')
+        .select('id, meta_template_id')
+        .eq('account_id', accountId)
+        .not('meta_template_id', 'is', null)
+        .neq('status', 'DELETED')
+      const goneIds = (local ?? [])
+        .filter((r) => !metaIds.has(r.meta_template_id as string))
+        .map((r) => r.id as string)
+      for (const chunk of chunkIds(goneIds)) {
+        const { error: delErr } = await supabase
+          .from('message_templates')
+          .update({ status: 'DELETED', updated_at: new Date().toISOString() })
+          .in('id', chunk)
+        if (delErr) {
+          errors.push({ name: '(deleted templates)', language: '', message: delErr.message })
+        } else {
+          deleted += chunk.length
+        }
+      }
+    }
+
     return NextResponse.json({
       success: errors.length === 0,
       total: metaTemplates.length,
       inserted,
       updated,
+      deleted,
       errors,
-      truncated: pageCount >= PAGE_CAP && nextUrl !== null,
+      truncated,
     })
   } catch (error) {
     // Auth failures map to 401/403 rather than being folded into the

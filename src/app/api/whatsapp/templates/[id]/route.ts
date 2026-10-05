@@ -282,7 +282,7 @@ export async function DELETE(
 
     const { data: existing, error: lookupErr } = await supabase
       .from('message_templates')
-      .select('id, name, meta_template_id')
+      .select('id, name, status, meta_template_id')
       .eq('id', id)
       .eq('account_id', accountId)
       .maybeSingle()
@@ -290,7 +290,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Template not found.' }, { status: 404 })
     }
 
-    if (existing.meta_template_id && !isDryRun()) {
+    // DELETED = already gone from Meta (found by sync), so only the local
+    // row is left to remove.
+    if (
+      existing.meta_template_id &&
+      existing.status !== 'DELETED' &&
+      !isDryRun()
+    ) {
       const { data: config, error: configError } = await supabase
         .from('whatsapp_config')
         .select('*')

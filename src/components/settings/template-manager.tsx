@@ -302,6 +302,9 @@ export function TemplateManager() {
             ? t('toastSyncDetails', { inserted: data.inserted, updated: data.updated })
             : ''),
       );
+      if (data.deleted > 0) {
+        toast.warning(t('toastSyncDeleted', { count: data.deleted }));
+      }
       if (Array.isArray(data.errors) && data.errors.length > 0) {
         const preview = data.errors.slice(0, 3).map(
           (e: { name: string; language: string; message: string }) =>
@@ -618,12 +621,12 @@ export function TemplateManager() {
                       onClick={() => setTemplateToDelete(template)}
                       disabled={deletingId === template.id}
                       aria-label={
-                        template.meta_template_id
+                        template.meta_template_id && statusKey !== 'DELETED'
                           ? t('deleteMetaLocallyAria')
                           : t('deleteLocallyAria')
                       }
                       title={
-                        template.meta_template_id
+                        template.meta_template_id && statusKey !== 'DELETED'
                           ? t('deleteMetaLocallyTitle')
                           : t('deleteLocallyTitle')
                       }
@@ -1124,7 +1127,8 @@ export function TemplateManager() {
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">{t('deleteDialogTitle')}</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              {templateToDelete?.meta_template_id
+              {templateToDelete?.meta_template_id &&
+              templateToDelete.status !== 'DELETED'
                 ? t('deleteMetaDesc', { name: templateToDelete.name })
                 : t('deleteLocalDesc', { name: templateToDelete?.name || '' })}
             </DialogDescription>

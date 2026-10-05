@@ -2,7 +2,8 @@
  * Shared display config for message_templates.status.
  *
  * The DB stores Meta's raw enum (DRAFT / APPROVED / PENDING / REJECTED /
- * PAUSED / DISABLED / IN_APPEAL / PENDING_DELETION) — the UI maps it to
+ * PAUSED / DISABLED / IN_APPEAL / PENDING_DELETION) plus the local-only
+ * DELETED (gone from Meta, set by sync) — the UI maps it to
  * a human label + dark-theme badge classes here so the template manager,
  * inbox picker, and broadcast picker stay aligned.
  */
@@ -49,5 +50,9 @@ export const templateStatusConfig: Record<
   PENDING_DELETION: {
     label: 'Pending Deletion',
     classes: 'bg-slate-700/30 text-muted-foreground border-slate-700/40',
+  },
+  DELETED: {
+    label: 'Deleted',
+    classes: 'bg-red-900/30 text-red-500 border-red-900/40',
   },
 };
