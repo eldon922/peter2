@@ -34,6 +34,16 @@ export function appendCachedMessage(conversationId: string, message: Message) {
   cache.set(conversationId, [...existing, message]);
 }
 
+/** Keep a cached thread current when one of its messages changes. */
+export function updateCachedMessage(conversationId: string, message: Message) {
+  const existing = cache.get(conversationId);
+  if (!existing) return;
+  cache.set(
+    conversationId,
+    existing.map((m) => (m.id === message.id ? { ...m, ...message } : m)),
+  );
+}
+
 export function clearMessageCache() {
   cache.clear();
 }

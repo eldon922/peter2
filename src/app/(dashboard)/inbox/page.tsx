@@ -4,6 +4,7 @@ import {
   appendCachedMessage,
   getCachedMessages,
   setCachedMessages,
+  updateCachedMessage,
 } from "@/lib/inbox/message-cache";
 import { contactDisplayName } from "@/lib/contacts/display-name";
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
@@ -317,6 +318,8 @@ function InboxPageInner() {
       }
 
       if (event.eventType === "UPDATE") {
+        // Cached copy of the thread too, in case it isn't the open one.
+        updateCachedMessage(newMsg.conversation_id, newMsg);
         // Update message status
         setMessages((prev) =>
           prev.map((m) => (m.id === newMsg.id ? { ...m, ...newMsg } : m))
