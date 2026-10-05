@@ -700,19 +700,13 @@ export default function BroadcastDetailPage() {
   // this page) or a page load that landed mid-send from elsewhere —
   // either way, fall back to overall completion.
   const completedCount = broadcast.sent_count + broadcast.failed_count;
-  const sendProgress = retryTarget
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          Math.round(
-            ((completedCount - retryTarget.baseline) / retryTarget.total) * 100,
-          ),
-        ),
-      )
-    : broadcast.total_recipients > 0
-      ? Math.min(100, Math.round((completedCount / broadcast.total_recipients) * 100))
-      : 0;
+  const progressTotal = retryTarget ? retryTarget.total : broadcast.total_recipients;
+  const progressDone = Math.min(
+    progressTotal,
+    Math.max(0, retryTarget ? completedCount - retryTarget.baseline : completedCount),
+  );
+  const sendProgress =
+    progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
 
   // `onColor` is the text colour drawn on top of each fill. The primary
   // bar uses the theme's paired token; the three raw Tailwind fills are
@@ -901,6 +895,13 @@ export default function BroadcastDetailPage() {
               style={{ width: `${sendProgress}%` }}
             />
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t('sendingCounts', {
+              done: progressDone,
+              total: progressTotal,
+              remaining: Math.max(0, progressTotal - progressDone),
+            })}
+          </p>
         </div>
       )}
 

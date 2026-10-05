@@ -755,7 +755,8 @@
       "targetCustomField": "Kolom kustom",
       "targetCsv": "Unggahan CSV",
       "targetExcluding": "kecuali",
-      "targetRecipients": "{count} penerima"
+      "targetRecipients": "{count} penerima",
+      "sendingCounts": "{done} dari {total} diproses · {remaining} tersisa"
     },
     "new": {
       "title": "Siaran Baru",
@@ -899,7 +900,15 @@
         "recipients": "Penerima",
         "recipientCount": "{count} kontak",
         "cannotUndo": "Tindakan ini tidak dapat dibatalkan.",
-        "sendTo": "Kirim ke {count} kontak"
+        "sendTo": "Kirim ke {count} kontak",
+        "stage": {
+          "resolving": "Mencari penerima…",
+          "creating": "Membuat siaran…",
+          "preparing": "Menyiapkan pesan…",
+          "saving": "Menyimpan penerima…",
+          "starting": "Memulai pengiriman…"
+        },
+        "savingCounts": "{done} dari {total} tersimpan · {remaining} tersisa"
       },
       "contactList": {
         "title": "Penerima",

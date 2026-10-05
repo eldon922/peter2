@@ -17,6 +17,7 @@ import {
 import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAudience } from '@/hooks/use-audience';
+import type { SendingStage } from '@/hooks/use-broadcast-sending';
 import {
   fetchAudiencePage,
   type AudienceConfig,
@@ -46,6 +47,8 @@ interface Step4Props {
   onBack: () => void;
   isProcessing: boolean;
   progress: number;
+  stage: SendingStage | null;
+  counts: { done: number; total: number } | null;
 }
 
 export function Step4ScheduleSend({
@@ -61,6 +64,8 @@ export function Step4ScheduleSend({
   onBack,
   isProcessing,
   progress,
+  stage,
+  counts,
 }: Step4Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -248,7 +253,9 @@ export function Step4ScheduleSend({
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="text-sm font-medium text-foreground">{t('scheduleSend.sending')}</p>
+              <p className="text-sm font-medium text-foreground">
+                {stage ? t(`scheduleSend.stage.${stage}`) : t('scheduleSend.sending')}
+              </p>
             </div>
             <span className="text-xs font-medium text-primary">{progress}%</span>
           </div>
@@ -258,6 +265,15 @@ export function Step4ScheduleSend({
               style={{ width: `${progress}%` }}
             />
           </div>
+          {counts && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t('scheduleSend.savingCounts', {
+                done: counts.done,
+                total: counts.total,
+                remaining: Math.max(0, counts.total - counts.done),
+              })}
+            </p>
+          )}
         </div>
       )}
 

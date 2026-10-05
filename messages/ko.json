@@ -756,7 +756,8 @@
       "targetCustomField": "사용자 정의 필드",
       "targetCsv": "CSV 업로드",
       "targetExcluding": "제외",
-      "targetRecipients": "수신자 {count}명"
+      "targetRecipients": "수신자 {count}명",
+      "sendingCounts": "{total}명 중 {done}명 처리됨 · {remaining}명 남음"
     },
     "new": {
       "title": "새 브로드캐스트",
@@ -900,7 +901,15 @@
         "recipients": "수신자",
         "recipientCount": "{count}명",
         "cannotUndo": "이 작업은 되돌릴 수 없습니다.",
-        "sendTo": "{count}명에게 보내기"
+        "sendTo": "{count}명에게 보내기",
+        "stage": {
+          "resolving": "수신자 찾는 중…",
+          "creating": "브로드캐스트 만드는 중…",
+          "preparing": "메시지 준비 중…",
+          "saving": "수신자 저장 중…",
+          "starting": "발송 시작 중…"
+        },
+        "savingCounts": "{total}명 중 {done}명 저장됨 · {remaining}명 남음"
       },
       "contactList": {
         "title": "수신자",

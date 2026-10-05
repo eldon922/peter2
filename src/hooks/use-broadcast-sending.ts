@@ -47,10 +47,21 @@ interface BroadcastPayload {
   headerMediaId?: string;
 }
 
+export type SendingStage =
+  | 'resolving'
+  | 'creating'
+  | 'preparing'
+  | 'saving'
+  | 'starting';
+
 interface UseBroadcastSendingReturn {
   createAndSendBroadcast: (payload: BroadcastPayload) => Promise<string>;
   isProcessing: boolean;
   progress: number;
+  /** What the send is doing right now, for the progress panel. */
+  stage: SendingStage | null;
+  /** Recipients saved so far vs. total, during the `saving` stage. */
+  counts: { done: number; total: number } | null;
 }
 
 /** Bulk-fetch contacts by id, chunked to stay under the request-size limit. */
@@ -101,6 +112,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
   const { accountId } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<SendingStage | null>(null);
+  const [counts, setCounts] = useState<{ done: number; total: number } | null>(null);
 
   /**
    * Every read below goes through `fetchAllRows`. PostgREST clips each
@@ -301,6 +314,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
   async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
     setIsProcessing(true);
     setProgress(0);
+    setStage('resolving');
+    setCounts(null);
 
     const supabase = createClient();
 
@@ -357,6 +372,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // 003/005) and derived from broadcast_recipients — never seeded
       // or written here, or a manual value races the trigger.
       setProgress(10);
+      setStage('creating');
       const { data: broadcast, error: broadcastError } = await supabase
         .from('broadcasts')
         .insert({
@@ -399,6 +415,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // replays exactly what was sent, and an abandoned tab still
       // leaves retryable rows behind.
       setProgress(20);
+      setStage('preparing');
       const customValueIndex = await fetchCustomValueIndex(
         supabase,
         contacts.map((c) => c.id),
@@ -421,6 +438,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         template_params: paramsByContact.get(contact.id) ?? [],
       }));
 
+      setStage('saving');
+      let saved = 0;
+      setCounts({ done: 0, total: recipientRows.length });
       for (const [batchIndex, batch] of chunkRows(recipientRows).entries()) {
         const { error: recipientError } = await supabase
           .from('broadcast_recipients')
@@ -440,6 +460,10 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             `Failed to insert recipient batch ${batchIndex + 1}: ${recipientError.message}`,
           );
         }
+        saved += batch.length;
+        setCounts({ done: saved, total: recipientRows.length });
+        // 20 → 40 across the inserts, so a big audience visibly moves.
+        setProgress(20 + Math.round((saved / recipientRows.length) * 20));
       }
 
       // ── Step 4: Hand the fan-out to the server ─────────────────────
@@ -453,6 +477,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // broadcast detail page polls `broadcasts`/`broadcast_recipients`
       // for live progress once we navigate there.
       setProgress(40);
+      setStage('starting');
       const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
         method: 'POST',
       });
@@ -465,8 +490,10 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       return broadcast.id;
     } finally {
       setIsProcessing(false);
+      setStage(null);
+      setCounts(null);
     }
   }
 
-  return { createAndSendBroadcast, isProcessing, progress };
+  return { createAndSendBroadcast, isProcessing, progress, stage, counts };
 }

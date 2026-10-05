@@ -755,7 +755,8 @@
       "targetCustomField": "Custom field",
       "targetCsv": "CSV upload",
       "targetExcluding": "excluding",
-      "targetRecipients": "{count, plural, one {# recipient} other {# recipients}}"
+      "targetRecipients": "{count, plural, one {# recipient} other {# recipients}}",
+      "sendingCounts": "{done} of {total} processed · {remaining} remaining"
     },
     "new": {
       "title": "New Broadcast",
@@ -899,7 +900,15 @@
         "recipients": "Recipients",
         "recipientCount": "{count, plural, one {# contact} other {# contacts}}",
         "cannotUndo": "This action cannot be undone.",
-        "sendTo": "Send to {count, plural, one {# contact} other {# contacts}}"
+        "sendTo": "Send to {count, plural, one {# contact} other {# contacts}}",
+        "stage": {
+          "resolving": "Finding recipients…",
+          "creating": "Creating the broadcast…",
+          "preparing": "Preparing messages…",
+          "saving": "Saving recipients…",
+          "starting": "Starting to send…"
+        },
+        "savingCounts": "{done} of {total} saved · {remaining} remaining"
       },
       "contactList": {
         "title": "Recipients",
