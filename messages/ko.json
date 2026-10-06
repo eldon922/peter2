@@ -940,6 +940,8 @@
         "recipients": "수신자",
         "recipientCount": "{count}명",
         "cannotUndo": "이 작업은 되돌릴 수 없습니다.",
+        "savedNotice": "브로드캐스트가 저장되었지만 확인하지 못했습니다. 이미 시작되었을 수 있습니다. 두 번 전송되지 않도록 열어서 확인하세요.",
+        "openSaved": "브로드캐스트 열기",
         "sendTo": "{count}명에게 보내기",
         "stage": {
           "uploading": "미디어 업로드 중…",

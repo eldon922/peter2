@@ -15,6 +15,7 @@ import { NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media
 import { defaultHeaderMedia, whatChangingTemplateClears } from '@/lib/broadcasts/template-change';
 import { useLeaveGuard } from '@/hooks/use-leave-guard';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
+import { BroadcastSavedError } from '@/lib/broadcasts/finish-broadcast';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -75,6 +76,9 @@ export default function NewBroadcastPage() {
 
   // A double click on a confirm button must not create the broadcast twice.
   const submitted = useRef(false);
+  // Set when the last step failed after the broadcast was saved. It may have
+  // started, so the buttons stay locked and the way out is to open it.
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   /** Sends now, or saves the broadcast to go out at `scheduledAt` (ISO). */
   async function handleSend(scheduledAt?: string) {
@@ -103,6 +107,11 @@ export default function NewBroadcastPage() {
       }
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
+      if (err instanceof BroadcastSavedError) {
+        setSavedId(err.broadcastId);
+        toast.error(err.message);
+        return;
+      }
       submitted.current = false;
       // Previously swallowed with console.error — the wizard would
       // just no-op, leaving the user confused. Surface the reason.
@@ -167,6 +176,11 @@ export default function NewBroadcastPage() {
     toast.success(t('toastDraftSaved'));
     await release();
     router.push('/broadcasts');
+  }
+
+  async function openSaved() {
+    await release();
+    router.push(`/broadcasts/${savedId}`);
   }
 
   async function handleLeave() {
@@ -283,6 +297,8 @@ export default function NewBroadcastPage() {
               onSchedule={handleSend}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}
+              savedBroadcastId={savedId}
+              onOpenSaved={openSaved}
               isProcessing={isProcessing}
               progress={progress}
               stage={stage}

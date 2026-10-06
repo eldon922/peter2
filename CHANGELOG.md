@@ -92,6 +92,9 @@ and polish.
   desktops and the template column truncates instead.
 - Double-clicking Send or Schedule in the broadcast wizard no longer
   creates the broadcast twice.
+- If the last step of the broadcast wizard fails or its reply is lost,
+  the wizard now locks and offers *Open broadcast*, so it can't be created
+  a second time by pressing Send again.
 - A broadcast that is still being saved can no longer be started by
   someone else, and a start is refused until all its recipients are saved.
 - *Retry* right after *Stop* can no longer send a message twice: the send

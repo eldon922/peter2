@@ -13,6 +13,7 @@ import {
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
 import { isHeaderMediaKind } from '@/lib/media-specs';
 import { uploadHeaderMedia } from '@/lib/broadcasts/upload-header-media';
+import { finishBroadcast } from '@/lib/broadcasts/finish-broadcast';
 import type {
   AudienceConfig,
   CustomFieldFilter,
@@ -493,37 +494,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // `after()`, so the send no longer depends on this tab staying open;
       // the detail page polls for live progress.
       setProgress(40);
-      const { data: finished, error: finishError } = await supabase
-        .from('broadcasts')
-        .update(
-          payload.scheduledAt
-            ? {
-                total_recipients: contacts.length,
-                status: 'scheduled',
-                scheduled_at: payload.scheduledAt,
-              }
-            : { total_recipients: contacts.length }
-        )
-        .eq('id', broadcast.id)
-        .eq('status', 'draft')
-        .select('id');
-      if (finishError) {
-        throw new Error(`Failed to finish saving the broadcast: ${finishError.message}`);
-      }
-      if (!finished?.length) {
-        throw new Error('This broadcast was removed or changed while it was being saved.');
-      }
-
-      if (!payload.scheduledAt) {
-        setStage('starting');
-        const startRes = await fetch(`/api/broadcasts/${broadcast.id}/start`, {
-          method: 'POST',
-        });
-        if (!startRes.ok) {
-          const startData = await startRes.json().catch(() => ({}));
-          throw new Error(startData.error || 'Failed to start sending');
-        }
-      }
+      if (!payload.scheduledAt) setStage('starting');
+      await finishBroadcast(supabase, broadcast.id, contacts.length, payload.scheduledAt);
 
       setProgress(100);
       return broadcast.id;

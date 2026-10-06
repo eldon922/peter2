@@ -939,6 +939,8 @@
         "recipients": "Penerima",
         "recipientCount": "{count} kontak",
         "cannotUndo": "Tindakan ini tidak dapat dibatalkan.",
+        "savedNotice": "Broadcast Anda sudah tersimpan, tetapi kami tidak dapat memastikannya. Mungkin sudah mulai terkirim. Buka untuk memeriksa agar tidak terkirim dua kali.",
+        "openSaved": "Buka broadcast",
         "sendTo": "Kirim ke {count} kontak",
         "stage": {
           "uploading": "Mengunggah media…",

@@ -49,6 +49,9 @@ interface Step4Props {
   onSchedule: (iso: string) => void;
   onSaveDraft?: () => void;
   onBack: () => void;
+  /** Set when the broadcast was saved but the last step failed: nothing more can be sent from here. */
+  savedBroadcastId?: string | null;
+  onOpenSaved?: () => void;
   isProcessing: boolean;
   progress: number;
   stage: SendingStage | null;
@@ -67,6 +70,8 @@ export function Step4ScheduleSend({
   onSchedule,
   onSaveDraft,
   onBack,
+  savedBroadcastId,
+  onOpenSaved,
   isProcessing,
   progress,
   stage,
@@ -78,6 +83,7 @@ export function Step4ScheduleSend({
   const [formatted, setFormatted] = useState(true);
   const { resolved, count, loading: loadingReach } = useAudience(audience);
   const reach = count ?? 0;
+  const locked = Boolean(savedBroadcastId);
 
   const [allTags, setAllTags] = useState<Tag[]>([]);
   useEffect(() => {
@@ -288,11 +294,23 @@ export function Step4ScheduleSend({
         </div>
       )}
 
+      {locked && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <p className="text-sm text-foreground">{t('scheduleSend.savedNotice')}</p>
+          <Button
+            onClick={onOpenSaved}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {t('scheduleSend.openSaved')}
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
         <Button
           variant="outline"
           onClick={onBack}
-          disabled={isProcessing}
+          disabled={isProcessing || locked}
           className="border-border text-muted-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -304,7 +322,7 @@ export function Step4ScheduleSend({
             <Button
               variant="outline"
               onClick={onSaveDraft}
-              disabled={!name.trim() || isProcessing}
+              disabled={!name.trim() || isProcessing || locked}
               className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
@@ -315,7 +333,7 @@ export function Step4ScheduleSend({
           <Button
             variant="outline"
             onClick={() => setShowSchedule(true)}
-            disabled={!name.trim() || isProcessing || loadingReach || reach === 0}
+            disabled={!name.trim() || isProcessing || locked || loadingReach || reach === 0}
             className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
           >
             <CalendarClock className="h-4 w-4" />
@@ -337,7 +355,7 @@ export function Step4ScheduleSend({
           <DialogTrigger
             render={
               <Button
-                disabled={!name.trim() || isProcessing || loadingReach || reach === 0}
+                disabled={!name.trim() || isProcessing || locked || loadingReach || reach === 0}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               />
             }

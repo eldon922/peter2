@@ -939,6 +939,8 @@
         "recipients": "Recipients",
         "recipientCount": "{count, plural, one {# contact} other {# contacts}}",
         "cannotUndo": "This action cannot be undone.",
+        "savedNotice": "Your broadcast was saved, but we could not confirm it. It may already have started. Open it to check, so it is not sent twice.",
+        "openSaved": "Open broadcast",
         "sendTo": "Send to {count, plural, one {# contact} other {# contacts}}",
         "stage": {
           "uploading": "Uploading the media…",
