@@ -412,9 +412,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             customField: payload.audience.customField,
             excludeTagIds: payload.audience.excludeTagIds,
           },
-          // A scheduled one stays a draft until every recipient is saved,
-          // or the cron could send it half-saved.
-          status: payload.scheduledAt ? 'draft' : 'sending',
+          // Stays a draft until every recipient is saved, so neither the
+          // cron nor a start can pick it up half-saved.
+          status: 'draft',
           total_recipients: contacts.length,
         })
         .select()
@@ -483,19 +483,13 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         setProgress(20 + Math.round((saved / recipientRows.length) * 20));
       }
 
-      // ── Step 4: Hand the fan-out to the server ─────────────────────
+      // ── Step 4: Schedule it, or hand the fan-out to the server ─────
       // Every row above is already 'pending' with its template_params
-      // resolved, so from here this is exactly what a retry does:
-      // kick off /api/broadcasts/{id}/send, which plans the pending
-      // rows and delivers them in `after()` — the same server-side
-      // path `deliverBroadcast` uses for retries, instead of this hook
-      // looping batches against /api/whatsapp/broadcast itself. The
-      // actual send no longer depends on this tab staying open; the
-      // broadcast detail page polls `broadcasts`/`broadcast_recipients`
-      // for live progress once we navigate there.
-      //
-      // A scheduled broadcast stops here: its recipient rows stay
-      // 'pending' until the cron or "Start now" sends them.
+      // resolved. A scheduled broadcast is marked 'scheduled' and stops
+      // here: the cron or "Start now" sends it later. Otherwise
+      // /api/broadcasts/{id}/start claims the draft and delivers it in
+      // `after()`, so the send no longer depends on this tab staying open;
+      // the detail page polls for live progress.
       setProgress(40);
       if (payload.scheduledAt) {
         const { error: scheduleError } = await supabase
@@ -507,12 +501,12 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         }
       } else {
         setStage('starting');
-        const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
+        const startRes = await fetch(`/api/broadcasts/${broadcast.id}/start`, {
           method: 'POST',
         });
-        if (!sendRes.ok) {
-          const sendData = await sendRes.json().catch(() => ({}));
-          throw new Error(sendData.error || 'Failed to start sending');
+        if (!startRes.ok) {
+          const startData = await startRes.json().catch(() => ({}));
+          throw new Error(startData.error || 'Failed to start sending');
         }
       }
 

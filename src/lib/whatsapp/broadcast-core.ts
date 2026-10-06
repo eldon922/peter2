@@ -795,20 +795,18 @@ interface PendingRecipientRow {
 
 /**
  * Build a {@link BroadcastPlan} for a broadcast whose `broadcasts` row
- * and `pending` `broadcast_recipients` rows already exist — created
- * just before this call by the dashboard wizard (`use-broadcast-sending`),
- * which still resolves the audience, creates the broadcast, and
- * inserts recipient rows (each already carrying its resolved
- * `template_params`) client-side.
+ * and `pending` `broadcast_recipients` rows already exist — saved by the
+ * dashboard wizard (`use-broadcast-sending`), which resolves the audience,
+ * creates the broadcast, and inserts recipient rows (each already carrying
+ * its resolved `template_params`) client-side.
  *
- * This function's only job is turning those rows into a plan for
+ * Only {@link planBroadcastStart} calls this, after it has claimed the
+ * broadcast as 'sending'. Its job is turning those rows into a plan for
  * {@link deliverBroadcast}, the same way {@link planBroadcastRetry}
- * does for a retry — so the wizard's actual Meta fan-out runs
- * server-side in `after()` instead of looping batches from the
- * browser. Unlike a retry there is no prior attempt to reconcile: no
- * variable re-resolution, no claim/compare-and-set (nothing else can
- * be racing a 'pending' row created moments ago in the same flow), no
- * media-URL prompt (the wizard collected it before insert).
+ * does for a retry. Unlike a retry there is no prior attempt to reconcile:
+ * no variable re-resolution, no per-row claim (the start's status claim
+ * already keeps a second start out), no media-URL prompt (the wizard
+ * collected it before insert).
  */
 export async function planBroadcastSend(
   db: SupabaseClient,
@@ -830,8 +828,8 @@ export async function planBroadcastSend(
   if (!broadcast) {
     throw new BroadcastError('not_found', 'Broadcast not found', 404);
   }
-  // Scheduled and draft broadcasts also hold pending rows; only a broadcast
-  // that was started (wizard insert, or the claim in planBroadcastStart) may send.
+  // Scheduled and draft broadcasts also hold pending rows; only one that
+  // planBroadcastStart has claimed as 'sending' may send.
   if (broadcast.status !== 'sending') {
     throw new BroadcastError('conflict', 'This broadcast is not ready to send.', 409);
   }
@@ -910,8 +908,8 @@ export async function planBroadcastSend(
       );
       messageParams = { headerMediaId };
     } catch (e) {
-      // The wizard already inserted these rows and stamped the broadcast
-      // 'sending'. Fail them with the reason and close the broadcast,
+      // The start already stamped the broadcast 'sending'. Fail the
+      // pending rows with the reason and close the broadcast,
       // otherwise it polls 'sending' forever; a retry can pick them up
       // once the media is fixed.
       await db
@@ -948,10 +946,10 @@ export async function planBroadcastSend(
 }
 
 /**
- * Start a broadcast that has not gone out yet. Its `broadcasts` row and
- * `pending` recipient rows were saved when it was scheduled, so this flips
- * it to 'sending' and plans it like a fresh wizard send
- * ({@link planBroadcastSend}).
+ * Start a broadcast that has not gone out yet (the wizard's "Send now", a
+ * scheduled one, or a cancelled schedule). Its `broadcasts` row and
+ * `pending` recipient rows were saved earlier, so this flips it to
+ * 'sending' and plans it ({@link planBroadcastSend}).
  *
  * `from` is the statuses it may start from. The cron leaves the default
  * ('scheduled'), so it can never send a schedule that was cancelled a
@@ -961,9 +959,9 @@ export async function planBroadcastSend(
  * The flip is a compare-and-set on status, so the cron and a "Start now"
  * click can't both start it — the loser gets a 409.
  *
- * Nobody watches a cron-started send, so when planning fails the pending
- * rows are failed with the reason and the broadcast is closed. Retry can
- * pick them up; otherwise the row would sit on 'sending' forever.
+ * When planning fails the pending rows are failed with the reason and the
+ * broadcast is closed. Retry can pick them up; otherwise the row would
+ * sit on 'sending' forever.
  */
 export async function planBroadcastStart(
   db: SupabaseClient,

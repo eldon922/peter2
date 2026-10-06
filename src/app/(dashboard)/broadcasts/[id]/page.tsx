@@ -605,8 +605,8 @@ export default function BroadcastDetailPage() {
   // Same 0–100 shape as the wizard's Step4ScheduleSend "Processing"
   // overlay, driven by polling instead of a client-tracked counter
   // since the fan-out itself now always runs server-side (both a
-  // fresh wizard send and a retry — see use-broadcast-sending.ts and
-  // /api/broadcasts/[id]/send).
+  // start and a retry — see use-broadcast-sending.ts and
+  // /api/broadcasts/[id]/start).
   //
   // `retryTarget` set: scope to just that retry's claimed rows, so the
   // bar moves visibly even when it's a handful of rows against a

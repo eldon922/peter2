@@ -62,8 +62,8 @@ export const DELIVER_BUDGET_MS =
 // ============================================================
 // Send pacing — governs `deliverBroadcast`'s fan-out.
 //
-// `deliverBroadcast` (running in `after()`, for both a fresh wizard
-// send via /api/broadcasts/{id}/send and a retry via
+// `deliverBroadcast` (running in `after()`, for both a start via
+// /api/broadcasts/{id}/start and a retry via
 // /api/broadcasts/{id}/retry) sends a group of `batchSize`, then
 // pauses `batchDelayMs` before the next group. This is the only place
 // sends are paced — earlier the dashboard hook (`use-broadcast-sending`)

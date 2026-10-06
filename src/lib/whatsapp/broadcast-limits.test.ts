@@ -41,7 +41,6 @@ const DEFAULT_RECIPIENT_LIMIT = Math.floor(
 const ROUTES_WITH_MAX_DURATION = [
   'src/app/api/whatsapp/webhook/route.ts',
   'src/app/api/broadcasts/[id]/retry/route.ts',
-  'src/app/api/broadcasts/[id]/send/route.ts',
   'src/app/api/broadcasts/[id]/start/route.ts',
   'src/app/api/broadcasts/cron/route.ts',
   'src/app/api/v1/broadcasts/route.ts',

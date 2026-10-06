@@ -1354,6 +1354,39 @@ describe('planBroadcastStart', () => {
     expect(claim!.filters).toContainEqual(['status', ['scheduled', 'draft']]);
   });
 
+  it.each([
+    ['a text template', {}, { ...TEMPLATE_ROW, header_type: 'text' }],
+    [
+      'an image template with a stored media id',
+      { header_media_id: 'media-1', header_media_uploaded_at: new Date().toISOString() },
+      { ...TEMPLATE_ROW, header_type: 'image' },
+    ],
+  ])(
+    'plans exactly what the old send planned for the same draft (%s)',
+    async (_name, broadcast, template) => {
+      const asSending = sentBroadcast({
+        status: 'sending',
+        created_at: new Date().toISOString(),
+        ...broadcast,
+      });
+      const old = await planBroadcastSend(
+        makeDb({
+          broadcasts: { rows: [asSending] },
+          broadcast_recipients: { rows: [pendingRow()] },
+          whatsapp_config: { rows: [CONFIG_ROW] },
+          message_templates: { rows: [template] },
+        }).db,
+        'acc',
+        'b-1'
+      );
+
+      const { db } = scheduledDb(broadcast, template);
+      const started = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+
+      expect(started).toEqual(old);
+    }
+  );
+
   it('409s and touches nothing else when it lost the race (started, cancelled)', async () => {
     const { db, writes } = scheduledDb({}, undefined, false);
 
