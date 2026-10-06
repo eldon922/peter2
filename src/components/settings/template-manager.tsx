@@ -251,6 +251,15 @@ export function TemplateManager() {
     setDialogOpen(true);
   }
 
+  function handleDialogOpenChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingId(null);
+      setViewOnly(false);
+      setForm(emptyForm);
+    }
+  }
+
   async function handleSubmit() {
     // AUTHENTICATION is blocked by the persistent banner + disabled
     // submit button; this is a defensive second line of defense.
@@ -668,17 +677,7 @@ export function TemplateManager() {
         </div>
       )}
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) {
-            setEditingId(null);
-            setViewOnly(false);
-            setForm(emptyForm);
-          }
-        }}
-      >
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="bg-popover border-border sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">
@@ -1117,7 +1116,7 @@ export function TemplateManager() {
           <DialogFooter className="bg-popover border-border">
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={() => handleDialogOpenChange(false)}
               className="border-border text-muted-foreground hover:bg-muted"
             >
               {viewOnly ? t('close') : t('cancel')}
