@@ -16,7 +16,9 @@ and polish.
 > `supabase/migrations/049_contact_profile_name.sql` (adds
 > `contacts.profile_name`) and
 > `supabase/migrations/050_message_edits.sql` (adds `messages.edited_at`
-> and `messages.edit_history`).
+> and `messages.edit_history`) and
+> `supabase/migrations/051_cron_setup.sql` (lets the app create the cron
+> job that starts scheduled broadcasts; needs `pg_cron` and `pg_net`).
 
 ### Added
 
@@ -25,10 +27,9 @@ and polish.
   the time, or *Cancel schedule* until it goes out. A cancelled
   schedule becomes a draft that keeps its recipients, and can be started
   or scheduled again. The recipient list is saved when you schedule, and
-  the broadcasts list shows the scheduled time. Needs a scheduler
-  calling `GET /api/broadcasts/cron` every minute, with the same
-  `x-cron-secret` as the other crons (see `docs/docker.md`). No
-  migration.
+  the broadcasts list shows the scheduled time. The app creates the
+  Supabase cron job that starts them on its own when it starts (see
+  `docs/docker.md`).
 - **Language switcher** in the header, beside the light/dark toggle.
 - **Broadcast Stop button.** Unsent recipients are marked failed, so
   Retry resumes where it stopped.

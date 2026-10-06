@@ -81,11 +81,15 @@ deployment is genuinely silent, because nothing is going wrong.
 - Database migrations under `supabase/` are **not** run by the
   container — apply them with the Supabase CLI as described in the
   README.
-- Nothing inside the container is scheduled. If you use automation
-  Wait steps, flows or scheduled broadcasts, point an external
-  scheduler at `GET /api/automations/cron`, `GET /api/flows/cron` and
-  `GET /api/broadcasts/cron` on this deployment, sending the shared
-  secret in the `x-cron-secret` header (`AUTOMATION_CRON_SECRET`, see
-  `.env.local.example`). All three return 503 until that variable is
-  set. Scheduled broadcasts only start when `/api/broadcasts/cron` is
-  called, so hit it every minute.
+- Nothing inside the container is scheduled. Scheduled broadcasts only
+  start when `GET /api/broadcasts/cron` is called every minute. In
+  production the app creates that Supabase cron job itself each time it
+  starts (job `peter2-broadcasts`, see Integrations → Cron), through
+  `setup_cron_jobs` from migration 051. It needs migration 051 applied,
+  `AUTOMATION_CRON_SECRET` and `NEXT_PUBLIC_SITE_URL` set, and that URL
+  reachable from your Supabase project.
+- Automation Wait steps and flows are not set up by the app. Point an
+  external scheduler at `GET /api/automations/cron` and
+  `GET /api/flows/cron`, sending the same secret in the `x-cron-secret`
+  header (see `.env.local.example`). All three crons return 503 until
+  `AUTOMATION_CRON_SECRET` is set.
