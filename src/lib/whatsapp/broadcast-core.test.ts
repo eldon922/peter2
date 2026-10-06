@@ -1106,6 +1106,24 @@ describe('planBroadcastSend', () => {
     });
   });
 
+  it.each(['scheduled', 'draft', 'sent'])(
+    'refuses a %s broadcast, so nothing sends by accident',
+    async (status) => {
+      const { db, writes } = makeDb({
+        broadcasts: { rows: [sentBroadcast({ status })] },
+        broadcast_recipients: { rows: [pendingRow()] },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+      });
+
+      await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'conflict',
+        status: 409,
+      });
+      expect(writes).toHaveLength(0);
+    }
+  );
+
   it('plans every pending recipient, replaying its stored template_params', async () => {
     const { db } = makeDb({
       broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },

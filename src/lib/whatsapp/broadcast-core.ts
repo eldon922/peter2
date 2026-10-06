@@ -830,6 +830,11 @@ export async function planBroadcastSend(
   if (!broadcast) {
     throw new BroadcastError('not_found', 'Broadcast not found', 404);
   }
+  // Scheduled and draft broadcasts also hold pending rows; only a broadcast
+  // that was started (wizard insert, or the claim in planBroadcastStart) may send.
+  if (broadcast.status !== 'sending') {
+    throw new BroadcastError('conflict', 'This broadcast is not ready to send.', 409);
+  }
 
   const templateLanguage = broadcast.template_language || 'en_US';
 
