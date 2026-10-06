@@ -1401,6 +1401,15 @@ describe('planBroadcastStart', () => {
     expect(writes).toHaveLength(0);
   });
 
+  it('refuses a broadcast whose total is still 0 while recipients are being saved', async () => {
+    const { db, writes } = scheduledDb({ total_recipients: 0 });
+
+    await expect(
+      planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft'])
+    ).rejects.toMatchObject({ code: 'incomplete', status: 409 });
+    expect(writes).toHaveLength(0);
+  });
+
   it('starts when every expected recipient is saved', async () => {
     const { db } = scheduledDb({ total_recipients: 1 });
 

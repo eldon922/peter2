@@ -980,9 +980,10 @@ export async function planBroadcastStart(
   broadcastId: string,
   from: ('scheduled' | 'draft')[] = ['scheduled']
 ): Promise<BroadcastPlan> {
-  // The wizard saves the broadcast first and its recipients after, so a
-  // broadcast with fewer saved recipients than it expects is still being
-  // saved, or was cut off. Starting it would send to only part of the list.
+  // The wizard saves the broadcast first and its recipients after, and sets
+  // the total last. A broadcast whose saved recipients don't match its total
+  // is still being saved, or was cut off. Starting it would send to only
+  // part of the list.
   const { data: expected, error: expectedError } = await db
     .from('broadcasts')
     .select('total_recipients')
@@ -997,7 +998,12 @@ export async function planBroadcastStart(
     console.error('[broadcast-core] start check error:', expectedError ?? savedError);
     throw new BroadcastError('internal', 'Failed to start broadcast', 500);
   }
-  if (expected && typeof saved === 'number' && saved < expected.total_recipients) {
+  if (
+    expected &&
+    typeof expected.total_recipients === 'number' &&
+    typeof saved === 'number' &&
+    saved !== expected.total_recipients
+  ) {
     throw new BroadcastError(
       'incomplete',
       'This broadcast has not finished saving its recipients, so it was not started. Create it again.',

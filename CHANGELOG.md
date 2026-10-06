@@ -87,6 +87,8 @@ and polish.
   desktops and the template column truncates instead.
 - Double-clicking Send or Schedule in the broadcast wizard no longer
   creates the broadcast twice.
+- A broadcast that is still being saved can no longer be started by
+  someone else, and a start is refused until all its recipients are saved.
 - *Retry* right after *Stop* can no longer send a message twice: the send
   checks each message is still waiting just before sending it.
 

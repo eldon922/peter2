@@ -412,10 +412,11 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             customField: payload.audience.customField,
             excludeTagIds: payload.audience.excludeTagIds,
           },
-          // Stays a draft until every recipient is saved, so neither the
-          // cron nor a start can pick it up half-saved.
+          // A draft with a total of 0 is still being saved: nobody sees a
+          // Start button for it and a start is refused (the total is set,
+          // and it is scheduled, only after every recipient is saved).
           status: 'draft',
-          total_recipients: contacts.length,
+          total_recipients: 0,
         })
         .select()
         .single();
@@ -483,30 +484,37 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         setProgress(20 + Math.round((saved / recipientRows.length) * 20));
       }
 
-      // ── Step 4: Schedule it, or hand the fan-out to the server ─────
+      // ── Step 4: Finish saving, then schedule it or start it ────────
       // Every row above is already 'pending' with its template_params
-      // resolved. A scheduled broadcast is marked 'scheduled' and stops
-      // here: the cron or "Start now" sends it later. Otherwise
+      // resolved. Setting the total (and the schedule) is what makes the
+      // broadcast startable, and only by this tab. A scheduled one stops
+      // there: the cron or "Start now" sends it later. Otherwise
       // /api/broadcasts/{id}/start claims the draft and delivers it in
       // `after()`, so the send no longer depends on this tab staying open;
       // the detail page polls for live progress.
       setProgress(40);
-      if (payload.scheduledAt) {
-        // Only a draft may be scheduled: if someone started it meanwhile,
-        // flipping it back would move a running send.
-        const { data: scheduled, error: scheduleError } = await supabase
-          .from('broadcasts')
-          .update({ status: 'scheduled', scheduled_at: payload.scheduledAt })
-          .eq('id', broadcast.id)
-          .eq('status', 'draft')
-          .select('id');
-        if (scheduleError) {
-          throw new Error(`Failed to schedule broadcast: ${scheduleError.message}`);
-        }
-        if (!scheduled?.length) {
-          throw new Error('This broadcast was started or changed while it was being saved, so it was not scheduled.');
-        }
-      } else {
+      const { data: finished, error: finishError } = await supabase
+        .from('broadcasts')
+        .update(
+          payload.scheduledAt
+            ? {
+                total_recipients: contacts.length,
+                status: 'scheduled',
+                scheduled_at: payload.scheduledAt,
+              }
+            : { total_recipients: contacts.length }
+        )
+        .eq('id', broadcast.id)
+        .eq('status', 'draft')
+        .select('id');
+      if (finishError) {
+        throw new Error(`Failed to finish saving the broadcast: ${finishError.message}`);
+      }
+      if (!finished?.length) {
+        throw new Error('This broadcast was removed or changed while it was being saved.');
+      }
+
+      if (!payload.scheduledAt) {
         setStage('starting');
         const startRes = await fetch(`/api/broadcasts/${broadcast.id}/start`, {
           method: 'POST',
