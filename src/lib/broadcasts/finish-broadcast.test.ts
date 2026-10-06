@@ -82,6 +82,34 @@ describe('finishBroadcast: send now', () => {
   });
 });
 
+describe('finishBroadcast: a write that throws instead of returning an error', () => {
+  const throwing = {
+    from: () => {
+      const chain = {
+        update: () => chain,
+        eq: () => chain,
+        select: () => Promise.reject(new TypeError('Failed to fetch')),
+      };
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+
+  it('locks a schedule, since it may have gone through', async () => {
+    await expect(
+      finishBroadcast(throwing, 'b-1', 42, '2026-10-08T09:00:00.000Z', reply(200))
+    ).rejects.toMatchObject({ name: 'BroadcastSavedError', broadcastId: 'b-1' });
+  });
+
+  it('does not lock a send now, which had not started yet', async () => {
+    const failure = await finishBroadcast(throwing, 'b-1', 42, undefined, reply(200)).catch(
+      (e) => e
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(BroadcastSavedError);
+  });
+});
+
 describe('finishBroadcast: schedule', () => {
   it('sets the total and the schedule in one write, and starts nothing', async () => {
     const { db, updates } = makeDb(applied);

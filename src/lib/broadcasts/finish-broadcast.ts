@@ -26,22 +26,30 @@ export async function finishBroadcast(
   scheduledAt?: string,
   fetchFn: typeof fetch = fetch
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('broadcasts')
-    .update(
-      scheduledAt
-        ? { total_recipients: total, status: 'scheduled', scheduled_at: scheduledAt }
-        : { total_recipients: total }
-    )
-    .eq('id', broadcastId)
-    .eq('status', 'draft')
-    .select('id');
-  if (error) {
-    const message = `Failed to finish saving the broadcast: ${error.message}`;
-    // Scheduling is this same write, so its outcome is unknown; setting the
-    // total on its own starts nothing.
-    throw scheduledAt ? new BroadcastSavedError(message, broadcastId) : new Error(message);
+  // Scheduling is this same write, so its outcome is unknown if it fails;
+  // setting the total on its own starts nothing.
+  const failed = (message: string) =>
+    scheduledAt ? new BroadcastSavedError(message, broadcastId) : new Error(message);
+
+  let result;
+  try {
+    result = await supabase
+      .from('broadcasts')
+      .update(
+        scheduledAt
+          ? { total_recipients: total, status: 'scheduled', scheduled_at: scheduledAt }
+          : { total_recipients: total }
+      )
+      .eq('id', broadcastId)
+      .eq('status', 'draft')
+      .select('id');
+  } catch (e) {
+    throw failed(
+      `Failed to finish saving the broadcast: ${e instanceof Error ? e.message : String(e)}`
+    );
   }
+  const { data, error } = result;
+  if (error) throw failed(`Failed to finish saving the broadcast: ${error.message}`);
   if (!data?.length) {
     throw new Error('This broadcast was removed or changed while it was being saved.');
   }
