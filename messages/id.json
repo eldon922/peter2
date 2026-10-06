@@ -785,6 +785,8 @@
       "toastNoLongerScheduled": "Blast ini sudah dimulai atau dibatalkan.",
       "draftTitle": "Belum dijadwalkan",
       "draftHint": "Daftar penerima sudah tersimpan. Mulai sekarang, atau pilih waktu untuk mengirimnya.",
+      "missedTitle": "Tidak terkirim: dijadwalkan pada {time}",
+      "missedHint": "Waktunya sudah terlewat terlalu lama, jadi tidak dikirim. Daftar penerima sudah tersimpan. Mulai sekarang, atau pilih waktu baru.",
       "schedule": "Jadwalkan",
       "scheduleTitle": "Jadwalkan blast",
       "scheduleDesc": "Pilih kapan blast dikirim.",

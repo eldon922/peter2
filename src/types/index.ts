@@ -456,7 +456,10 @@ export interface Broadcast {
    * migration 046; NULL on broadcasts created before it.
    */
   header_media_id?: string | null;
-  /** Set only while the broadcast is 'scheduled'. */
+  /**
+   * Set while the broadcast is 'scheduled', and on a draft that was too late
+   * to send (the time it missed). Cleared when it starts or the schedule is cancelled.
+   */
   scheduled_at?: string | null;
   status: BroadcastStatus;
   total_recipients: number;

@@ -40,6 +40,8 @@ export function UnsentBanner({
 }: UnsentBannerProps) {
   const t = useTranslations('Broadcasts.detail');
   const isDraft = broadcast.status === 'draft';
+  // A draft that still has its time was too late to send.
+  const missed = isDraft && Boolean(broadcast.scheduled_at);
   const [confirming, setConfirming] = useState<'start' | 'cancel' | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [busy, setBusy] = useState<Action | null>(null);
@@ -115,7 +117,11 @@ export function UnsentBanner({
           <div>
             {isDraft ? (
               <p className="text-sm font-medium text-foreground">
-                {t('draftTitle')}
+                {missed
+                  ? t('missedTitle', {
+                      time: formatScheduledAt(broadcast.scheduled_at!),
+                    })
+                  : t('draftTitle')}
               </p>
             ) : (
               broadcast.scheduled_at && (
@@ -127,7 +133,11 @@ export function UnsentBanner({
               )
             )}
             <p className="mt-1 text-xs text-muted-foreground">
-              {isDraft ? t('draftHint') : t('scheduledHint')}
+              {missed
+                ? t('missedHint')
+                : isDraft
+                  ? t('draftHint')
+                  : t('scheduledHint')}
             </p>
           </div>
         </div>
@@ -183,7 +193,7 @@ export function UnsentBanner({
         title={isDraft ? t('scheduleTitle') : t('editScheduleTitle')}
         description={isDraft ? t('scheduleDesc') : t('editScheduleDesc')}
         confirmLabel={isDraft ? t('schedule') : t('editScheduleConfirm')}
-        initialAt={broadcast.scheduled_at ?? undefined}
+        initialAt={isDraft ? undefined : (broadcast.scheduled_at ?? undefined)}
         busy={busy === 'schedule'}
         onConfirm={(iso) =>
           update(

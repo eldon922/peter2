@@ -786,6 +786,8 @@
       "toastNoLongerScheduled": "이 브로드캐스트는 이미 시작되었거나 취소되었습니다.",
       "draftTitle": "예약되지 않음",
       "draftHint": "수신자 목록이 저장되어 있습니다. 지금 바로 시작하거나, 전송할 시간을 선택하세요.",
+      "missedTitle": "전송되지 않음: {time}에 예약됨",
+      "missedHint": "예약 시간이 너무 많이 지나 전송하지 않았습니다. 수신자 목록이 저장되어 있습니다. 지금 바로 시작하거나 새 시간을 선택하세요.",
       "schedule": "예약",
       "scheduleTitle": "브로드캐스트 예약",
       "scheduleDesc": "전송할 시간을 선택하세요.",

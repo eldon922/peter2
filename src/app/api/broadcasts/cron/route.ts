@@ -62,7 +62,8 @@ export async function GET(request: Request) {
 
   const { data: late, error: lateError } = await admin
     .from('broadcasts')
-    .update({ status: 'draft', scheduled_at: null })
+    // scheduled_at stays, so the broadcast page can say when it was due.
+    .update({ status: 'draft' })
     .eq('status', 'scheduled')
     .lt('scheduled_at', cutoff)
     .select('id');

@@ -785,6 +785,8 @@
       "toastNoLongerScheduled": "This broadcast already started or was cancelled.",
       "draftTitle": "Not scheduled",
       "draftHint": "The recipient list is saved. Start it now, or pick a time to send it.",
+      "missedTitle": "Not sent: it was scheduled for {time}",
+      "missedHint": "It was too late to send, so it was held back. The recipient list is saved. Start it now, or pick a new time.",
       "schedule": "Schedule",
       "scheduleTitle": "Schedule broadcast",
       "scheduleDesc": "Pick when to send it.",

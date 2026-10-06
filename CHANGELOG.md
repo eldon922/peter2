@@ -32,7 +32,7 @@ and polish.
   `docs/docker.md`). One that is more than an hour late (set
   `BROADCAST_MAX_LATE_HOURS` to change it), for example because the cron
   was not running, is not sent: it goes back to a draft with its
-  recipients.
+  recipients, and its page says when it was due.
 - **Language switcher** in the header, beside the light/dark toggle.
 - **Broadcast Stop button.** Unsent recipients are marked failed, so
   Retry resumes where it stopped.

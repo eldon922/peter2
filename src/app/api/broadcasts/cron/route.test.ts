@@ -135,7 +135,8 @@ describe('GET /api/broadcasts/cron', () => {
     const res = await GET(request('shh'));
 
     expect(await res.json()).toEqual({ started: 0, skipped: 2 });
-    expect(updates).toEqual([{ status: 'draft', scheduled_at: null }]);
+    // Its time stays, so the broadcast page can say when it was due.
+    expect(updates).toEqual([{ status: 'draft' }]);
     // Only a still-scheduled row older than the cutoff is touched.
     expect(filters).toContainEqual(['eq', 'status', 'scheduled']);
     expect(filters).toContainEqual(['lt', 'scheduled_at', expect.any(String)]);
