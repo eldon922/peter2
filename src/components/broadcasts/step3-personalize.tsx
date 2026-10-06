@@ -12,14 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, CheckCheck, Eye, FileIcon, ImageIcon, Loader2, Upload, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCheck, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { toast } from 'sonner';
-import { bodyPlaceholderKeys, isValidHttpUrl } from '@/lib/broadcasts/variables';
+import { bodyPlaceholderKeys } from '@/lib/broadcasts/variables';
+import { headerMediaError, type HeaderMedia } from '@/lib/broadcasts/header-media';
+import { isHeaderMediaKind } from '@/lib/media-specs';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { FormattedText } from '@/components/inbox/formatted-text';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
+import { HeaderMediaPicker } from '@/components/broadcasts/header-media-picker';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -32,41 +34,12 @@ interface Step3Props {
   template: MessageTemplate;
   variables: Record<string, VariableMapping>;
   onUpdate: (variables: Record<string, VariableMapping>) => void;
-  /** Media URL for an IMAGE/VIDEO/DOCUMENT header, when the template has one. */
-  headerMediaUrl: string;
-  onHeaderMediaUrlChange: (url: string) => void;
-  /**
-   * Meta media id (from the Upload Media endpoint) for the same header —
-   * the recommended path. Mutually exclusive with headerMediaUrl in this
-   * UI: picking a file clears the URL, typing a URL clears the id.
-   */
-  headerMediaId: string;
-  onHeaderMediaIdChange: (id: string) => void;
+  /** Image/video/document for the template's header, when it has one. */
+  headerMedia: HeaderMedia;
+  onHeaderMediaChange: (media: HeaderMedia) => void;
   onNext: () => void;
   onBack: () => void;
 }
-
-const MEDIA_HEADER_TYPES = ['image', 'video', 'document'] as const;
-type MediaHeaderType = (typeof MEDIA_HEADER_TYPES)[number];
-
-function isMediaHeaderType(value: unknown): value is MediaHeaderType {
-  return MEDIA_HEADER_TYPES.includes(value as MediaHeaderType);
-}
-
-// Mirrors ALLOWED_MIME_BY_KIND / MAX_BYTES_BY_KIND in
-// /api/whatsapp/media/upload — kept in sync manually since one is a
-// client-side pre-check (nicer error before spending an upload round
-// trip) and the other is the server's actual enforcement.
-const MEDIA_ACCEPT: Record<MediaHeaderType, string[]> = {
-  image: ['image/jpeg', 'image/png'],
-  video: ['video/mp4', 'video/3gpp'],
-  document: ['application/pdf'],
-};
-const MEDIA_MAX_BYTES: Record<MediaHeaderType, number> = {
-  image: 5 * 1024 * 1024,
-  video: 16 * 1024 * 1024,
-  document: 16 * 1024 * 1024,
-};
 
 const contactFields = [
   { value: 'name', labelKey: 'name' },
@@ -90,10 +63,8 @@ export function Step3Personalize({
   template,
   variables,
   onUpdate,
-  headerMediaUrl,
-  onHeaderMediaUrlChange,
-  headerMediaId,
-  onHeaderMediaIdChange,
+  headerMedia,
+  onHeaderMediaChange,
   onNext,
   onBack,
 }: Step3Props) {
@@ -106,18 +77,6 @@ export function Step3Personalize({
   >(new Map());
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [formatted, setFormatted] = useState(true);
-  // 'upload' is the recommended default: Meta caches an uploaded media
-  // id server-side, so a broadcast of thousands of recipients doesn't
-  // make Meta re-fetch a link on every single send. Switches to 'url'
-  // automatically if the wizard already has a URL and no id (e.g. a
-  // draft resumed from before this existed).
-  const [mediaMode, setMediaMode] = useState<'upload' | 'url'>(
-    headerMediaUrl && !headerMediaId ? 'url' : 'upload',
-  );
-  const [uploading, setUploading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState('');
-  const [localPreviewUrl, setLocalPreviewUrl] = useState('');
-
   // Load user's custom fields + a representative contact for the
   // live preview. Fall back to sample data if no contacts exist yet.
   useEffect(() => {
@@ -171,108 +130,10 @@ export function Step3Personalize({
     [template.body_text],
   );
 
-  // Templates with an IMAGE/VIDEO/DOCUMENT header need a media URL at
-  // send time — Meta requires the media component on every delivery and
-  // rejects the broadcast without it. The field is hidden for text-only
-  // headers.
-  const mediaHeaderType = isMediaHeaderType(template.header_type)
-    ? template.header_type
-    : null;
-
-  // Seed the URL field with the template's stored sample URL the first
-  // time we land on a media-header template in URL mode, so the common
-  // "reuse the approved media" case needs no typing. Only seeds when
-  // empty to avoid clobbering a URL the user already edited.
-  useEffect(() => {
-    if (
-      mediaMode === 'url' &&
-      mediaHeaderType &&
-      !headerMediaUrl &&
-      !headerMediaId &&
-      template.header_media_url
-    ) {
-      onHeaderMediaUrlChange(template.header_media_url);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaMode, mediaHeaderType, template.header_media_url]);
-
-  // Revoke the object URL used for the upload-tab preview when it's
-  // replaced or the component unmounts, so we don't leak blob memory.
-  useEffect(() => {
-    return () => {
-      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-    };
-  }, [localPreviewUrl]);
-
-  const headerMediaError = useMemo<'missing' | 'invalid' | null>(() => {
-    if (!mediaHeaderType) return null;
-    if (headerMediaId.trim()) return null;
-    const value = headerMediaUrl.trim();
-    if (!value) return 'missing';
-    if (!isValidHttpUrl(value)) return 'invalid';
-    return null;
-  }, [mediaHeaderType, headerMediaId, headerMediaUrl]);
-
-  async function handleFileSelected(file: File) {
-    if (!mediaHeaderType) return;
-    const allowedMimes = MEDIA_ACCEPT[mediaHeaderType];
-    if (!allowedMimes.includes(file.type)) {
-      toast.error(
-        t('personalize.toastInvalidMediaFile', {
-          kind: mediaHeaderType,
-          types: allowedMimes.join(', '),
-        }),
-      );
-      return;
-    }
-    const maxBytes = MEDIA_MAX_BYTES[mediaHeaderType];
-    if (file.size > maxBytes) {
-      toast.error(
-        t('personalize.toastMediaTooLarge', {
-          size: (file.size / 1024 / 1024).toFixed(1),
-          limit: (maxBytes / 1024 / 1024).toFixed(0),
-        }),
-      );
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('kind', mediaHeaderType);
-      const res = await fetch('/api/whatsapp/media/upload', {
-        method: 'POST',
-        body: form,
-      });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (!res.ok || !data.id) {
-        throw new Error(data.error || t('personalize.toastUploadFailed'));
-      }
-      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-      setLocalPreviewUrl(URL.createObjectURL(file));
-      setUploadedFileName(file.name);
-      onHeaderMediaIdChange(data.id);
-      onHeaderMediaUrlChange('');
-      toast.success(t('personalize.toastUploadSuccess'));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('personalize.toastUploadFailed'));
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function switchMediaMode(next: 'upload' | 'url') {
-    setMediaMode(next);
-    if (next === 'upload') {
-      onHeaderMediaUrlChange('');
-    } else {
-      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-      setLocalPreviewUrl('');
-      setUploadedFileName('');
-      onHeaderMediaIdChange('');
-    }
-  }
+  // A template with an IMAGE/VIDEO/DOCUMENT header needs that media on
+  // every send — Meta rejects the broadcast without it.
+  const mediaHeaderType = isHeaderMediaKind(template.header_type) ? template.header_type : null;
+  const mediaError = mediaHeaderType ? headerMediaError(headerMedia) : null;
 
   /**
    * A placeholder is "unmapped" if the user hasn't picked either a
@@ -365,130 +226,12 @@ export function Step3Personalize({
             </span>
           </div>
 
-          <div className="mb-3 inline-flex rounded-lg border border-border bg-muted p-0.5">
-            <button
-              type="button"
-              onClick={() => switchMediaMode('upload')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                mediaMode === 'upload'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {t('personalize.uploadTab')}
-              <span
-                className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold ${
-                  mediaMode === 'upload'
-                    ? 'bg-primary-foreground/20'
-                    : 'bg-primary/15 text-primary'
-                }`}
-              >
-                <Zap className="h-2.5 w-2.5" />
-                {t('personalize.recommended')}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMediaMode('url')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                mediaMode === 'url'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t('personalize.urlTab')}
-            </button>
-          </div>
-
-          {mediaMode === 'upload' ? (
-            <div>
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-muted">
-                <input
-                  type="file"
-                  accept={MEDIA_ACCEPT[mediaHeaderType].join(',')}
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleFileSelected(f);
-                    e.target.value = '';
-                  }}
-                />
-                {uploading ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                ) : mediaHeaderType === 'image' ? (
-                  <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <FileIcon className="h-5 w-5 text-muted-foreground" />
-                )}
-                <span className="text-sm font-medium text-foreground">
-                  {uploading
-                    ? t('personalize.uploading')
-                    : headerMediaId
-                      ? t('personalize.replaceFile')
-                      : t('personalize.chooseFile')}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {t(`personalize.${mediaHeaderType}Hint`)}
-                </span>
-              </label>
-
-              {headerMediaId && !uploading && (
-                <div className="mt-2 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs text-primary">
-                  <Zap className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {t('personalize.uploadedReady', {
-                      name: uploadedFileName || mediaHeaderType,
-                    })}
-                  </span>
-                </div>
-              )}
-
-              {mediaHeaderType === 'image' && localPreviewUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={localPreviewUrl}
-                  alt="Header preview"
-                  className="mt-3 max-h-40 rounded-lg border border-border object-contain"
-                />
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                {t('personalize.imageUrl')}
-              </label>
-              <Input
-                type="url"
-                value={headerMediaUrl}
-                onChange={(e) => onHeaderMediaUrlChange(e.target.value)}
-                placeholder={t('personalize.imageUrlPlaceholder')}
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
-              />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                {t('personalize.headerImageDesc')}
-              </p>
-              {mediaHeaderType === 'image' &&
-                headerMediaError === null &&
-                headerMediaUrl.trim() && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={headerMediaUrl.trim()}
-                    alt="Header preview"
-                    className="mt-3 max-h-40 rounded-lg border border-border object-contain"
-                  />
-                )}
-            </div>
-          )}
-
-          {headerMediaError && (
-            <p className="mt-1.5 text-xs text-amber-300">
-              {headerMediaError === 'missing'
-                ? t('personalize.headerMediaMissing')
-                : t('personalize.headerMediaInvalid')}
-            </p>
-          )}
+          <HeaderMediaPicker
+            kind={mediaHeaderType}
+            value={headerMedia}
+            onChange={onHeaderMediaChange}
+            defaultUrl={template.header_media_url}
+          />
         </div>
       )}
 
@@ -665,7 +408,7 @@ export function Step3Personalize({
         </Button>
         <Button
           onClick={onNext}
-          disabled={unmappedKeys.length > 0 || headerMediaError !== null}
+          disabled={unmappedKeys.length > 0 || mediaError !== null}
           className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {t('next')}

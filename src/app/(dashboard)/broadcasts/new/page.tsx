@@ -11,6 +11,7 @@ import { Step2SelectAudience } from '@/components/broadcasts/step2-select-audien
 import { Step3Personalize } from '@/components/broadcasts/step3-personalize';
 import { Step4ScheduleSend } from '@/components/broadcasts/step4-schedule-send';
 import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
+import { NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media';
 import { useLeaveGuard } from '@/hooks/use-leave-guard';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -45,8 +46,7 @@ export default function NewBroadcastPage() {
   const [variables, setVariables] = useState<
     Record<string, { type: 'static' | 'field' | 'custom_field'; value: string }>
   >({});
-  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
-  const [headerMediaId, setHeaderMediaId] = useState('');
+  const [headerMedia, setHeaderMedia] = useState<HeaderMedia>(NO_HEADER_MEDIA);
   const [name, setName] = useState('');
 
   // Anything chosen so far would be lost by leaving; ask first.
@@ -62,10 +62,7 @@ export default function NewBroadcastPage() {
 
   // The image belongs to the template it was picked for.
   function selectTemplate(next: MessageTemplate) {
-    if (next.id !== template?.id) {
-      setHeaderMediaUrl('');
-      setHeaderMediaId('');
-    }
+    if (next.id !== template?.id) setHeaderMedia(NO_HEADER_MEDIA);
     setTemplate(next);
   }
 
@@ -84,8 +81,8 @@ export default function NewBroadcastPage() {
           excludeTagIds: audience.excludeTagIds,
         },
         variables,
-        headerMediaUrl,
-        headerMediaId,
+        headerMediaUrl: headerMedia.url,
+        headerMediaId: headerMedia.mediaId,
       });
       await release();
       router.push(`/broadcasts/${broadcastId}`);
@@ -250,10 +247,8 @@ export default function NewBroadcastPage() {
               template={template}
               variables={variables}
               onUpdate={setVariables}
-              headerMediaUrl={headerMediaUrl}
-              onHeaderMediaUrlChange={setHeaderMediaUrl}
-              headerMediaId={headerMediaId}
-              onHeaderMediaIdChange={setHeaderMediaId}
+              headerMedia={headerMedia}
+              onHeaderMediaChange={setHeaderMedia}
               onNext={() => setCurrentStep(3)}
               onBack={() => setCurrentStep(1)}
             />
@@ -265,8 +260,8 @@ export default function NewBroadcastPage() {
               template={template}
               audience={audience}
               variables={variables}
-              headerMediaUrl={headerMediaUrl}
-              headerMediaId={headerMediaId}
+              headerMediaUrl={headerMedia.url}
+              headerMediaId={headerMedia.mediaId}
               onSend={handleSend}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}
