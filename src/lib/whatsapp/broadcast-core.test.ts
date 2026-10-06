@@ -79,6 +79,8 @@ interface Fixture {
    * losing the race.
    */
   onUpdate?: (filters: [string, unknown][]) => Record<string, unknown>[];
+  /** Makes an update fail with this error (the write is still recorded). */
+  updateError?: (filters: [string, unknown][]) => { message: string } | null;
 }
 
 /**
@@ -116,6 +118,8 @@ function makeDb(
       const fixture = fixtures[table] ?? {};
       if (op === 'update' || op === 'insert') {
         writes.push({ table, op, values, filters: [...filters] });
+        const failure = fixture.updateError?.(filters);
+        if (failure) return { data: null, error: failure };
         if (fixture.onUpdate) {
           return { data: fixture.onUpdate(filters), error: null };
         }
@@ -1438,7 +1442,7 @@ describe('deliverBroadcast', () => {
       phoneNumberId: 'pn-1',
       accessToken: 'tok',
       templateRow: null,
-      planned: [{ recipientRowId: 'rec-1', phone: '14155550123', params: ['Jane'] }],
+      planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: ['Jane'] }],
       rejected: 0,
       ...over,
     };
@@ -1458,7 +1462,7 @@ describe('deliverBroadcast', () => {
     const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 1 }] } });
     await deliverBroadcast(
       db,
-      plan({ planned: [{ recipientRowId: 'rec-1', phone: input, params: [] }] })
+      plan({ planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: input, params: [] }] })
     );
 
     const stamp = writes.find((w) => w.values.status === 'sent');
@@ -1478,7 +1482,7 @@ describe('deliverBroadcast', () => {
     const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 0 }] } });
     await deliverBroadcast(
       db,
-      plan({ planned: [{ recipientRowId: 'rec-1', phone: input, params: [] }] })
+      plan({ planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: input, params: [] }] })
     );
 
     const variants = phoneVariants(input);
@@ -1513,7 +1517,7 @@ describe('deliverBroadcast', () => {
   const spanningTwoBatches = Array.from(
     { length: SEND_BATCH_SIZE + 1 },
     (_, i) => ({
-      recipientRowId: `rec-${i}`,
+      recipientRowId: `rec-${i}`, attemptCount: 1,
       phone: '14155550123',
       params: [] as string[],
     })
@@ -1575,7 +1579,7 @@ describe('deliverBroadcast', () => {
     const spanningTwoFastBatches = Array.from(
       { length: SEND_BATCH_SIZE_FAST + 1 },
       (_, i) => ({
-        recipientRowId: `rec-${i}`,
+        recipientRowId: `rec-${i}`, attemptCount: 1,
         phone: '14155550123',
         params: [] as string[],
       })
@@ -1615,7 +1619,7 @@ describe('deliverBroadcast', () => {
     const spanningOneClampedBatch = Array.from(
       { length: SEND_BATCH_SIZE + 1 },
       (_, i) => ({
-        recipientRowId: `rec-${i}`,
+        recipientRowId: `rec-${i}`, attemptCount: 1,
         phone: '14155550123',
         params: [] as string[],
       })
@@ -1698,8 +1702,8 @@ describe('deliverBroadcast deadline guard', () => {
       accessToken: 'tok',
       templateRow: null,
       planned: [
-        { recipientRowId: 'rec-1', phone: '14155550123', params: [] },
-        { recipientRowId: 'rec-2', phone: '14155550124', params: [] },
+        { recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: [] },
+        { recipientRowId: 'rec-2', attemptCount: 1, phone: '14155550124', params: [] },
       ],
       rejected: 0,
     });
@@ -1779,12 +1783,137 @@ describe('deliverBroadcast stop check', () => {
       accessToken: 'tok',
       templateRow: null,
       planned: [
-        { recipientRowId: 'rec-1', phone: '14155550123', params: [] },
-        { recipientRowId: 'rec-2', phone: '14155550124', params: [] },
+        { recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: [] },
+        { recipientRowId: 'rec-2', attemptCount: 1, phone: '14155550124', params: [] },
       ],
       rejected: 0,
     });
 
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('attempt numbers in the plans', () => {
+  it('a retry plans each row with the attempt it just claimed', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sent' })] },
+      broadcast_recipients: { rows: [failedRow({ attempt_count: 2 })] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastRetry(db, 'acc', 'b-1');
+
+    expect(plan.planned[0].attemptCount).toBe(3);
+  });
+
+  it('a send plans each row with the attempt it already has', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
+      broadcast_recipients: {
+        rows: [pendingRow(), pendingRow({ id: 'rec-2', attempt_count: 2 })],
+      },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
+    });
+
+    const plan = await planBroadcastSend(db, 'acc', 'b-1');
+
+    expect(plan.planned.map((p) => p.attemptCount)).toEqual([1, 2]);
+  });
+});
+
+describe('deliverBroadcast only sends rows that are still waiting for it', () => {
+  const claimed = (filters: [string, unknown][]) =>
+    filters.some(([col]) => col === 'attempt_count');
+
+  function plan(over: Partial<BroadcastPlan> = {}): BroadcastPlan {
+    return {
+      broadcastId: 'b-1',
+      templateName: 'promo',
+      templateLanguage: 'en_US',
+      phoneNumberId: 'pn-1',
+      accessToken: 'tok',
+      templateRow: null,
+      planned: [
+        { recipientRowId: 'rec-1', attemptCount: 2, phone: '14155550123', params: [] },
+        { recipientRowId: 'rec-2', attemptCount: 2, phone: '14155550124', params: [] },
+      ],
+      rejected: 0,
+      ...over,
+    };
+  }
+
+  it('checks the row (still pending, same attempt) right before each send', async () => {
+    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 2 }] } });
+
+    await deliverBroadcast(db, plan());
+
+    const checks = writes.filter((w) => claimed(w.filters));
+    expect(checks).toHaveLength(2);
+    expect(checks[0].filters).toEqual(
+      expect.arrayContaining([
+        ['id', 'rec-1'],
+        ['status', 'pending'],
+        ['attempt_count', 2],
+      ])
+    );
+    expect(sendTemplateMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips a row that was stopped or claimed by a newer retry, and does not stamp it', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ status: 'sending', sent_count: 1 }] },
+      broadcast_recipients: {
+        // rec-1 moved on; rec-2 is still ours.
+        onUpdate: (filters) =>
+          claimed(filters) && filters.some(([, v]) => v === 'rec-1')
+            ? []
+            : [{ id: 'x' }],
+      },
+    });
+
+    await deliverBroadcast(db, plan());
+
+    expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
+    expect(sendTemplateMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ to: '14155550124' })
+    );
+    expect(
+      writes.filter((w) => w.values.status === 'sent' && w.filters.some(([, v]) => v === 'rec-1'))
+    ).toHaveLength(0);
+  });
+
+  it('stops at the first row it lost when the broadcast was stopped', async () => {
+    const { db } = makeDb({
+      broadcasts: { rows: [{ status: 'sent', sent_count: 0 }] },
+      broadcast_recipients: { onUpdate: (filters) => (claimed(filters) ? [] : [{ id: 'x' }]) },
+    });
+
+    await deliverBroadcast(db, plan());
+
+    expect(sendTemplateMessage).not.toHaveBeenCalled();
+  });
+
+  it('fails the row instead of sending when it cannot be checked', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 0 }] },
+      broadcast_recipients: {
+        updateError: (filters) => (claimed(filters) ? { message: 'db down' } : null),
+      },
+    });
+
+    await deliverBroadcast(db, plan());
+
+    expect(sendTemplateMessage).not.toHaveBeenCalled();
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: 'broadcast_recipients',
+        values: expect.objectContaining({
+          status: 'failed',
+          error_message: expect.stringContaining('db down'),
+        }),
+      })
+    );
   });
 });

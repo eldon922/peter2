@@ -91,6 +91,12 @@ export interface CreateBroadcastParams {
 
 interface PlannedRecipient {
   recipientRowId: string;
+  /**
+   * The row's `attempt_count` this plan was made for. A retry claims the
+   * row with a higher one, so deliverBroadcast can tell the row has moved
+   * on to a newer send and must not be sent again by this one.
+   */
+  attemptCount: number;
   phone: string;
   params: string[];
   /**
@@ -504,6 +510,7 @@ export async function createBroadcast(
     const r = byContact.get(row.contact_id as string)!;
     return {
       recipientRowId: row.id as string,
+      attemptCount: 1,
       phone: r.phone,
       params: r.params,
       ...(apiMediaId ? { messageParams: { headerMediaId: apiMediaId } } : {}),
@@ -730,6 +737,7 @@ export async function planBroadcastRetry(
   const claimedAt = new Date().toISOString();
   for (const row of sendable) {
     const contact = row.contact!;
+    const attemptCount = (row.attempt_count ?? 1) + 1;
     const params = Array.isArray(row.template_params)
       ? (row.template_params as string[])
       : templateVariables
@@ -741,7 +749,7 @@ export async function planBroadcastRetry(
       .update({
         status: 'pending',
         error_message: null,
-        attempt_count: (row.attempt_count ?? 1) + 1,
+        attempt_count: attemptCount,
         last_attempt_at: claimedAt,
       })
       .eq('id', row.id)
@@ -755,6 +763,7 @@ export async function planBroadcastRetry(
 
     planned.push({
       recipientRowId: row.id,
+      attemptCount,
       phone: contact.phone as string,
       params,
       ...(messageParams ? { messageParams } : {}),
@@ -789,6 +798,7 @@ export async function planBroadcastRetry(
 interface PendingRecipientRow {
   id: string;
   contact_id: string | null;
+  attempt_count: number | null;
   template_params: unknown;
   contact: Contact | null;
 }
@@ -848,7 +858,7 @@ export async function planBroadcastSend(
   >((from, to) =>
     db
       .from('broadcast_recipients')
-      .select('id, contact_id, template_params, contact:contacts(*)')
+      .select('id, contact_id, attempt_count, template_params, contact:contacts(*)')
       .eq('broadcast_id', broadcastId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
@@ -927,6 +937,7 @@ export async function planBroadcastSend(
 
   const planned: PlannedRecipient[] = sendable.map((row) => ({
     recipientRowId: row.id,
+    attemptCount: row.attempt_count ?? 1,
     phone: row.contact!.phone as string,
     params: Array.isArray(row.template_params) ? (row.template_params as string[]) : [],
     ...(messageParams ? { messageParams } : {}),
@@ -1014,8 +1025,9 @@ async function wasStopped(db: SupabaseClient, broadcastId: string): Promise<bool
 
 /**
  * Stop a running broadcast. Recipients not yet sent become 'failed' so
- * the normal retry resumes them; the running fan-out notices the status
- * change within a couple of seconds and stops sending.
+ * the normal retry resumes them. The running fan-out checks each row
+ * before sending it, so it skips those at once, and it also notices the
+ * status change within a couple of seconds and ends.
  */
 export async function stopBroadcast(
   db: SupabaseClient,
@@ -1149,6 +1161,37 @@ export async function deliverBroadcast(
     // has no duration budget to guard, the server does.
     if (index > 0 && index % pacing.batchSize === 0) {
       await sleep(pacing.batchDelayMs);
+    }
+
+    // Still waiting for this send? Stop fails the unsent rows and a retry
+    // claims them again with a higher attempt_count, so a row that moved on
+    // belongs to someone else now — sending it here would be a duplicate.
+    // The write changes nothing; it only reports whether the row matched.
+    const { data: owned, error: ownedError } = await db
+      .from('broadcast_recipients')
+      .update({ status: 'pending' })
+      .eq('id', recipient.recipientRowId)
+      .eq('status', 'pending')
+      .eq('attempt_count', recipient.attemptCount)
+      .select('id');
+    if (ownedError) {
+      await db
+        .from('broadcast_recipients')
+        .update({
+          status: 'failed',
+          error_message: `Could not check the message before sending: ${ownedError.message}`,
+          phone_attempted: recipient.phone,
+          template_params: recipient.params,
+        })
+        .eq('id', recipient.recipientRowId);
+      continue;
+    }
+    if (!owned || owned.length === 0) {
+      if (await wasStopped(db, plan.broadcastId)) {
+        log.info('fan-out stopped', { broadcast: plan.broadcastId });
+        break;
+      }
+      continue;
     }
 
     const variants = phoneVariants(toMetaPhone(recipient.phone));
