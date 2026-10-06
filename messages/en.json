@@ -774,7 +774,8 @@
       "toastNotLinked": "Your profile is not linked to an account.",
       "toastFailedDraft": "Failed to save draft: {error}",
       "toastDraftSaved": "Draft saved",
-      "leaveConfirm": "You have an unfinished broadcast. Leave this page and lose your progress?"
+      "leaveConfirm": "You have an unfinished broadcast. Leave this page and lose your progress?",
+      "changeTemplateConfirm": "Changing the template will clear: {items, select, both {the variable values and the header media} variables {the variable values} other {the header media}}. Continue?"
     },
     "wizard": {
       "next": "Next",

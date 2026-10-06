@@ -774,7 +774,8 @@
       "toastNotLinked": "Profil Anda belum tertaut ke sebuah akun.",
       "toastFailedDraft": "Gagal menyimpan draf: {error}",
       "toastDraftSaved": "Draf disimpan",
-      "leaveConfirm": "Anda memiliki blast yang belum selesai. Tinggalkan halaman ini dan kehilangan kemajuan Anda?"
+      "leaveConfirm": "Anda memiliki blast yang belum selesai. Tinggalkan halaman ini dan kehilangan kemajuan Anda?",
+      "changeTemplateConfirm": "Mengganti template akan menghapus: {items, select, both {nilai variabel dan media header} variables {nilai variabel} other {media header}}. Lanjutkan?"
     },
     "wizard": {
       "next": "Lanjut",

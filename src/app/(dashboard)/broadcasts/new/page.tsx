@@ -12,6 +12,7 @@ import { Step3Personalize } from '@/components/broadcasts/step3-personalize';
 import { Step4ScheduleSend } from '@/components/broadcasts/step4-schedule-send';
 import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
 import { NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media';
+import { defaultHeaderMedia, whatChangingTemplateClears } from '@/lib/broadcasts/template-change';
 import { useLeaveGuard } from '@/hooks/use-leave-guard';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -63,8 +64,10 @@ export default function NewBroadcastPage() {
   // The variable values and the image belong to the template they were set for.
   function selectTemplate(next: MessageTemplate) {
     if (next.id !== template?.id) {
+      const clears = whatChangingTemplateClears(template, variables, headerMedia);
+      if (clears && !window.confirm(t('changeTemplateConfirm', { items: clears }))) return;
       setVariables({});
-      setHeaderMedia(NO_HEADER_MEDIA);
+      setHeaderMedia(defaultHeaderMedia(next));
     }
     setTemplate(next);
   }
