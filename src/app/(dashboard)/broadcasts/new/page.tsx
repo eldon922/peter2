@@ -60,6 +60,15 @@ export default function NewBroadcastPage() {
     if (!profileLoading && !canSendMessages) router.replace('/broadcasts');
   }, [profileLoading, canSendMessages, router]);
 
+  // The image belongs to the template it was picked for.
+  function selectTemplate(next: MessageTemplate) {
+    if (next.id !== template?.id) {
+      setHeaderMediaUrl('');
+      setHeaderMediaId('');
+    }
+    setTemplate(next);
+  }
+
   async function handleSend() {
     if (!template) return;
 
@@ -223,7 +232,7 @@ export default function NewBroadcastPage() {
           {currentStep === 0 && (
             <Step1ChooseTemplate
               selectedTemplate={template}
-              onSelect={setTemplate}
+              onSelect={selectTemplate}
               onNext={() => setCurrentStep(1)}
               onBack={handleLeave}
             />
