@@ -907,6 +907,7 @@
         "cannotUndo": "This action cannot be undone.",
         "sendTo": "Send to {count, plural, one {# contact} other {# contacts}}",
         "stage": {
+          "uploading": "Uploading the media…",
           "resolving": "Finding recipients…",
           "creating": "Creating the broadcast…",
           "preparing": "Preparing messages…",

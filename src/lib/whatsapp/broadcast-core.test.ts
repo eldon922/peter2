@@ -1195,16 +1195,22 @@ describe('planBroadcastSend', () => {
       );
     });
 
-    it("uploads the template's default image when the broadcast recorded none", async () => {
-      const { db } = sendDb(
+    it("does not fall back to the template's default image; it fails the rows instead", async () => {
+      const { db, writes } = sendDb(
         { header_media_url: null },
         { ...imageTemplate, header_media_url: 'https://cdn/template-default.jpg' }
       );
-      const plan = await planBroadcastSend(db, 'acc', 'b-1');
-      expect(uploadMediaFromUrl).toHaveBeenCalledWith(
-        expect.objectContaining({ url: 'https://cdn/template-default.jpg' })
+      await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({
+        code: 'header_media_required',
+      });
+      expect(uploadMediaFromUrl).not.toHaveBeenCalled();
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          table: 'broadcast_recipients',
+          values: expect.objectContaining({ status: 'failed' }),
+          filters: expect.arrayContaining([['status', 'pending']]),
+        })
       );
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
     });
 
     it('reuses a fresh stored id without uploading again', async () => {

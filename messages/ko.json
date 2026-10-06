@@ -908,6 +908,7 @@
         "cannotUndo": "이 작업은 되돌릴 수 없습니다.",
         "sendTo": "{count}명에게 보내기",
         "stage": {
+          "uploading": "미디어 업로드 중…",
           "resolving": "수신자 찾는 중…",
           "creating": "브로드캐스트 만드는 중…",
           "preparing": "메시지 준비 중…",

@@ -11,6 +11,8 @@ import {
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
+import { isHeaderMediaKind } from '@/lib/media-specs';
+import { uploadHeaderMedia } from '@/lib/broadcasts/upload-header-media';
 import type {
   AudienceConfig,
   CustomFieldFilter,
@@ -31,23 +33,18 @@ interface BroadcastPayload {
   audience: AudienceConfig;
   variables: Record<string, VariableMapping>;
   /**
-   * Media URL for an IMAGE/VIDEO/DOCUMENT header. Required at send
-   * time for media-header templates — Meta rejects the send without
-   * it. Passed through as `messageParams.headerMediaUrl`; the builder
-   * falls back to the template's stored URL only when this is empty.
-   * Ignored when `headerMediaId` is also set — the id path wins.
+   * Public link for an IMAGE/VIDEO/DOCUMENT header. Uploaded to Meta
+   * before anything is saved, so a bad link fails here and leaves no
+   * broadcast behind. Kept on the broadcast as the source for retries.
+   * Ignored when `headerMediaId` is also set.
    */
   headerMediaUrl?: string;
-  /**
-   * Meta media id (from the Upload Media endpoint) for the same
-   * header. Preferred over `headerMediaUrl` — Meta caches an uploaded
-   * id server-side, so a broadcast fan-out doesn't re-fetch a link on
-   * every single recipient send.
-   */
+  /** Meta media id from an already-uploaded file for the same header. */
   headerMediaId?: string;
 }
 
 export type SendingStage =
+  | 'uploading'
   | 'resolving'
   | 'creating'
   | 'preparing'
@@ -336,7 +333,28 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         throw new Error('Your profile is not linked to an account.');
       }
 
+      // ── Step 0b: Media header ─────────────────────────────────────
+      // Media-header templates need a Meta media id on every send. A
+      // picked file already has one; a link is uploaded now, before
+      // anything is saved, so a bad link leaves no broadcast behind.
+      const mediaKind = payload.template.header_type;
+      let headerMediaId: string | undefined;
+      let headerMediaUrl: string | undefined;
+      if (isHeaderMediaKind(mediaKind)) {
+        headerMediaId = payload.headerMediaId?.trim() || undefined;
+        headerMediaUrl = headerMediaId ? undefined : payload.headerMediaUrl?.trim() || undefined;
+        if (headerMediaUrl) {
+          setStage('uploading');
+          headerMediaId = await uploadHeaderMedia(
+            headerMediaUrl,
+            mediaKind,
+            'Could not upload the media.'
+          );
+        }
+      }
+
       // ── Step 1: Resolve audience contacts ─────────────────────────
+      setStage('resolving');
       setProgress(5);
       const contacts = await resolveAudience(payload.audience);
 
@@ -357,15 +375,6 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       if (contacts.length > recipientLimit) {
         toast.warning(audienceTooLargeWarning(contacts.length, recipientLimit));
       }
-
-      // Media-header templates (image/video/document) require a media
-      // URL or media id on every send. Collected in the personalize
-      // step, persisted on the broadcast row below, and turned back
-      // into a send-time `messageParams` by the server
-      // (`planBroadcastSend`) when it builds the fan-out plan. The id
-      // (upload path) wins when both are present.
-      const headerMediaId = payload.headerMediaId?.trim();
-      const headerMediaUrl = headerMediaId ? undefined : payload.headerMediaUrl?.trim();
 
       // ── Step 2: Create broadcast row ──────────────────────────────
       // Count columns are owned by the DB aggregate trigger (migrations

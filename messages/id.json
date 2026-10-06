@@ -907,6 +907,7 @@
         "cannotUndo": "Tindakan ini tidak dapat dibatalkan.",
         "sendTo": "Kirim ke {count} kontak",
         "stage": {
+          "uploading": "Mengunggah media…",
           "resolving": "Mencari penerima…",
           "creating": "Membuat siaran…",
           "preparing": "Menyiapkan pesan…",
