@@ -492,12 +492,19 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // the detail page polls for live progress.
       setProgress(40);
       if (payload.scheduledAt) {
-        const { error: scheduleError } = await supabase
+        // Only a draft may be scheduled: if someone started it meanwhile,
+        // flipping it back would move a running send.
+        const { data: scheduled, error: scheduleError } = await supabase
           .from('broadcasts')
           .update({ status: 'scheduled', scheduled_at: payload.scheduledAt })
-          .eq('id', broadcast.id);
+          .eq('id', broadcast.id)
+          .eq('status', 'draft')
+          .select('id');
         if (scheduleError) {
           throw new Error(`Failed to schedule broadcast: ${scheduleError.message}`);
+        }
+        if (!scheduled?.length) {
+          throw new Error('This broadcast was started or changed while it was being saved, so it was not scheduled.');
         }
       } else {
         setStage('starting');
