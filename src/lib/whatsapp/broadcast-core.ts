@@ -21,11 +21,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendTemplateMessage, getPhoneNumberThroughput } from '@/lib/whatsapp/meta-api';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import { isMetaMediaIdExpired } from '@/lib/whatsapp/media-expiry';
-import {
-  isBroadcastMediaKind,
-  uploadMediaFromUrl,
-  type BroadcastMediaKind,
-} from '@/lib/whatsapp/media-upload';
+import { uploadMediaFromUrl } from '@/lib/whatsapp/media-upload';
+import { isHeaderMediaKind, type HeaderMediaKind } from '@/lib/media-specs';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import {
   DELIVER_BUDGET_MS,
@@ -152,7 +149,7 @@ function sleep(ms: number): Promise<void> {
  * the link, which is exactly the slow path this exists to prevent.
  */
 async function uploadHeaderMediaOrThrow(
-  kind: BroadcastMediaKind,
+  kind: HeaderMediaKind,
   url: string,
   phoneNumberId: string,
   accessToken: string
@@ -342,7 +339,7 @@ export async function createBroadcast(
   const apiHeaderType = templateRow?.header_type;
   const apiMediaSource = templateRow?.header_media_url?.trim() || undefined;
   let apiMediaId: string | undefined;
-  if (isBroadcastMediaKind(apiHeaderType) && apiMediaSource) {
+  if (isHeaderMediaKind(apiHeaderType) && apiMediaSource) {
     if (!isValidHttpUrl(apiMediaSource)) {
       throw new BroadcastError(
         'bad_request',
@@ -661,7 +658,7 @@ export async function planBroadcastRetry(
       // Thrown before any row is claimed, so a failed upload consumes
       // no failures.
       headerMediaId = await uploadHeaderMediaOrThrow(
-        headerType as BroadcastMediaKind,
+        headerType as HeaderMediaKind,
         headerMediaUrl,
         phoneNumberId,
         accessToken
@@ -903,7 +900,7 @@ export async function planBroadcastSend(
   // messageParams unset and the builder fails each recipient with an
   // explicit "needs a media link or id" message, as before.
   let messageParams: SendTimeParams | undefined;
-  if (isMediaHeader && isBroadcastMediaKind(headerType)) {
+  if (isMediaHeader && isHeaderMediaKind(headerType)) {
     const storedId = broadcast.header_media_id?.trim() || undefined;
     const freshId =
       storedId &&

@@ -6,7 +6,7 @@ vi.mock('@/lib/whatsapp/meta-api', () => ({ uploadPhoneMedia }))
 const isDeliverableUrl = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/webhooks/ssrf', () => ({ isDeliverableUrl }))
 
-import { uploadMediaFromUrl, isBroadcastMediaKind } from './media-upload'
+import { uploadMediaFromUrl } from './media-upload'
 
 const ARGS = {
   url: 'https://cdn.example.com/header.jpg',
@@ -137,13 +137,5 @@ describe('uploadMediaFromUrl', () => {
   it('turns a network failure into a reachability error', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNRESET'))
     await expect(uploadMediaFromUrl(ARGS)).rejects.toThrow(/publicly reachable/)
-  })
-})
-
-describe('isBroadcastMediaKind', () => {
-  it('accepts only media header kinds', () => {
-    expect(['image', 'video', 'document'].every(isBroadcastMediaKind)).toBe(true)
-    expect(isBroadcastMediaKind('text')).toBe(false)
-    expect(isBroadcastMediaKind(undefined)).toBe(false)
   })
 })

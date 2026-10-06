@@ -28,13 +28,8 @@ function payload(over: Partial<TemplatePayload> = {}): TemplatePayload {
   };
 }
 
-function imgResponse(type = 'image/jpeg', size = 1024, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? type : null) },
-    arrayBuffer: async () => new ArrayBuffer(size),
-  } as unknown as Response;
+function imgResponse(type = 'image/jpeg', size = 1024, status = 200): Response {
+  return new Response(new Uint8Array(size), { status, headers: { 'content-type': type } });
 }
 
 describe('ensureImageHeaderHandle', () => {
@@ -79,7 +74,7 @@ describe('ensureImageHeaderHandle', () => {
   it('rejects a non-image content type', async () => {
     vi.stubEnv('META_APP_ID', 'app-1');
     vi.stubGlobal('fetch', vi.fn(async () => imgResponse('text/html')));
-    await expect(ensureImageHeaderHandle(payload(), 'tok')).rejects.toThrow(/JPEG or PNG/);
+    await expect(ensureImageHeaderHandle(payload(), 'tok')).rejects.toThrow(/image\/jpeg or image\/png/);
   });
 
   it('rejects an image over 5 MB', async () => {
