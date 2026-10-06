@@ -20,6 +20,7 @@ import {
   getBroadcastStatus,
   percentOfRecipients,
 } from '@/lib/broadcast-status';
+import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
 
 /**
@@ -290,6 +291,11 @@ export default function BroadcastsPage() {
                         )}
                         {tStatus(status.label)}
                       </span>
+                      {broadcast.status === 'scheduled' && broadcast.scheduled_at && (
+                        <span className="mt-1 block whitespace-nowrap text-xs text-muted-foreground">
+                          {formatScheduledAt(broadcast.scheduled_at)}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {new Date(broadcast.created_at).toLocaleDateString()}
