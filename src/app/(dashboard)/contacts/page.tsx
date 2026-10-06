@@ -456,6 +456,18 @@ export default function ContactsPage() {
     setDeleteByTagCount(error ? 0 : (count ?? 0));
   }
 
+  // One tag at a time: ticking another one replaces the pick, ticking the
+  // picked one clears it.
+  function toggleDeleteByTag(tagId: string) {
+    if (tagId !== deleteByTagId) {
+      selectDeleteByTag(tagId);
+      return;
+    }
+    setDeleteByTagId(null);
+    setDeleteByTagCount(null);
+    setDeleteByTagConfirm('');
+  }
+
   async function handleDeleteByTag() {
     if (!deleteByTagId) return;
     setDeleting(true);
@@ -498,6 +510,13 @@ export default function ContactsPage() {
 
   // What the user must type to confirm delete-by-tag: the tag's name, or
   // the "Untagged" label for the no-tag choice.
+  const untaggedOption: Tag = {
+    id: UNTAGGED,
+    user_id: '',
+    name: t('deleteUntaggedChip'),
+    color: '#94a3b8',
+    created_at: '',
+  };
   const deleteByTagName = !deleteByTagId
     ? ''
     : deleteByTagId === UNTAGGED
@@ -1094,39 +1113,12 @@ export default function ContactsPage() {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => selectDeleteByTag(UNTAGGED)}
-                className={cn(
-                  'inline-flex items-center rounded-full border border-dashed border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition-all',
-                  deleteByTagId === UNTAGGED
-                    ? 'ring-2 ring-destructive ring-offset-1 ring-offset-popover'
-                    : 'opacity-60 hover:opacity-100'
-                )}
-              >
-                {t('deleteUntaggedChip')}
-              </button>
-              {allTags.map((tag) => {
-                const isPicked = deleteByTagId === tag.id;
-                return (
-                  <button
-                    key={tag.id}
-                    onClick={() => selectDeleteByTag(tag.id)}
-                    className={cn(
-                      'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all',
-                      isPicked
-                        ? 'ring-2 ring-destructive ring-offset-1 ring-offset-popover'
-                        : 'opacity-60 hover:opacity-100'
-                    )}
-                    style={{
-                      backgroundColor: tag.color + '20',
-                      color: tag.color,
-                    }}
-                  >
-                    {tag.name}
-                  </button>
-                );
-              })}
+            <div className="rounded-lg border border-border bg-muted/30">
+              <TagPickerList
+                tags={[untaggedOption, ...allTags]}
+                value={deleteByTagId ? [deleteByTagId] : []}
+                onToggle={toggleDeleteByTag}
+              />
             </div>
 
             {deleteByTagId && (
