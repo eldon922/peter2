@@ -448,7 +448,7 @@
       "desc": "Upload a CSV with a required <phoneCode>phone</phoneCode> column. Optional: <nameCode>name</nameCode>, <emailCode>email</emailCode>, <companyCode>company</companyCode>, <tagsCode>tags</tagsCode> (comma-separated; quote multi-tag cells).",
       "uploadDropzone": "Drag a CSV file here, or click to choose",
       "uploadHint": ".csv up to your browser limit",
-      "rowsReady": "{count} row ready",
+      "rowsReady": "{count} row(s) ready",
       "rowsReady_plural": "{count} rows ready",
       "preview": "Preview · first {count}",
       "previewTags": "{tags} tag · {contacts} contact",
