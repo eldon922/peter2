@@ -412,8 +412,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             customField: payload.audience.customField,
             excludeTagIds: payload.audience.excludeTagIds,
           },
-          status: payload.scheduledAt ? 'scheduled' : 'sending',
-          scheduled_at: payload.scheduledAt ?? null,
+          // A scheduled one stays a draft until every recipient is saved,
+          // or the cron could send it half-saved.
+          status: payload.scheduledAt ? 'draft' : 'sending',
           total_recipients: contacts.length,
         })
         .select()
@@ -496,7 +497,15 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // A scheduled broadcast stops here: its recipient rows stay
       // 'pending' until the cron or "Start now" sends them.
       setProgress(40);
-      if (!payload.scheduledAt) {
+      if (payload.scheduledAt) {
+        const { error: scheduleError } = await supabase
+          .from('broadcasts')
+          .update({ status: 'scheduled', scheduled_at: payload.scheduledAt })
+          .eq('id', broadcast.id);
+        if (scheduleError) {
+          throw new Error(`Failed to schedule broadcast: ${scheduleError.message}`);
+        }
+      } else {
         setStage('starting');
         const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
           method: 'POST',
