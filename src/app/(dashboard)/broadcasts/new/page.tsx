@@ -60,9 +60,12 @@ export default function NewBroadcastPage() {
     if (!profileLoading && !canSendMessages) router.replace('/broadcasts');
   }, [profileLoading, canSendMessages, router]);
 
-  // The image belongs to the template it was picked for.
+  // The variable values and the image belong to the template they were set for.
   function selectTemplate(next: MessageTemplate) {
-    if (next.id !== template?.id) setHeaderMedia(NO_HEADER_MEDIA);
+    if (next.id !== template?.id) {
+      setVariables({});
+      setHeaderMedia(NO_HEADER_MEDIA);
+    }
     setTemplate(next);
   }
 
