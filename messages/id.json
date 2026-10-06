@@ -773,7 +773,7 @@
       "startConfirmTitle": "Mulai blast ini sekarang?",
       "startConfirmDesc": "Blast akan langsung dikirim ke {count} kontak. Tindakan ini tidak dapat dibatalkan.",
       "cancelConfirmTitle": "Batalkan jadwal ini?",
-      "cancelConfirmDesc": "Blast tidak akan dikirim. Blast tetap ada di daftar sebagai draf.",
+      "cancelConfirmDesc": "Blast tidak akan dikirim. Blast tetap ada di daftar sebagai draf, dan Anda bisa menjadwalkannya lagi nanti.",
       "keepSchedule": "Pertahankan jadwal",
       "editScheduleTitle": "Ubah jadwal",
       "editScheduleDesc": "Pilih waktu baru untuk blast ini.",
@@ -782,7 +782,13 @@
       "toastScheduleSaved": "Jadwal diperbarui",
       "toastScheduleCancelled": "Jadwal dibatalkan. Blast sekarang menjadi draf.",
       "toastScheduleFailed": "Gagal memperbarui jadwal: {error}",
-      "toastNoLongerScheduled": "Blast ini sudah dimulai atau dibatalkan."
+      "toastNoLongerScheduled": "Blast ini sudah dimulai atau dibatalkan.",
+      "draftTitle": "Belum dijadwalkan",
+      "draftHint": "Daftar penerima sudah tersimpan. Mulai sekarang, atau pilih waktu untuk mengirimnya.",
+      "schedule": "Jadwalkan",
+      "scheduleTitle": "Jadwalkan blast",
+      "scheduleDesc": "Pilih kapan blast dikirim.",
+      "toastScheduled": "Blast dijadwalkan pada {time}"
     },
     "new": {
       "title": "Blast Baru",

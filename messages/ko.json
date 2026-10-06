@@ -774,7 +774,7 @@
       "startConfirmTitle": "지금 바로 시작할까요?",
       "startConfirmDesc": "{count}명에게 즉시 전송됩니다. 이 작업은 되돌릴 수 없습니다.",
       "cancelConfirmTitle": "예약을 취소할까요?",
-      "cancelConfirmDesc": "브로드캐스트가 전송되지 않습니다. 목록에는 초안으로 남습니다.",
+      "cancelConfirmDesc": "브로드캐스트가 전송되지 않습니다. 목록에는 초안으로 남으며, 나중에 다시 예약할 수 있습니다.",
       "keepSchedule": "예약 유지",
       "editScheduleTitle": "예약 수정",
       "editScheduleDesc": "이 브로드캐스트의 새 시간을 선택하세요.",
@@ -783,7 +783,13 @@
       "toastScheduleSaved": "예약이 수정되었습니다",
       "toastScheduleCancelled": "예약이 취소되었습니다. 브로드캐스트는 이제 초안입니다.",
       "toastScheduleFailed": "예약을 수정하지 못했습니다: {error}",
-      "toastNoLongerScheduled": "이 브로드캐스트는 이미 시작되었거나 취소되었습니다."
+      "toastNoLongerScheduled": "이 브로드캐스트는 이미 시작되었거나 취소되었습니다.",
+      "draftTitle": "예약되지 않음",
+      "draftHint": "수신자 목록이 저장되어 있습니다. 지금 바로 시작하거나, 전송할 시간을 선택하세요.",
+      "schedule": "예약",
+      "scheduleTitle": "브로드캐스트 예약",
+      "scheduleDesc": "전송할 시간을 선택하세요.",
+      "toastScheduled": "브로드캐스트가 {time}에 예약되었습니다"
     },
     "new": {
       "title": "새 브로드캐스트",

@@ -7,12 +7,12 @@ vi.mock('next/server', async (importOriginal) => ({
   after,
 }));
 
-const planScheduledBroadcast = vi.hoisted(() => vi.fn());
+const planBroadcastStart = vi.hoisted(() => vi.fn());
 const deliverBroadcast = vi.hoisted(() => vi.fn());
 const finalizeBroadcastStatus = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/whatsapp/broadcast-core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/whatsapp/broadcast-core')>()),
-  planScheduledBroadcast,
+  planBroadcastStart,
   deliverBroadcast,
   finalizeBroadcastStatus,
 }));
@@ -52,8 +52,8 @@ beforeEach(() => {
     limit: () => Promise.resolve(due),
   };
   admin.from.mockImplementation(() => chain);
-  planScheduledBroadcast.mockReset();
-  planScheduledBroadcast.mockResolvedValue(plan(2));
+  planBroadcastStart.mockReset();
+  planBroadcastStart.mockResolvedValue(plan(2));
 });
 
 afterEach(() => {
@@ -85,8 +85,8 @@ describe('GET /api/broadcasts/cron', () => {
     const res = await GET(request('shh'));
 
     expect(await res.json()).toEqual({ started: 2 });
-    expect(planScheduledBroadcast).toHaveBeenCalledWith(admin, 'acc-1', 'b-1');
-    expect(planScheduledBroadcast).toHaveBeenCalledWith(admin, 'acc-2', 'b-2');
+    expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-1', 'b-1');
+    expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-2', 'b-2');
     expect(after).toHaveBeenCalledTimes(2);
     // Only scheduled broadcasts whose time has come.
     expect(filters).toContainEqual(['eq', 'status', 'scheduled']);
@@ -102,7 +102,7 @@ describe('GET /api/broadcasts/cron', () => {
       ],
       error: null,
     };
-    planScheduledBroadcast.mockRejectedValueOnce(
+    planBroadcastStart.mockRejectedValueOnce(
       new BroadcastError('conflict', 'no longer scheduled', 409)
     );
 
@@ -121,7 +121,7 @@ describe('GET /api/broadcasts/cron', () => {
       ],
       error: null,
     };
-    planScheduledBroadcast.mockRejectedValueOnce(new Error('boom'));
+    planBroadcastStart.mockRejectedValueOnce(new Error('boom'));
 
     const res = await GET(request('shh'));
 
@@ -131,7 +131,7 @@ describe('GET /api/broadcasts/cron', () => {
 
   it('closes a broadcast that has nothing to send instead of fanning out', async () => {
     due = { data: [{ id: 'b-1', account_id: 'acc-1' }], error: null };
-    planScheduledBroadcast.mockResolvedValue(plan(0));
+    planBroadcastStart.mockResolvedValue(plan(0));
 
     await GET(request('shh'));
 
@@ -146,6 +146,6 @@ describe('GET /api/broadcasts/cron', () => {
     const res = await GET(request('shh'));
 
     expect(res.status).toBe(500);
-    expect(planScheduledBroadcast).not.toHaveBeenCalled();
+    expect(planBroadcastStart).not.toHaveBeenCalled();
   });
 });

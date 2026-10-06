@@ -5,7 +5,7 @@ import {
   createBroadcast,
   planBroadcastRetry,
   planBroadcastSend,
-  planScheduledBroadcast,
+  planBroadcastStart,
   deliverBroadcast,
   stopBroadcast,
   BroadcastError,
@@ -176,7 +176,10 @@ function makeDb(
         filters.push([col, val]);
         return chain;
       },
-      in: () => chain,
+      in: (col: string, vals: unknown[]) => {
+        if (op !== 'select') filters.push([col, vals]);
+        return chain;
+      },
       or: (expr: string) => {
         orSuffixes = expr
           .split(',')
@@ -1271,7 +1274,7 @@ describe('planBroadcastSend', () => {
   });
 });
 
-describe('planScheduledBroadcast', () => {
+describe('planBroadcastStart', () => {
   // `claimed` models the compare-and-set: the row the flip returns, or
   // none when someone else got there first.
   const scheduledDb = (
@@ -1295,7 +1298,7 @@ describe('planScheduledBroadcast', () => {
   it('flips scheduled to sending, then plans the pending recipients', async () => {
     const { db, writes } = scheduledDb();
 
-    const plan = await planScheduledBroadcast(db, 'acc', 'b-1');
+    const plan = await planBroadcastStart(db, 'acc', 'b-1');
 
     expect(plan.planned).toHaveLength(1);
     expect(plan.planned[0]).toMatchObject({
@@ -1308,15 +1311,35 @@ describe('planScheduledBroadcast', () => {
       expect.arrayContaining([
         ['id', 'b-1'],
         ['account_id', 'acc'],
-        ['status', 'scheduled'],
+        ['status', ['scheduled']],
       ])
     );
+  });
+
+  it('only starts a scheduled broadcast by default — never a cancelled one (the cron)', async () => {
+    const { db, writes } = scheduledDb();
+
+    await planBroadcastStart(db, 'acc', 'b-1');
+
+    const claim = writes.find((w) => w.table === 'broadcasts');
+    expect(claim!.filters).toContainEqual(['status', ['scheduled']]);
+    expect(JSON.stringify(claim!.filters)).not.toContain('draft');
+  });
+
+  it('also starts a draft when the caller allows it (Start now on a cancelled schedule)', async () => {
+    const { db, writes } = scheduledDb();
+
+    const plan = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+
+    expect(plan.planned).toHaveLength(1);
+    const claim = writes.find((w) => w.table === 'broadcasts');
+    expect(claim!.filters).toContainEqual(['status', ['scheduled', 'draft']]);
   });
 
   it('409s and touches nothing else when it lost the race (started, cancelled)', async () => {
     const { db, writes } = scheduledDb({}, undefined, false);
 
-    await expect(planScheduledBroadcast(db, 'acc', 'b-1')).rejects.toMatchObject({
+    await expect(planBroadcastStart(db, 'acc', 'b-1')).rejects.toMatchObject({
       code: 'conflict',
       status: 409,
     });
@@ -1331,7 +1354,7 @@ describe('planScheduledBroadcast', () => {
       whatsapp_config: { rows: [] },
     });
 
-    await expect(planScheduledBroadcast(db, 'acc', 'b-1')).rejects.toMatchObject({
+    await expect(planBroadcastStart(db, 'acc', 'b-1')).rejects.toMatchObject({
       code: 'whatsapp_not_configured',
     });
 

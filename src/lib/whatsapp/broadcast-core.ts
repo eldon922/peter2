@@ -943,37 +943,42 @@ export async function planBroadcastSend(
 }
 
 /**
- * Start a scheduled broadcast. Its `broadcasts` row and `pending`
- * recipient rows were saved when it was scheduled, so this flips it to
- * 'sending' and plans it like a fresh wizard send
+ * Start a broadcast that has not gone out yet. Its `broadcasts` row and
+ * `pending` recipient rows were saved when it was scheduled, so this flips
+ * it to 'sending' and plans it like a fresh wizard send
  * ({@link planBroadcastSend}).
  *
+ * `from` is the statuses it may start from. The cron leaves the default
+ * ('scheduled'), so it can never send a schedule that was cancelled a
+ * moment after it looked. A "Start now" click also allows 'draft': a
+ * cancelled schedule keeps its recipients and can still be sent.
+ *
  * The flip is a compare-and-set on status, so the cron and a "Start now"
- * click can't both start it — the loser gets a 409, as does a broadcast
- * that was cancelled in the meantime.
+ * click can't both start it — the loser gets a 409.
  *
  * Nobody watches a cron-started send, so when planning fails the pending
  * rows are failed with the reason and the broadcast is closed. Retry can
  * pick them up; otherwise the row would sit on 'sending' forever.
  */
-export async function planScheduledBroadcast(
+export async function planBroadcastStart(
   db: SupabaseClient,
   accountId: string,
-  broadcastId: string
+  broadcastId: string,
+  from: ('scheduled' | 'draft')[] = ['scheduled']
 ): Promise<BroadcastPlan> {
   const { data: claimed, error } = await db
     .from('broadcasts')
     .update({ status: 'sending', scheduled_at: null })
     .eq('id', broadcastId)
     .eq('account_id', accountId)
-    .eq('status', 'scheduled')
+    .in('status', from)
     .select('id');
   if (error) {
     console.error('[broadcast-core] start claim error:', error);
     throw new BroadcastError('internal', 'Failed to start broadcast', 500);
   }
   if (!claimed || claimed.length === 0) {
-    throw new BroadcastError('conflict', 'This broadcast is no longer scheduled.', 409);
+    throw new BroadcastError('conflict', 'This broadcast can no longer be started.', 409);
   }
 
   try {

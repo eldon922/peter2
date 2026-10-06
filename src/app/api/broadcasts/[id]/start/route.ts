@@ -1,10 +1,11 @@
 // ============================================================
-// POST /api/broadcasts/{id}/start — start a scheduled broadcast now
-// ("Start now" on the broadcast page).
+// POST /api/broadcasts/{id}/start — start a scheduled broadcast, or a
+// draft that has recipients (a cancelled schedule), now ("Start now" on
+// the broadcast page).
 //
 // Same shape as /send: claim and plan here, fan out in `after()`. The
-// claim (scheduled → sending) is a compare-and-set, so it can't race
-// the cron that starts due broadcasts — the loser gets a 409.
+// claim (scheduled or draft → sending) is a compare-and-set, so it can't
+// race the cron that starts due broadcasts — the loser gets a 409.
 //
 // Response (200):
 //   { "sending": 42 }
@@ -15,7 +16,7 @@ import { NextResponse, after } from 'next/server';
 import { requireRole, toErrorResponse } from '@/lib/auth/account';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import {
-  planScheduledBroadcast,
+  planBroadcastStart,
   deliverBroadcast,
   finalizeBroadcastStatus,
   BroadcastError,
@@ -43,7 +44,10 @@ export async function POST(
 
     // Claim and plan with the request-scoped client (RLS enforces account
     // ownership), fan out on the service-role client — same split as /send.
-    const plan = await planScheduledBroadcast(supabase, accountId, id);
+    const plan = await planBroadcastStart(supabase, accountId, id, [
+      'scheduled',
+      'draft',
+    ]);
     if (plan.planned.length > 0) {
       after(() => deliverBroadcast(supabaseAdmin(), plan));
     } else {

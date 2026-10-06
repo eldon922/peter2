@@ -20,7 +20,7 @@ import { NextResponse, after } from 'next/server';
 
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import {
-  planScheduledBroadcast,
+  planBroadcastStart,
   deliverBroadcast,
   finalizeBroadcastStatus,
   BroadcastError,
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
   let started = 0;
   for (const row of due ?? []) {
     try {
-      const plan = await planScheduledBroadcast(
+      const plan = await planBroadcastStart(
         admin,
         row.account_id as string,
         row.id as string

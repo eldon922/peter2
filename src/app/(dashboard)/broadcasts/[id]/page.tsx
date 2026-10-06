@@ -53,7 +53,7 @@ import {
 } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
-import { ScheduledBanner } from '@/components/broadcasts/scheduled-banner';
+import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 
 interface StatCardProps {
@@ -788,8 +788,11 @@ export default function BroadcastDetailPage() {
         </div>
       </div>
 
-      {broadcast.status === 'scheduled' && (
-        <ScheduledBanner
+      {/* A draft only has something to start once it holds recipients (a
+          cancelled schedule); the old "Save as Draft" ones hold none. */}
+      {(broadcast.status === 'scheduled' ||
+        (broadcast.status === 'draft' && broadcast.total_recipients > 0)) && (
+        <UnsentBanner
           broadcast={broadcast}
           canSend={canSend}
           onChange={refresh}

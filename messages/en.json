@@ -773,7 +773,7 @@
       "startConfirmTitle": "Start this broadcast now?",
       "startConfirmDesc": "It will be sent to {count, plural, one {# contact} other {# contacts}} right away. This action cannot be undone.",
       "cancelConfirmTitle": "Cancel this schedule?",
-      "cancelConfirmDesc": "The broadcast will not be sent. It stays in your list as a draft.",
+      "cancelConfirmDesc": "The broadcast will not be sent. It stays in your list as a draft, and you can schedule it again later.",
       "keepSchedule": "Keep schedule",
       "editScheduleTitle": "Edit schedule",
       "editScheduleDesc": "Pick a new time for this broadcast.",
@@ -782,7 +782,13 @@
       "toastScheduleSaved": "Schedule updated",
       "toastScheduleCancelled": "Schedule cancelled. The broadcast is now a draft.",
       "toastScheduleFailed": "Couldn't update the schedule: {error}",
-      "toastNoLongerScheduled": "This broadcast already started or was cancelled."
+      "toastNoLongerScheduled": "This broadcast already started or was cancelled.",
+      "draftTitle": "Not scheduled",
+      "draftHint": "The recipient list is saved. Start it now, or pick a time to send it.",
+      "schedule": "Schedule",
+      "scheduleTitle": "Schedule broadcast",
+      "scheduleDesc": "Pick when to send it.",
+      "toastScheduled": "Broadcast scheduled for {time}"
     },
     "new": {
       "title": "New Broadcast",

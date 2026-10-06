@@ -19,24 +19,29 @@ import {
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 
-interface ScheduledBannerProps {
+interface UnsentBannerProps {
   broadcast: Broadcast;
   canSend: boolean;
   /** Reloads the broadcast after anything changed. */
   onChange: () => Promise<void>;
 }
 
-type Action = 'start' | 'edit' | 'cancel';
+type Action = 'start' | 'schedule' | 'cancel';
 
-/** What a scheduled broadcast can do before it goes out: start now, edit the time, cancel. */
-export function ScheduledBanner({
+/**
+ * What a broadcast can do before it goes out. Scheduled: start now, edit
+ * the time, cancel. A draft that has recipients (a cancelled schedule):
+ * start now, or schedule it again.
+ */
+export function UnsentBanner({
   broadcast,
   canSend,
   onChange,
-}: ScheduledBannerProps) {
+}: UnsentBannerProps) {
   const t = useTranslations('Broadcasts.detail');
+  const isDraft = broadcast.status === 'draft';
   const [confirming, setConfirming] = useState<'start' | 'cancel' | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [busy, setBusy] = useState<Action | null>(null);
 
   async function start() {
@@ -65,11 +70,12 @@ export function ScheduledBanner({
     await onChange();
   }
 
-  // Guarded on status so it can't undo the cron (or "Start now") that
-  // started the broadcast a moment ago — then no row matches.
+  // Guarded on the status this page showed, so it can't undo the cron (or
+  // "Start now") that started the broadcast a moment ago — then no row
+  // matches.
   async function update(
-    action: 'edit' | 'cancel',
-    values: { status?: 'draft'; scheduled_at: string | null },
+    action: 'schedule' | 'cancel',
+    values: { status: 'draft' | 'scheduled'; scheduled_at: string | null },
     success: string
   ) {
     setBusy(action);
@@ -77,7 +83,7 @@ export function ScheduledBanner({
       .from('broadcasts')
       .update(values)
       .eq('id', broadcast.id)
-      .eq('status', 'scheduled')
+      .eq('status', broadcast.status)
       .select('id');
     setBusy(null);
     if (error) {
@@ -86,7 +92,7 @@ export function ScheduledBanner({
     }
     if (data?.length) toast.success(success);
     else toast.error(t('toastNoLongerScheduled'));
-    setEditing(false);
+    setScheduling(false);
     setConfirming(null);
     await onChange();
   }
@@ -94,20 +100,34 @@ export function ScheduledBanner({
   const disabled = busy !== null;
 
   return (
-    <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+    <div
+      className={`rounded-xl border p-4 ${
+        isDraft ? 'border-border bg-card' : 'border-blue-500/20 bg-blue-500/5'
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-start gap-3">
-          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+          <CalendarClock
+            className={`mt-0.5 h-4 w-4 shrink-0 ${
+              isDraft ? 'text-muted-foreground' : 'text-blue-400'
+            }`}
+          />
           <div>
-            {broadcast.scheduled_at && (
+            {isDraft ? (
               <p className="text-sm font-medium text-foreground">
-                {t('scheduledFor', {
-                  time: formatScheduledAt(broadcast.scheduled_at),
-                })}
+                {t('draftTitle')}
               </p>
+            ) : (
+              broadcast.scheduled_at && (
+                <p className="text-sm font-medium text-foreground">
+                  {t('scheduledFor', {
+                    time: formatScheduledAt(broadcast.scheduled_at),
+                  })}
+                </p>
+              )
             )}
             <p className="mt-1 text-xs text-muted-foreground">
-              {t('scheduledHint')}
+              {isDraft ? t('draftHint') : t('scheduledHint')}
             </p>
           </div>
         </div>
@@ -126,41 +146,53 @@ export function ScheduledBanner({
           </GatedButton>
           <GatedButton
             canAct={canSend}
-            gateReason="edit schedules"
+            gateReason={isDraft ? 'schedule broadcasts' : 'edit schedules'}
             variant="outline"
             size="sm"
             disabled={disabled}
-            onClick={() => setEditing(true)}
+            onClick={() => setScheduling(true)}
             className="border-border bg-transparent text-muted-foreground hover:bg-muted"
           >
-            <Pencil className="h-3.5 w-3.5" />
-            {t('editSchedule')}
+            {isDraft ? (
+              <CalendarClock className="h-3.5 w-3.5" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" />
+            )}
+            {isDraft ? t('schedule') : t('editSchedule')}
           </GatedButton>
-          <GatedButton
-            canAct={canSend}
-            gateReason="cancel schedules"
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            onClick={() => setConfirming('cancel')}
-            className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10"
-          >
-            <X className="h-3.5 w-3.5" />
-            {t('cancelSchedule')}
-          </GatedButton>
+          {!isDraft && (
+            <GatedButton
+              canAct={canSend}
+              gateReason="cancel schedules"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              onClick={() => setConfirming('cancel')}
+              className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10"
+            >
+              <X className="h-3.5 w-3.5" />
+              {t('cancelSchedule')}
+            </GatedButton>
+          )}
         </div>
       </div>
 
       <ScheduleDialog
-        open={editing}
-        onOpenChange={setEditing}
-        title={t('editScheduleTitle')}
-        description={t('editScheduleDesc')}
-        confirmLabel={t('editScheduleConfirm')}
+        open={scheduling}
+        onOpenChange={setScheduling}
+        title={isDraft ? t('scheduleTitle') : t('editScheduleTitle')}
+        description={isDraft ? t('scheduleDesc') : t('editScheduleDesc')}
+        confirmLabel={isDraft ? t('schedule') : t('editScheduleConfirm')}
         initialAt={broadcast.scheduled_at ?? undefined}
-        busy={busy === 'edit'}
+        busy={busy === 'schedule'}
         onConfirm={(iso) =>
-          update('edit', { scheduled_at: iso }, t('toastScheduleSaved'))
+          update(
+            'schedule',
+            { status: 'scheduled', scheduled_at: iso },
+            isDraft
+              ? t('toastScheduled', { time: formatScheduledAt(iso) })
+              : t('toastScheduleSaved')
+          )
         }
       />
 
