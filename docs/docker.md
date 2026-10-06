@@ -91,6 +91,11 @@ deployment is genuinely silent, because nothing is going wrong.
   `BROADCAST_MAX_LATE_HOURS` (default 1) late is not sent: it goes back
   to draft with its recipients, so an outage can't send old broadcasts at
   a surprising time.
+- If the app restarts while a broadcast is sending (a deploy, a crash),
+  the sending stops. When the app boots again it ends any broadcast left
+  on "sending": its unsent recipients show as failed ("Interrupted by a
+  server restart") and *Retry* resumes them. This assumes one copy of the
+  app is running.
 - Automation Wait steps and flows are not set up by the app. Point an
   external scheduler at `GET /api/automations/cron` and
   `GET /api/flows/cron`, sending the same secret in the `x-cron-secret`
