@@ -87,7 +87,10 @@ deployment is genuinely silent, because nothing is going wrong.
   starts (job `peter2-broadcasts`, see Integrations → Cron), through
   `setup_cron_jobs` from migration 051. It needs migration 051 applied,
   `AUTOMATION_CRON_SECRET` and `NEXT_PUBLIC_SITE_URL` set, and that URL
-  reachable from your Supabase project.
+  reachable from your Supabase project. A broadcast more than
+  `BROADCAST_MAX_LATE_HOURS` (default 1) late is not sent: it goes back
+  to draft with its recipients, so an outage can't send old broadcasts at
+  a surprising time.
 - Automation Wait steps and flows are not set up by the app. Point an
   external scheduler at `GET /api/automations/cron` and
   `GET /api/flows/cron`, sending the same secret in the `x-cron-secret`

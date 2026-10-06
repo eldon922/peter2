@@ -29,7 +29,10 @@ and polish.
   or scheduled again. The recipient list is saved when you schedule, and
   the broadcasts list shows the scheduled time. The app creates the
   Supabase cron job that starts them on its own when it starts (see
-  `docs/docker.md`).
+  `docs/docker.md`). One that is more than an hour late (set
+  `BROADCAST_MAX_LATE_HOURS` to change it), for example because the cron
+  was not running, is not sent: it goes back to a draft with its
+  recipients.
 - **Language switcher** in the header, beside the light/dark toggle.
 - **Broadcast Stop button.** Unsent recipients are marked failed, so
   Retry resumes where it stopped.
@@ -82,6 +85,10 @@ and polish.
 - Tapping tags quickly no longer leaves a stale audience estimate.
 - Broadcast list: the name column keeps a minimum width on narrow
   desktops and the template column truncates instead.
+- Double-clicking Send or Schedule in the broadcast wizard no longer
+  creates the broadcast twice.
+- *Retry* right after *Stop* can no longer send a message twice: the send
+  checks each message is still waiting just before sending it.
 
 ## [0.8.1] — 2026-07-10
 

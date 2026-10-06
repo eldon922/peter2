@@ -17,9 +17,11 @@ vi.mock('@/lib/whatsapp/broadcast-core', async (importOriginal) => ({
   finalizeBroadcastStatus,
 }));
 
-// The route reads the due list with
-//   from().select().eq().lte().order().limit()
-// and awaits the `limit` call.
+// The route first moves late broadcasts back to draft with
+//   from().update().eq().lt().select()
+// and then reads the due list with
+//   from().select().eq().gte().lte().order().limit()
+// awaiting the `select` of the first and the `limit` of the second.
 const admin = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('@/lib/flows/admin-client', () => ({ supabaseAdmin: () => admin }));
 
@@ -27,7 +29,9 @@ import { BroadcastError } from '@/lib/whatsapp/broadcast-core';
 import { GET } from './route';
 
 let due: { data: unknown[] | null; error: { message: string } | null };
+let late: { data: unknown[] | null; error: { message: string } | null };
 let filters: [string, string, unknown][];
+let updates: Record<string, unknown>[];
 
 function request(secret?: string) {
   return new Request('http://localhost/api/broadcasts/cron', {
@@ -43,21 +47,34 @@ const plan = (planned: number) => ({
 beforeEach(() => {
   process.env.AUTOMATION_CRON_SECRET = 'shh';
   due = { data: [], error: null };
+  late = { data: [], error: null };
   filters = [];
-  const chain = {
-    select: () => chain,
-    eq: (col: string, val: unknown) => (filters.push(['eq', col, val]), chain),
-    lte: (col: string, val: unknown) => (filters.push(['lte', col, val]), chain),
-    order: () => chain,
-    limit: () => Promise.resolve(due),
-  };
-  admin.from.mockImplementation(() => chain);
+  updates = [];
+  admin.from.mockImplementation(() => {
+    let updating = false;
+    const chain = {
+      update: (values: Record<string, unknown>) => {
+        updating = true;
+        updates.push(values);
+        return chain;
+      },
+      select: () => (updating ? Promise.resolve(late) : chain),
+      eq: (col: string, val: unknown) => (filters.push(['eq', col, val]), chain),
+      lt: (col: string, val: unknown) => (filters.push(['lt', col, val]), chain),
+      gte: (col: string, val: unknown) => (filters.push(['gte', col, val]), chain),
+      lte: (col: string, val: unknown) => (filters.push(['lte', col, val]), chain),
+      order: () => chain,
+      limit: () => Promise.resolve(due),
+    };
+    return chain;
+  });
   planBroadcastStart.mockReset();
   planBroadcastStart.mockResolvedValue(plan(2));
 });
 
 afterEach(() => {
   delete process.env.AUTOMATION_CRON_SECRET;
+  delete process.env.BROADCAST_MAX_LATE_HOURS;
   vi.restoreAllMocks();
 });
 
@@ -84,13 +101,57 @@ describe('GET /api/broadcasts/cron', () => {
 
     const res = await GET(request('shh'));
 
-    expect(await res.json()).toEqual({ started: 2 });
+    expect(await res.json()).toEqual({ started: 2, skipped: 0 });
     expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-1', 'b-1');
     expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-2', 'b-2');
     expect(after).toHaveBeenCalledTimes(2);
     // Only scheduled broadcasts whose time has come.
     expect(filters).toContainEqual(['eq', 'status', 'scheduled']);
     expect(filters).toContainEqual(['lte', 'scheduled_at', expect.any(String)]);
+  });
+
+  it('never starts one that is later than the allowed lateness (default 1 hour)', async () => {
+    await GET(request('shh'));
+
+    const cutoff = filters.find(([op, col]) => op === 'gte' && col === 'scheduled_at')![2];
+    expect(Date.now() - Date.parse(cutoff as string)).toBeGreaterThan(3_599_000);
+    expect(Date.now() - Date.parse(cutoff as string)).toBeLessThan(3_601_000);
+  });
+
+  it('takes the allowed lateness from BROADCAST_MAX_LATE_HOURS', async () => {
+    process.env.BROADCAST_MAX_LATE_HOURS = '6';
+
+    await GET(request('shh'));
+
+    const cutoff = filters.find(([op, col]) => op === 'gte' && col === 'scheduled_at')![2];
+    expect(Date.now() - Date.parse(cutoff as string)).toBeGreaterThan(6 * 3_600_000 - 1000);
+    expect(Date.now() - Date.parse(cutoff as string)).toBeLessThan(6 * 3_600_000 + 1000);
+  });
+
+  it('moves late scheduled broadcasts back to draft and reports them, sending nothing for them', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    late = { data: [{ id: 'old-1' }, { id: 'old-2' }], error: null };
+
+    const res = await GET(request('shh'));
+
+    expect(await res.json()).toEqual({ started: 0, skipped: 2 });
+    expect(updates).toEqual([{ status: 'draft', scheduled_at: null }]);
+    // Only a still-scheduled row older than the cutoff is touched.
+    expect(filters).toContainEqual(['eq', 'status', 'scheduled']);
+    expect(filters).toContainEqual(['lt', 'scheduled_at', expect.any(String)]);
+    expect(planBroadcastStart).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('old-1, old-2'));
+  });
+
+  it('still starts the on-time ones when the late scan fails', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    late = { data: null, error: { message: 'db hiccup' } };
+    due = { data: [{ id: 'b-1', account_id: 'acc-1' }], error: null };
+
+    const res = await GET(request('shh'));
+
+    expect(await res.json()).toEqual({ started: 1, skipped: 0 });
+    expect(error).toHaveBeenCalled();
   });
 
   it('skips one that was started or cancelled first, without logging an error', async () => {
@@ -108,7 +169,7 @@ describe('GET /api/broadcasts/cron', () => {
 
     const res = await GET(request('shh'));
 
-    expect(await res.json()).toEqual({ started: 1 });
+    expect(await res.json()).toEqual({ started: 1, skipped: 0 });
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -125,7 +186,7 @@ describe('GET /api/broadcasts/cron', () => {
 
     const res = await GET(request('shh'));
 
-    expect(await res.json()).toEqual({ started: 1 });
+    expect(await res.json()).toEqual({ started: 1, skipped: 0 });
     expect(error).toHaveBeenCalled();
   });
 

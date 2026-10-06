@@ -11,14 +11,19 @@
 // sent, so overlapping invocations or a "Start now" click can't start
 // the same one twice.
 //
+// A broadcast later than BROADCAST_MAX_LATE_HOURS (default 1) is not sent:
+// it goes back to draft with its recipients, so a scheduler that was down
+// can't send old broadcasts at a surprising time.
+//
 // Response (200):
-//   { "started": 2 }
+//   { "started": 2, "skipped": 0 }
 // ============================================================
 
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse, after } from 'next/server';
 
 import { supabaseAdmin } from '@/lib/flows/admin-client';
+import { maxLateMs } from '@/lib/broadcasts/max-late';
 import {
   planBroadcastStart,
   deliverBroadcast,
@@ -53,10 +58,28 @@ export async function GET(request: Request) {
   }
 
   const admin = supabaseAdmin();
+  const cutoff = new Date(Date.now() - maxLateMs()).toISOString();
+
+  const { data: late, error: lateError } = await admin
+    .from('broadcasts')
+    .update({ status: 'draft', scheduled_at: null })
+    .eq('status', 'scheduled')
+    .lt('scheduled_at', cutoff)
+    .select('id');
+  if (lateError) {
+    // The due scan below skips late ones anyway, so nothing sends by mistake.
+    console.error('[broadcasts-cron] late scan failed:', lateError.message);
+  } else if (late?.length) {
+    console.warn(
+      `[broadcasts-cron] too late to send, back to draft: ${late.map((r) => r.id).join(', ')}`
+    );
+  }
+
   const { data: due, error } = await admin
     .from('broadcasts')
     .select('id, account_id')
     .eq('status', 'scheduled')
+    .gte('scheduled_at', cutoff)
     .lte('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true })
     .limit(MAX_PER_RUN);
@@ -88,5 +111,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ started });
+  return NextResponse.json({ started, skipped: late?.length ?? 0 });
 }
