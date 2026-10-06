@@ -1769,17 +1769,6 @@ describe('stopBroadcast', () => {
     expect(closed!.values.status).toBe('sent');
   });
 
-  it('shows the reason it is given on the unsent rows', async () => {
-    const { db, writes } = makeDb({
-      broadcasts: { rows: [{ id: 'b-1', status: 'sending', sent_count: 0 }] },
-    });
-
-    await stopBroadcast(db, 'acct-1', 'b-1', 'Interrupted by a server restart');
-
-    const recipients = writes.find((w) => w.table === 'broadcast_recipients');
-    expect(recipients!.values.error_message).toBe('Interrupted by a server restart');
-  });
-
   it('refuses a broadcast that is not sending', async () => {
     const { db } = makeDb({
       broadcasts: { rows: [{ id: 'b-1', status: 'sent', sent_count: 3 }] },

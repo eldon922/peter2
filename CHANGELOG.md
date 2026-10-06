@@ -92,8 +92,6 @@ and polish.
   desktops and the template column truncates instead.
 - Double-clicking Send or Schedule in the broadcast wizard no longer
   creates the broadcast twice.
-- A broadcast left on *sending* by an app restart is ended when the app
-  boots: its unsent recipients show as failed, ready for *Retry*.
 - A broadcast that is still being saved can no longer be started by
   someone else, and a start is refused until all its recipients are saved.
 - *Retry* right after *Stop* can no longer send a message twice: the send

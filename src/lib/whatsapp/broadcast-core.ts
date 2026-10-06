@@ -1059,14 +1059,11 @@ async function wasStopped(db: SupabaseClient, broadcastId: string): Promise<bool
  * the normal retry resumes them. The running fan-out checks each row
  * before sending it, so it skips those at once, and it also notices the
  * status change within a couple of seconds and ends.
- *
- * `reason` is what those recipients show as their error.
  */
 export async function stopBroadcast(
   db: SupabaseClient,
   accountId: string,
-  broadcastId: string,
-  reason = 'Stopped — retry to resume'
+  broadcastId: string
 ): Promise<void> {
   const { data: broadcast, error } = await db
     .from('broadcasts')
@@ -1089,7 +1086,7 @@ export async function stopBroadcast(
     .from('broadcast_recipients')
     .update({
       status: 'failed',
-      error_message: reason,
+      error_message: 'Stopped — retry to resume',
     })
     .eq('broadcast_id', broadcastId)
     .eq('status', 'pending');
