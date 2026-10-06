@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
-import { formatScheduledAt } from '@/lib/broadcasts/schedule';
+import { formatScheduledAt, missedItsTime } from '@/lib/broadcasts/schedule';
 
 interface UnsentBannerProps {
   broadcast: Broadcast;
@@ -40,8 +40,7 @@ export function UnsentBanner({
 }: UnsentBannerProps) {
   const t = useTranslations('Broadcasts.detail');
   const isDraft = broadcast.status === 'draft';
-  // A draft that still has its time was too late to send.
-  const missed = isDraft && Boolean(broadcast.scheduled_at);
+  const missed = missedItsTime(broadcast);
   const [confirming, setConfirming] = useState<'start' | 'cancel' | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [busy, setBusy] = useState<Action | null>(null);
