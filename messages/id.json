@@ -446,7 +446,7 @@
     "importModal": {
       "title": "Impor Kontak",
       "desc": "Unggah CSV dengan kolom wajib <phoneCode>phone</phoneCode>. Opsional: <nameCode>name</nameCode>, <emailCode>email</emailCode>, <companyCode>company</companyCode>, <tagsCode>tags</tagsCode> (dipisahkan koma; gunakan tanda kutip untuk sel dengan banyak tag).",
-      "uploadDropzone": "Klik untuk memilih berkas CSV",
+      "uploadDropzone": "Seret berkas CSV ke sini, atau klik untuk memilih",
       "uploadHint": ".csv hingga batas peramban Anda",
       "rowsReady": "{count} baris siap",
       "rowsReady_plural": "{count} baris siap",
@@ -483,6 +483,7 @@
       "importBtn": "Impor {count} kontak",
       "importBtn_plural": "Impor {count} kontak",
       "toastNoValidRows": "Tidak ada baris valid. Pastikan CSV memiliki kolom \"phone\".",
+      "toastNotCsv": "Hanya berkas .csv yang dapat diimpor.",
       "toastTagsWarning": "Kontak diimpor, tetapi sebagian penetapan tag gagal.",
       "toastImported": "{count} kontak diimpor",
       "toastImported_plural": "{count} kontak diimpor",

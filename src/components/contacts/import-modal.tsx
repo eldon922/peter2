@@ -140,6 +140,7 @@ export function ImportModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedContactRow[]>([]);
   /**
    * In-file duplicates dropped at parse time, carried through to the
@@ -192,10 +193,7 @@ export function ImportModal({
     onOpenChange(next);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-
+  async function loadFile(selected: File) {
     setFile(selected);
     setResult(null);
 
@@ -245,6 +243,19 @@ export function ImportModal({
     } else {
       setTagColorByKey(new Map());
     }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    // Dropping bypasses the picker's `accept`, so check here.
+    if (!dropped || importing) return;
+    if (!/\.csv$/i.test(dropped.name) && dropped.type !== 'text/csv') {
+      toast.error(t('toastNotCsv'));
+      return;
+    }
+    void loadFile(dropped);
   }
 
   async function handleImport() {
@@ -653,11 +664,23 @@ export function ImportModal({
               if (e.key === 'Enter' || e.key === ' ')
                 fileInputRef.current?.click();
             }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setDragging(false);
+              }
+            }}
+            onDrop={handleDrop}
             className={cn(
               'group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-5 transition-all',
-              file
-                ? 'border-primary/35 bg-primary/[0.04]'
-                : 'hover:border-primary/40 border-border/80 bg-background/40 hover:bg-background/70'
+              dragging
+                ? 'border-primary bg-primary/10'
+                : file
+                  ? 'border-primary/35 bg-primary/[0.04]'
+                  : 'hover:border-primary/40 border-border/80 bg-background/40 hover:bg-background/70'
             )}
           >
             {file ? (
@@ -694,7 +717,10 @@ export function ImportModal({
             ref={fileInputRef}
             type="file"
             accept=".csv,text/csv"
-            onChange={handleFileChange}
+            onChange={(e) => {
+              const selected = e.target.files?.[0];
+              if (selected) void loadFile(selected);
+            }}
             className="hidden"
           />
         </div>

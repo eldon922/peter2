@@ -446,7 +446,7 @@
     "importModal": {
       "title": "Import Contacts",
       "desc": "Upload a CSV with a required <phoneCode>phone</phoneCode> column. Optional: <nameCode>name</nameCode>, <emailCode>email</emailCode>, <companyCode>company</companyCode>, <tagsCode>tags</tagsCode> (comma-separated; quote multi-tag cells).",
-      "uploadDropzone": "Click to choose a CSV file",
+      "uploadDropzone": "Drag a CSV file here, or click to choose",
       "uploadHint": ".csv up to your browser limit",
       "rowsReady": "{count} row ready",
       "rowsReady_plural": "{count} rows ready",
@@ -483,6 +483,7 @@
       "importBtn": "Import {count} contact",
       "importBtn_plural": "Import {count} contacts",
       "toastNoValidRows": "No valid rows found. Ensure CSV has a \"phone\" column header.",
+      "toastNotCsv": "Only .csv files can be imported.",
       "toastTagsWarning": "Contacts imported, but some tag assignments failed.",
       "toastImported": "{count} contact imported",
       "toastImported_plural": "{count} contacts imported",
