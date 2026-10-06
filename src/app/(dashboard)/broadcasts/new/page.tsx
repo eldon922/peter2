@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -73,9 +73,13 @@ export default function NewBroadcastPage() {
     setTemplate(next);
   }
 
+  // A double click on a confirm button must not create the broadcast twice.
+  const submitted = useRef(false);
+
   /** Sends now, or saves the broadcast to go out at `scheduledAt` (ISO). */
   async function handleSend(scheduledAt?: string) {
-    if (!template) return;
+    if (!template || submitted.current) return;
+    submitted.current = true;
 
     try {
       const broadcastId = await createAndSendBroadcast({
@@ -99,6 +103,7 @@ export default function NewBroadcastPage() {
       }
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
+      submitted.current = false;
       // Previously swallowed with console.error — the wizard would
       // just no-op, leaving the user confused. Surface the reason.
       const message = err instanceof Error ? err.message : 'Broadcast failed';
