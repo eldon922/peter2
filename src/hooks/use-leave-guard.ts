@@ -15,24 +15,29 @@ import { armLeaveGuard, type LeaveGuard } from '@/lib/leave-guard';
 export function useLeaveGuard(dirty: boolean, message: string) {
   const router = useRouter();
   const guardRef = useRef<LeaveGuard | null>(null);
+  // Read at prompt time so a language change doesn't rebuild the guard.
+  const messageRef = useRef(message);
+  useEffect(() => {
+    messageRef.current = message;
+  });
 
   useEffect(() => {
     if (!dirty) return;
-    const guard = armLeaveGuard(message, (url) => router.push(url));
+    const guard = armLeaveGuard(() => messageRef.current, (url) => router.push(url));
     guardRef.current = guard;
     return () => {
       void guard.release();
       guardRef.current = null;
     };
-  }, [dirty, message, router]);
+  }, [dirty, router]);
 
   const release = useCallback(async () => {
     await guardRef.current?.release();
   }, []);
 
   const confirmLeave = useCallback(
-    () => !guardRef.current || window.confirm(message),
-    [message]
+    () => !guardRef.current || window.confirm(messageRef.current),
+    []
   );
 
   return { release, confirmLeave };

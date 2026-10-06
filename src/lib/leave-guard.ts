@@ -17,7 +17,7 @@ export interface LeaveGuard {
 }
 
 export function armLeaveGuard(
-  message: string,
+  getMessage: () => string,
   navigate: (url: string) => void
 ): LeaveGuard {
   let layer: HistoryLayer | null = null;
@@ -42,14 +42,14 @@ export function armLeaveGuard(
     // Handled here either way, so the link's own navigation doesn't run.
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(message)) return;
+    if (!window.confirm(getMessage())) return;
     void release().then(() => navigate(url.pathname + url.search + url.hash));
   };
 
   // Back was pressed and our history entry is already gone: stay (put the
   // entry back) or really go back.
   const onBack = () => {
-    if (window.confirm(message)) {
+    if (window.confirm(getMessage())) {
       stopListening();
       layer = null;
       window.history.back();
