@@ -1391,6 +1391,24 @@ describe('planBroadcastStart', () => {
     }
   );
 
+  it('refuses a broadcast that has fewer saved recipients than it expects, and changes nothing', async () => {
+    // total_recipients 3, only 1 row saved: still being saved, or cut off.
+    const { db, writes } = scheduledDb({ total_recipients: 3 });
+
+    await expect(
+      planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft'])
+    ).rejects.toMatchObject({ code: 'incomplete', status: 409 });
+    expect(writes).toHaveLength(0);
+  });
+
+  it('starts when every expected recipient is saved', async () => {
+    const { db } = scheduledDb({ total_recipients: 1 });
+
+    const plan = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+
+    expect(plan.planned).toHaveLength(1);
+  });
+
   it('409s and touches nothing else when it lost the race (started, cancelled)', async () => {
     const { db, writes } = scheduledDb({}, undefined, false);
 
@@ -1861,15 +1879,27 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
     expect(sendTemplateMessage).toHaveBeenCalledTimes(2);
   });
 
-  it('skips a row that was stopped or claimed by a newer retry, and does not stamp it', async () => {
+  it('ends at the first row a stop or a newer retry took, sending nothing more', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ status: 'sending', sent_count: 0 }] },
+      broadcast_recipients: {
+        onUpdate: (filters) => (claimed(filters) ? [] : [{ id: 'x' }]),
+      },
+    });
+
+    await deliverBroadcast(db, plan());
+
+    expect(sendTemplateMessage).not.toHaveBeenCalled();
+    expect(writes.filter((w) => w.values.status === 'sent')).toHaveLength(0);
+  });
+
+  it('keeps what it already sent, stops at the first lost row, and leaves the status to whoever took over', async () => {
     const { db, writes } = makeDb({
       broadcasts: { rows: [{ status: 'sending', sent_count: 1 }] },
       broadcast_recipients: {
-        // rec-1 moved on; rec-2 is still ours.
+        // rec-1 is still ours; rec-2 was taken.
         onUpdate: (filters) =>
-          claimed(filters) && filters.some(([, v]) => v === 'rec-1')
-            ? []
-            : [{ id: 'x' }],
+          claimed(filters) && filters.some(([, v]) => v === 'rec-2') ? [] : [{ id: 'x' }],
       },
     });
 
@@ -1877,22 +1907,18 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
 
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
     expect(sendTemplateMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '14155550124' })
+      expect.objectContaining({ to: '14155550123' })
     );
-    expect(
-      writes.filter((w) => w.values.status === 'sent' && w.filters.some(([, v]) => v === 'rec-1'))
-    ).toHaveLength(0);
+    // No terminal status: a stop already set it, or a newer send owns it.
+    expect(writes.filter((w) => w.table === 'broadcasts')).toHaveLength(0);
   });
 
-  it('stops at the first row it lost when the broadcast was stopped', async () => {
-    const { db } = makeDb({
-      broadcasts: { rows: [{ status: 'sent', sent_count: 0 }] },
-      broadcast_recipients: { onUpdate: (filters) => (claimed(filters) ? [] : [{ id: 'x' }]) },
-    });
+  it('still sets the terminal status when nothing was taken from it', async () => {
+    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 2 }] } });
 
     await deliverBroadcast(db, plan());
 
-    expect(sendTemplateMessage).not.toHaveBeenCalled();
+    expect(writes.filter((w) => w.table === 'broadcasts')).toHaveLength(1);
   });
 
   it('fails the row instead of sending when it cannot be checked', async () => {

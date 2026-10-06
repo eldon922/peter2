@@ -980,6 +980,31 @@ export async function planBroadcastStart(
   broadcastId: string,
   from: ('scheduled' | 'draft')[] = ['scheduled']
 ): Promise<BroadcastPlan> {
+  // The wizard saves the broadcast first and its recipients after, so a
+  // broadcast with fewer saved recipients than it expects is still being
+  // saved, or was cut off. Starting it would send to only part of the list.
+  const { data: expected, error: expectedError } = await db
+    .from('broadcasts')
+    .select('total_recipients')
+    .eq('id', broadcastId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  const { count: saved, error: savedError } = await db
+    .from('broadcast_recipients')
+    .select('id', { count: 'exact', head: true })
+    .eq('broadcast_id', broadcastId);
+  if (expectedError || savedError) {
+    console.error('[broadcast-core] start check error:', expectedError ?? savedError);
+    throw new BroadcastError('internal', 'Failed to start broadcast', 500);
+  }
+  if (expected && typeof saved === 'number' && saved < expected.total_recipients) {
+    throw new BroadcastError(
+      'incomplete',
+      'This broadcast has not finished saving its recipients, so it was not started. Create it again.',
+      409
+    );
+  }
+
   const { data: claimed, error } = await db
     .from('broadcasts')
     .update({ status: 'sending', scheduled_at: null })
@@ -1091,6 +1116,8 @@ export async function deliverBroadcast(
   plan: BroadcastPlan
 ): Promise<void> {
   let sentCount = 0;
+  // Set when a row turned out to belong to someone else (see below).
+  let superseded = false;
   const startedAt = Date.now();
   let lastStopCheck = startedAt;
   const throughput = await getPhoneNumberThroughput({
@@ -1187,11 +1214,10 @@ export async function deliverBroadcast(
       continue;
     }
     if (!owned || owned.length === 0) {
-      if (await wasStopped(db, plan.broadcastId)) {
-        log.info('fan-out stopped', { broadcast: plan.broadcastId });
-        break;
-      }
-      continue;
+      // A stop or a newer send took this row, so this plan is out of date:
+      // end now rather than walk the rest, and leave the status alone.
+      superseded = true;
+      break;
     }
 
     const variants = phoneVariants(toMetaPhone(recipient.phone));
@@ -1269,17 +1295,24 @@ export async function deliverBroadcast(
     // sentCount === 0 here, and marking it 'failed' would erase the 90
     // successes from the UI. Use the trigger-maintained total instead.
     //
+    // A superseded fan-out sets no status: a stop already did, or a newer
+    // send is running and owns it.
+    //
     // Guarded on its own so a failure here can't mask whatever error
     // brought us into the `finally` — that error still propagates to the
     // caller's logs.
     try {
-      await finalizeBroadcastStatus(db, plan.broadcastId, sentCount, plan.isRetry);
-      log.info('fan-out finished', {
-        broadcast: plan.broadcastId,
-        sent: sentCount,
-        of: plan.planned.length,
-        ms: Date.now() - startedAt,
-      });
+      if (superseded) {
+        log.info('fan-out superseded', { broadcast: plan.broadcastId, sent: sentCount });
+      } else {
+        await finalizeBroadcastStatus(db, plan.broadcastId, sentCount, plan.isRetry);
+        log.info('fan-out finished', {
+          broadcast: plan.broadcastId,
+          sent: sentCount,
+          of: plan.planned.length,
+          ms: Date.now() - startedAt,
+        });
+      }
     } catch (error) {
       console.error(
         `[broadcast-core] failed to finalize status for ${plan.broadcastId}:`,
