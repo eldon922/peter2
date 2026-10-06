@@ -18,7 +18,9 @@ and polish.
 > `supabase/migrations/050_message_edits.sql` (adds `messages.edited_at`
 > and `messages.edit_history`) and
 > `supabase/migrations/051_cron_setup.sql` (lets the app create the cron
-> job that starts scheduled broadcasts; needs `pg_cron` and `pg_net`).
+> job that starts scheduled broadcasts; needs `pg_cron` and `pg_net`) and
+> `supabase/migrations/052_api_idempotency_keys.sql` (the table behind
+> the API's `Idempotency-Key`).
 
 ### Added
 
@@ -33,6 +35,9 @@ and polish.
   `BROADCAST_MAX_LATE_HOURS` to change it), for example because the cron
   was not running, is not sent: it goes back to a draft with its
   recipients, and its page says when it was due.
+- **`Idempotency-Key` for `POST /api/v1/broadcasts`.** A retry with the
+  same key and body (after a timeout, say) returns the first response
+  instead of creating a second broadcast. See `docs/public-api.md`.
 - **Language switcher** in the header, beside the light/dark toggle.
 - **Broadcast Stop button.** Unsent recipients are marked failed, so
   Retry resumes where it stopped.

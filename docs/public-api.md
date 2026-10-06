@@ -265,6 +265,33 @@ dropped and counted as `rejected`. Response (202):
 }
 ```
 
+#### Avoiding duplicate broadcasts (`Idempotency-Key`)
+
+If your request times out you can't tell whether the broadcast was
+created, and many HTTP clients retry on their own — which would create a
+second broadcast and message everyone twice. Send an `Idempotency-Key`
+header (any unique string of up to 255 visible characters, e.g. an order
+or job id) and a retry is safe:
+
+```bash
+curl -X POST https://your-crm.example.com/api/v1/broadcasts \
+  -H "Authorization: Bearer wacrm_live_xxx" \
+  -H "Idempotency-Key: promo-2026-07-10" \
+  -H "Content-Type: application/json" \
+  -d '{ … }'
+```
+
+A retry with the **same key and body** creates nothing and returns the
+first response again, with the header `Idempotent-Replayed: true`. Keys
+are remembered for 24 hours and are per account. A request that failed
+before creating the broadcast frees its key, so you can retry it.
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| `400` | `bad_request` | The key is empty, longer than 255 characters, or contains spaces. |
+| `409` | `request_in_progress` | The first request with this key is still running. Retry shortly. |
+| `422` | `idempotency_key_reused` | The key was already used with a different request body. |
+
 ### `GET /api/v1/broadcasts/{id}`
 
 Broadcast status + counts. Scope: `broadcasts:send`. `status` moves

@@ -20,12 +20,16 @@
 // the Meta fan-out runs in `after()` so the request returns fast. Poll
 // `GET /api/v1/broadcasts/{id}` for progress.
 //
+// Optional header `Idempotency-Key`: a retry with the same key and body
+// (after a timeout, say) gets the first response back, with
+// `Idempotent-Replayed: true`, instead of creating a second broadcast.
+//
 // Response (202):
 //   { "data": { "broadcast_id", "status": "sending",
 //               "total_recipients", "accepted", "rejected" } }
 // ============================================================
 
-import { after } from 'next/server';
+import { NextResponse, after } from 'next/server';
 
 import { requireApiKey } from '@/lib/auth/api-context';
 
@@ -44,6 +48,13 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // values. broadcast-limits.test.ts enforces the mirror.
 export const maxDuration = 1800;
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
+import {
+  claimIdempotencyKey,
+  hashRequestBody,
+  readIdempotencyKey,
+  releaseIdempotencyKey,
+  saveIdempotentResponse,
+} from '@/lib/api/v1/idempotency';
 import { resolveAuditUserId, ContactError } from '@/lib/api/v1/contacts';
 import {
   createBroadcast,
@@ -52,8 +63,11 @@ import {
 } from '@/lib/whatsapp/broadcast-core';
 
 export async function POST(request: Request) {
+  // Set once an Idempotency-Key is reserved, until the broadcast exists.
+  let releaseKey: (() => Promise<void>) | null = null;
   try {
     const ctx = await requireApiKey(request, 'broadcasts:send');
+    const idempotencyKey = readIdempotencyKey(request);
 
     const body = (await request.json().catch(() => null)) as Record<
       string,
@@ -61,6 +75,37 @@ export async function POST(request: Request) {
     > | null;
     if (!body || typeof body !== 'object') {
       return fail('bad_request', 'Request body must be a JSON object', 400);
+    }
+
+    if (idempotencyKey) {
+      const claim = await claimIdempotencyKey(
+        ctx.supabase,
+        ctx.accountId,
+        idempotencyKey,
+        hashRequestBody(body)
+      );
+      if (claim.kind === 'replay') {
+        return NextResponse.json(claim.body, {
+          status: claim.status,
+          headers: { 'Idempotent-Replayed': 'true' },
+        });
+      }
+      if (claim.kind === 'mismatch') {
+        return fail(
+          'idempotency_key_reused',
+          'This Idempotency-Key was already used with a different request body.',
+          422
+        );
+      }
+      if (claim.kind === 'busy') {
+        return fail(
+          'request_in_progress',
+          'A request with this Idempotency-Key is still being processed. Retry shortly.',
+          409
+        );
+      }
+      releaseKey = () =>
+        releaseIdempotencyKey(ctx.supabase, ctx.accountId, idempotencyKey);
     }
 
     const templateName =
@@ -82,22 +127,42 @@ export async function POST(request: Request) {
       })),
     });
 
+    // The broadcast exists now: a retry must get it back, not a new one.
+    releaseKey = null;
+
     // Fan out after the response is sent. Uses the same service-role
     // client — no request-scoped auth needed for the Meta calls or
     // the account-scoped row updates.
     after(() => deliverBroadcast(ctx.supabase, plan));
 
-    return ok(
-      {
-        broadcast_id: plan.broadcastId,
-        status: 'sending',
-        total_recipients: plan.planned.length,
-        accepted: plan.planned.length,
-        rejected: plan.rejected,
-      },
-      202
-    );
+    const payload = {
+      broadcast_id: plan.broadcastId,
+      status: 'sending',
+      total_recipients: plan.planned.length,
+      accepted: plan.planned.length,
+      rejected: plan.rejected,
+    };
+    if (idempotencyKey) {
+      try {
+        await saveIdempotentResponse(
+          ctx.supabase,
+          ctx.accountId,
+          idempotencyKey,
+          202,
+          { data: payload }
+        );
+      } catch (e) {
+        // The broadcast is already going out, so still answer 202.
+        console.error('[api/v1/broadcasts] could not store the idempotent response:', e);
+      }
+    }
+
+    return ok(payload, 202);
   } catch (err) {
+    // The request failed before creating anything: free the key for a retry.
+    await releaseKey?.().catch((e) =>
+      console.error('[api/v1/broadcasts] could not release the idempotency key:', e)
+    );
     if (err instanceof BroadcastError) {
       return fail(err.code, err.message, err.status);
     }
