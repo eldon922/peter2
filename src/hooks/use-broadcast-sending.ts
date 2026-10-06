@@ -41,6 +41,12 @@ interface BroadcastPayload {
   headerMediaUrl?: string;
   /** Meta media id from an already-uploaded file for the same header. */
   headerMediaId?: string;
+  /**
+   * ISO time to send at. When set, the broadcast and its recipients are
+   * saved as 'scheduled' and nothing is sent now — the cron (or "Start
+   * now" on the broadcast page) sends it later.
+   */
+  scheduledAt?: string;
 }
 
 export type SendingStage =
@@ -406,7 +412,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             customField: payload.audience.customField,
             excludeTagIds: payload.audience.excludeTagIds,
           },
-          status: 'sending',
+          status: payload.scheduledAt ? 'scheduled' : 'sending',
+          scheduled_at: payload.scheduledAt ?? null,
           total_recipients: contacts.length,
         })
         .select()
@@ -485,14 +492,19 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // actual send no longer depends on this tab staying open; the
       // broadcast detail page polls `broadcasts`/`broadcast_recipients`
       // for live progress once we navigate there.
+      //
+      // A scheduled broadcast stops here: its recipient rows stay
+      // 'pending' until the cron or "Start now" sends them.
       setProgress(40);
-      setStage('starting');
-      const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
-        method: 'POST',
-      });
-      if (!sendRes.ok) {
-        const sendData = await sendRes.json().catch(() => ({}));
-        throw new Error(sendData.error || 'Failed to start sending');
+      if (!payload.scheduledAt) {
+        setStage('starting');
+        const sendRes = await fetch(`/api/broadcasts/${broadcast.id}/send`, {
+          method: 'POST',
+        });
+        if (!sendRes.ok) {
+          const sendData = await sendRes.json().catch(() => ({}));
+          throw new Error(sendData.error || 'Failed to start sending');
+        }
       }
 
       setProgress(100);

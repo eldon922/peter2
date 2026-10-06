@@ -686,6 +686,12 @@
       "replied": "Replied",
       "unknown": "Unknown"
     },
+    "schedule": {
+      "sendAt": "Send at",
+      "timeZone": "Your time zone: {zone}",
+      "pastError": "Pick a time in the future.",
+      "cancel": "Cancel"
+    },
     "detail": {
       "backToBroadcasts": "Back to Broadcasts",
       "notFound": "Broadcast not found",
@@ -758,7 +764,25 @@
       "targetCsv": "CSV upload",
       "targetExcluding": "excluding",
       "targetRecipients": "{count, plural, one {# recipient} other {# recipients}}",
-      "sendingCounts": "{done} of {total} processed · {remaining} remaining"
+      "sendingCounts": "{done} of {total} processed · {remaining} remaining",
+      "scheduledFor": "Scheduled for {time}",
+      "scheduledHint": "It starts on its own at that time. Until then you can start it now, change the time, or cancel it.",
+      "startNow": "Start now",
+      "editSchedule": "Edit",
+      "cancelSchedule": "Cancel schedule",
+      "startConfirmTitle": "Start this broadcast now?",
+      "startConfirmDesc": "It will be sent to {count, plural, one {# contact} other {# contacts}} right away. This action cannot be undone.",
+      "cancelConfirmTitle": "Cancel this schedule?",
+      "cancelConfirmDesc": "The broadcast will not be sent. It stays in your list as a draft.",
+      "keepSchedule": "Keep schedule",
+      "editScheduleTitle": "Edit schedule",
+      "editScheduleDesc": "Pick a new time for this broadcast.",
+      "editScheduleConfirm": "Save",
+      "toastStartFailed": "Couldn't start the broadcast: {error}",
+      "toastScheduleSaved": "Schedule updated",
+      "toastScheduleCancelled": "Schedule cancelled. The broadcast is now a draft.",
+      "toastScheduleFailed": "Couldn't update the schedule: {error}",
+      "toastNoLongerScheduled": "This broadcast already started or was cancelled."
     },
     "new": {
       "title": "New Broadcast",
@@ -774,6 +798,7 @@
       "toastNotLinked": "Your profile is not linked to an account.",
       "toastFailedDraft": "Failed to save draft: {error}",
       "toastDraftSaved": "Draft saved",
+      "toastScheduled": "Broadcast scheduled for {time}",
       "leaveConfirm": "You have an unfinished broadcast. Leave this page and lose your progress?",
       "changeTemplateConfirm": "Changing the template will clear: {items, select, both {the variable values and the header media} variables {the variable values} other {the header media}}. Continue?"
     },
@@ -885,6 +910,10 @@
         "variables": "Variables:",
         "variablesMapped": "{count} mapped",
         "saveDraft": "Save as Draft",
+        "schedule": "Schedule",
+        "scheduleTitle": "Schedule Broadcast",
+        "scheduleDesc": "Pick when to send it. The recipient list is saved now, so contacts added later won't get it.",
+        "scheduleConfirm": "Schedule for {count, plural, one {# contact} other {# contacts}}",
         "sendNow": "Send Broadcast",
         "sending": "Sending...",
         "preparing": "Preparing...",

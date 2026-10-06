@@ -5,6 +5,7 @@ import {
   createBroadcast,
   planBroadcastRetry,
   planBroadcastSend,
+  planScheduledBroadcast,
   deliverBroadcast,
   stopBroadcast,
   BroadcastError,
@@ -1267,6 +1268,90 @@ describe('planBroadcastSend', () => {
 
     const plan = await planBroadcastSend(db, 'acc', 'b-1');
     expect(plan.connectionType).toBe('embedded_signup');
+  });
+});
+
+describe('planScheduledBroadcast', () => {
+  // `claimed` models the compare-and-set: the row the flip returns, or
+  // none when someone else got there first.
+  const scheduledDb = (
+    over: Record<string, unknown> = {},
+    template: Record<string, unknown> = { ...TEMPLATE_ROW, header_type: 'text' },
+    claimed = true
+  ) => {
+    const row = sentBroadcast({
+      status: 'sending',
+      created_at: new Date().toISOString(),
+      ...over,
+    });
+    return makeDb({
+      broadcasts: { rows: [row], onUpdate: () => (claimed ? [row] : []) },
+      broadcast_recipients: { rows: [pendingRow()] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [template] },
+    });
+  };
+
+  it('flips scheduled to sending, then plans the pending recipients', async () => {
+    const { db, writes } = scheduledDb();
+
+    const plan = await planScheduledBroadcast(db, 'acc', 'b-1');
+
+    expect(plan.planned).toHaveLength(1);
+    expect(plan.planned[0]).toMatchObject({
+      recipientRowId: 'rec-1',
+      params: ['Jane', '1234'],
+    });
+    const claim = writes.find((w) => w.table === 'broadcasts');
+    expect(claim!.values).toEqual({ status: 'sending', scheduled_at: null });
+    expect(claim!.filters).toEqual(
+      expect.arrayContaining([
+        ['id', 'b-1'],
+        ['account_id', 'acc'],
+        ['status', 'scheduled'],
+      ])
+    );
+  });
+
+  it('409s and touches nothing else when it lost the race (started, cancelled)', async () => {
+    const { db, writes } = scheduledDb({}, undefined, false);
+
+    await expect(planScheduledBroadcast(db, 'acc', 'b-1')).rejects.toMatchObject({
+      code: 'conflict',
+      status: 409,
+    });
+    expect(writes).toHaveLength(1);
+  });
+
+  it('fails the pending rows and closes the broadcast when planning fails', async () => {
+    const row = sentBroadcast({ status: 'sending' });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [row], onUpdate: () => [row] },
+      broadcast_recipients: { rows: [pendingRow()] },
+      whatsapp_config: { rows: [] },
+    });
+
+    await expect(planScheduledBroadcast(db, 'acc', 'b-1')).rejects.toMatchObject({
+      code: 'whatsapp_not_configured',
+    });
+
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: 'broadcast_recipients',
+        values: expect.objectContaining({
+          status: 'failed',
+          error_message: expect.stringContaining('WhatsApp not configured'),
+        }),
+        filters: expect.arrayContaining([
+          ['broadcast_id', 'b-1'],
+          ['status', 'pending'],
+        ]),
+      })
+    );
+    expect(writes[writes.length - 1]).toMatchObject({
+      table: 'broadcasts',
+      values: expect.objectContaining({ status: 'failed' }),
+    });
   });
 });
 

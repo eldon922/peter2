@@ -686,6 +686,12 @@
       "replied": "Dibalas",
       "unknown": "Tidak diketahui"
     },
+    "schedule": {
+      "sendAt": "Kirim pada",
+      "timeZone": "Zona waktu Anda: {zone}",
+      "pastError": "Pilih waktu di masa depan.",
+      "cancel": "Batal"
+    },
     "detail": {
       "backToBroadcasts": "Kembali ke Blast",
       "notFound": "Blast tidak ditemukan",
@@ -758,7 +764,25 @@
       "targetCsv": "Unggahan CSV",
       "targetExcluding": "kecuali",
       "targetRecipients": "{count} penerima",
-      "sendingCounts": "{done} dari {total} diproses · {remaining} tersisa"
+      "sendingCounts": "{done} dari {total} diproses · {remaining} tersisa",
+      "scheduledFor": "Dijadwalkan pada {time}",
+      "scheduledHint": "Blast dimulai sendiri pada waktu tersebut. Sebelum itu Anda bisa memulainya sekarang, mengubah waktunya, atau membatalkannya.",
+      "startNow": "Mulai sekarang",
+      "editSchedule": "Ubah",
+      "cancelSchedule": "Batalkan jadwal",
+      "startConfirmTitle": "Mulai blast ini sekarang?",
+      "startConfirmDesc": "Blast akan langsung dikirim ke {count} kontak. Tindakan ini tidak dapat dibatalkan.",
+      "cancelConfirmTitle": "Batalkan jadwal ini?",
+      "cancelConfirmDesc": "Blast tidak akan dikirim. Blast tetap ada di daftar sebagai draf.",
+      "keepSchedule": "Pertahankan jadwal",
+      "editScheduleTitle": "Ubah jadwal",
+      "editScheduleDesc": "Pilih waktu baru untuk blast ini.",
+      "editScheduleConfirm": "Simpan",
+      "toastStartFailed": "Gagal memulai blast: {error}",
+      "toastScheduleSaved": "Jadwal diperbarui",
+      "toastScheduleCancelled": "Jadwal dibatalkan. Blast sekarang menjadi draf.",
+      "toastScheduleFailed": "Gagal memperbarui jadwal: {error}",
+      "toastNoLongerScheduled": "Blast ini sudah dimulai atau dibatalkan."
     },
     "new": {
       "title": "Blast Baru",
@@ -774,6 +798,7 @@
       "toastNotLinked": "Profil Anda belum tertaut ke sebuah akun.",
       "toastFailedDraft": "Gagal menyimpan draf: {error}",
       "toastDraftSaved": "Draf disimpan",
+      "toastScheduled": "Blast dijadwalkan pada {time}",
       "leaveConfirm": "Anda memiliki blast yang belum selesai. Tinggalkan halaman ini dan kehilangan kemajuan Anda?",
       "changeTemplateConfirm": "Mengganti template akan menghapus: {items, select, both {nilai variabel dan media header} variables {nilai variabel} other {media header}}. Lanjutkan?"
     },
@@ -885,6 +910,10 @@
         "variables": "Variabel:",
         "variablesMapped": "{count} dipetakan",
         "saveDraft": "Simpan sebagai Draf",
+        "schedule": "Jadwalkan",
+        "scheduleTitle": "Jadwalkan Blast",
+        "scheduleDesc": "Pilih kapan blast dikirim. Daftar penerima disimpan sekarang, jadi kontak yang ditambahkan nanti tidak akan menerimanya.",
+        "scheduleConfirm": "Jadwalkan untuk {count} kontak",
         "sendNow": "Kirim Blast",
         "sending": "Mengirim...",
         "preparing": "Menyiapkan...",

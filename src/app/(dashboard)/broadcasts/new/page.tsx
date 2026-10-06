@@ -14,6 +14,7 @@ import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
 import { NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media';
 import { defaultHeaderMedia, whatChangingTemplateClears } from '@/lib/broadcasts/template-change';
 import { useLeaveGuard } from '@/hooks/use-leave-guard';
+import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -72,7 +73,8 @@ export default function NewBroadcastPage() {
     setTemplate(next);
   }
 
-  async function handleSend() {
+  /** Sends now, or saves the broadcast to go out at `scheduledAt` (ISO). */
+  async function handleSend(scheduledAt?: string) {
     if (!template) return;
 
     try {
@@ -89,8 +91,12 @@ export default function NewBroadcastPage() {
         variables,
         headerMediaUrl: headerMedia.url,
         headerMediaId: headerMedia.mediaId,
+        scheduledAt,
       });
       await release();
+      if (scheduledAt) {
+        toast.success(t('toastScheduled', { time: formatScheduledAt(scheduledAt) }));
+      }
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
       // Previously swallowed with console.error — the wizard would
@@ -268,7 +274,8 @@ export default function NewBroadcastPage() {
               variables={variables}
               headerMediaUrl={headerMedia.url}
               headerMediaId={headerMedia.mediaId}
-              onSend={handleSend}
+              onSend={() => handleSend()}
+              onSchedule={handleSend}
               onSaveDraft={handleSaveDraft}
               onBack={() => setCurrentStep(2)}
               isProcessing={isProcessing}

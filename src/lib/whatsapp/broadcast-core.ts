@@ -942,6 +942,56 @@ export async function planBroadcastSend(
   };
 }
 
+/**
+ * Start a scheduled broadcast. Its `broadcasts` row and `pending`
+ * recipient rows were saved when it was scheduled, so this flips it to
+ * 'sending' and plans it like a fresh wizard send
+ * ({@link planBroadcastSend}).
+ *
+ * The flip is a compare-and-set on status, so the cron and a "Start now"
+ * click can't both start it — the loser gets a 409, as does a broadcast
+ * that was cancelled in the meantime.
+ *
+ * Nobody watches a cron-started send, so when planning fails the pending
+ * rows are failed with the reason and the broadcast is closed. Retry can
+ * pick them up; otherwise the row would sit on 'sending' forever.
+ */
+export async function planScheduledBroadcast(
+  db: SupabaseClient,
+  accountId: string,
+  broadcastId: string
+): Promise<BroadcastPlan> {
+  const { data: claimed, error } = await db
+    .from('broadcasts')
+    .update({ status: 'sending', scheduled_at: null })
+    .eq('id', broadcastId)
+    .eq('account_id', accountId)
+    .eq('status', 'scheduled')
+    .select('id');
+  if (error) {
+    console.error('[broadcast-core] start claim error:', error);
+    throw new BroadcastError('internal', 'Failed to start broadcast', 500);
+  }
+  if (!claimed || claimed.length === 0) {
+    throw new BroadcastError('conflict', 'This broadcast is no longer scheduled.', 409);
+  }
+
+  try {
+    return await planBroadcastSend(db, accountId, broadcastId);
+  } catch (e) {
+    await db
+      .from('broadcast_recipients')
+      .update({
+        status: 'failed',
+        error_message: e instanceof Error ? e.message : 'Could not start the broadcast',
+      })
+      .eq('broadcast_id', broadcastId)
+      .eq('status', 'pending');
+    await finalizeBroadcastStatus(db, broadcastId, 0);
+    throw e;
+  }
+}
+
 const STOP_CHECK_INTERVAL_MS = 2000;
 
 /** True once something other than a running fan-out moved the broadcast off 'sending'. */

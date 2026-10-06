@@ -20,6 +20,13 @@ and polish.
 
 ### Added
 
+- **Scheduled broadcasts.** Schedule a broadcast for a date and time
+  from the last wizard step. On the broadcast page, *Start now*, *Edit*
+  the time, or *Cancel schedule* until it goes out. The recipient list
+  is saved when you schedule. Needs a scheduler calling
+  `GET /api/broadcasts/cron` every minute, with the same
+  `x-cron-secret` as the other crons (see `docs/docker.md`). No
+  migration.
 - **Language switcher** in the header, beside the light/dark toggle.
 - **Broadcast Stop button.** Unsent recipients are marked failed, so
   Retry resumes where it stopped.

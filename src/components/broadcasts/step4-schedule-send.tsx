@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Users, Save, CalendarClock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAudience } from '@/hooks/use-audience';
 import type { SendingStage } from '@/hooks/use-broadcast-sending';
@@ -34,6 +34,7 @@ import { AudienceContactList } from '@/components/broadcasts/audience-contact-li
 import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
 import { TagChips } from '@/components/broadcasts/tag-chips';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
+import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 
 interface Step4Props {
   name: string;
@@ -44,6 +45,8 @@ interface Step4Props {
   headerMediaUrl: string;
   headerMediaId: string;
   onSend: () => void;
+  /** Saves the broadcast to go out at `iso` instead of sending now. */
+  onSchedule: (iso: string) => void;
   onSaveDraft?: () => void;
   onBack: () => void;
   isProcessing: boolean;
@@ -61,6 +64,7 @@ export function Step4ScheduleSend({
   headerMediaUrl,
   headerMediaId,
   onSend,
+  onSchedule,
   onSaveDraft,
   onBack,
   isProcessing,
@@ -70,6 +74,7 @@ export function Step4ScheduleSend({
 }: Step4Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [formatted, setFormatted] = useState(true);
   const { resolved, count, loading: loadingReach } = useAudience(audience);
   const reach = count ?? 0;
@@ -294,7 +299,7 @@ export function Step4ScheduleSend({
           {t('back')}
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {onSaveDraft && (
             <Button
               variant="outline"
@@ -306,6 +311,27 @@ export function Step4ScheduleSend({
               {t('scheduleSend.saveDraft')}
             </Button>
           )}
+
+          <Button
+            variant="outline"
+            onClick={() => setShowSchedule(true)}
+            disabled={!name.trim() || isProcessing || loadingReach || reach === 0}
+            className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+          >
+            <CalendarClock className="h-4 w-4" />
+            {t('scheduleSend.schedule')}
+          </Button>
+          <ScheduleDialog
+            open={showSchedule}
+            onOpenChange={setShowSchedule}
+            title={t('scheduleSend.scheduleTitle')}
+            description={t('scheduleSend.scheduleDesc')}
+            confirmLabel={t('scheduleSend.scheduleConfirm', { count: reach })}
+            onConfirm={(iso) => {
+              setShowSchedule(false);
+              onSchedule(iso);
+            }}
+          />
 
           <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
           <DialogTrigger

@@ -53,6 +53,7 @@ import {
 } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
+import { ScheduledBanner } from '@/components/broadcasts/scheduled-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 
 interface StatCardProps {
@@ -786,6 +787,14 @@ export default function BroadcastDetailPage() {
         </div>
         </div>
       </div>
+
+      {broadcast.status === 'scheduled' && (
+        <ScheduledBanner
+          broadcast={broadcast}
+          canSend={canSend}
+          onChange={refresh}
+        />
+      )}
 
       {/* Sending progress — shown whenever the fan-out is actually
           running server-side, whether that's the wizard's initial send
