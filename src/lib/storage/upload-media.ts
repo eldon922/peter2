@@ -18,22 +18,6 @@ import { createClient } from "@/lib/supabase/client";
 export const MEDIA_MAX_BYTES = 16 * 1024 * 1024;
 
 /**
- * Per-kind upload ceilings that mirror Meta's WhatsApp Cloud API caps so
- * a file that the bucket would accept (≤16 MB) but Meta would reject is
- * caught client-side BEFORE upload — otherwise it lands in storage as an
- * orphan and the send fails with a confusing 400. Images are Meta's
- * tightest cap at 5 MB; documents are held at the 16 MB bucket limit
- * (Meta allows 100 MB, but the bucket — and shared-hosting upload UX —
- * caps lower).
- */
-export const MEDIA_MAX_BYTES_BY_KIND = {
-  image: 5 * 1024 * 1024,
-  video: 16 * 1024 * 1024,
-  audio: 16 * 1024 * 1024,
-  document: 16 * 1024 * 1024,
-} as const;
-
-/**
  * Build the account-scoped object path for an upload. Pure + exported so
  * it can be unit-tested without a Supabase client.
  *

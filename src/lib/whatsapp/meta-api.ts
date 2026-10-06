@@ -10,6 +10,7 @@
  */
 
 import { META_API_VERSION } from './meta-version'
+import type { MediaKind } from '@/lib/media-specs'
 
 /**
  * Exported (rather than module-private) so the Embedded Signup helpers
@@ -417,7 +418,7 @@ export async function sendTextMessage(
   return { messageId: data.messages[0].id }
 }
 
-export type MediaKind = 'image' | 'video' | 'document' | 'audio'
+export type { MediaKind }
 
 export interface SendMediaMessageArgs {
   phoneNumberId: string

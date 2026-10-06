@@ -14,31 +14,10 @@
 
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
-import { uploadPhoneMedia, type MediaKind } from '@/lib/whatsapp/meta-api'
+import { uploadPhoneMedia } from '@/lib/whatsapp/meta-api'
+import { isMediaKind, MEDIA_SPECS } from '@/lib/media-specs'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
-
-// Mirrors MEDIA_MAX_BYTES_BY_KIND in lib/storage/upload-media.ts —
-// kept as a local literal (rather than importing) because that module
-// pulls in the browser Supabase client, which server routes must not
-// bundle.
-const MAX_BYTES_BY_KIND: Record<MediaKind, number> = {
-  image: 5 * 1024 * 1024,
-  video: 16 * 1024 * 1024,
-  document: 16 * 1024 * 1024,
-  audio: 16 * 1024 * 1024,
-}
-
-const ALLOWED_MIME_BY_KIND: Record<MediaKind, string[]> = {
-  image: ['image/jpeg', 'image/png'],
-  video: ['video/mp4', 'video/3gpp'],
-  document: ['application/pdf'],
-  audio: ['audio/aac', 'audio/mp4', 'audio/mpeg', 'audio/amr', 'audio/ogg'],
-}
-
-function isMediaKind(value: unknown): value is MediaKind {
-  return value === 'image' || value === 'video' || value === 'document' || value === 'audio'
-}
 
 export async function POST(request: Request) {
   try {
@@ -63,14 +42,14 @@ export async function POST(request: Request) {
     }
     const kind = kindRaw
 
-    const allowedMimes = ALLOWED_MIME_BY_KIND[kind]
+    const allowedMimes = MEDIA_SPECS[kind].mimeTypes
     if (!allowedMimes.includes(file.type)) {
       return NextResponse.json(
         { error: `${kind} must be one of: ${allowedMimes.join(', ')} (got ${file.type || 'unknown'}).` },
         { status: 400 },
       )
     }
-    const maxBytes = MAX_BYTES_BY_KIND[kind]
+    const maxBytes = MEDIA_SPECS[kind].maxBytes
     if (file.size > maxBytes) {
       return NextResponse.json(
         {

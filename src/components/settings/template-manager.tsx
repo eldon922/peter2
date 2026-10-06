@@ -15,10 +15,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import {
-  uploadAccountMedia,
-  MEDIA_MAX_BYTES_BY_KIND,
-} from '@/lib/storage/upload-media';
+import { uploadAccountMedia } from '@/lib/storage/upload-media';
+import { checkMediaFile, MEDIA_SPECS } from '@/lib/media-specs';
 import { useAuth } from '@/hooks/use-auth';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
@@ -464,29 +462,14 @@ export function TemplateManager() {
   const headerNeedsMedia =
     form.header_format !== 'none' && form.header_format !== 'text';
 
-  // Mime allow-lists per header type. Image was the original (#230)
-  // scope; video/document now get the same upload button instead of
-  // URL-only entry — sizes still enforced by MEDIA_MAX_BYTES_BY_KIND.
-  const HEADER_MEDIA_ACCEPT: Record<'image' | 'video' | 'document', string[]> = {
-    image: ['image/jpeg', 'image/png'],
-    video: ['video/mp4', 'video/3gpp'],
-    document: ['application/pdf'],
-  };
-
   async function handleHeaderMediaFile(file: File, kind: 'image' | 'video' | 'document') {
-    const allowed = HEADER_MEDIA_ACCEPT[kind];
-    if (!allowed.includes(file.type)) {
-      toast.error(t('toastInvalidMediaFile', { kind, types: allowed.join(', ') }));
+    const issue = checkMediaFile(kind, file);
+    if (issue?.problem === 'type') {
+      toast.error(t('toastInvalidMediaFile', { kind, types: issue.types }));
       return;
     }
-    if (file.size > MEDIA_MAX_BYTES_BY_KIND[kind]) {
-      toast.error(
-        t('toastMediaTooLarge', {
-          kind,
-          size: (file.size / 1024 / 1024).toFixed(1),
-          limit: (MEDIA_MAX_BYTES_BY_KIND[kind] / 1024 / 1024).toFixed(0),
-        }),
-      );
+    if (issue?.problem === 'size') {
+      toast.error(t('toastMediaTooLarge', { kind, size: issue.size, limit: issue.limit }));
       return;
     }
     setUploadingHeader(true);
@@ -862,7 +845,7 @@ export function TemplateManager() {
                       <input
                         ref={headerFileRef}
                         type="file"
-                        accept={HEADER_MEDIA_ACCEPT[form.header_format].join(',')}
+                        accept={MEDIA_SPECS[form.header_format].mimeTypes.join(',')}
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];

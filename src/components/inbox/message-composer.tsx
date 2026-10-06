@@ -45,8 +45,8 @@ import { toast } from "sonner";
 import {
   uploadAccountMedia,
   deleteAccountMedia,
-  MEDIA_MAX_BYTES_BY_KIND,
 } from "@/lib/storage/upload-media";
+import { MEDIA_SPECS } from "@/lib/media-specs";
 import { ReplyQuote } from "./reply-quote";
 import { useTranslations } from "next-intl";
 import {
@@ -388,7 +388,7 @@ export function MessageComposer({
       // Per-kind ceiling mirrors Meta's caps (image 5 MB, etc.) so we
       // reject before upload rather than orphaning an object that Meta
       // would then refuse at send.
-      const max = MEDIA_MAX_BYTES_BY_KIND[kind];
+      const max = MEDIA_SPECS[kind].maxBytes;
       if (file.size > max) {
         toast.error(
           `File is ${(file.size / 1024 / 1024).toFixed(1)} MB — ${kind} limit is ${Math.round(
@@ -431,7 +431,7 @@ export function MessageComposer({
         type: "audio/ogg",
       });
       if (file.size === 0) return; // cancelled / empty take
-      if (file.size > MEDIA_MAX_BYTES_BY_KIND.audio) {
+      if (file.size > MEDIA_SPECS.audio.maxBytes) {
         toast.error("Recording is too long (over 16 MB).");
         return;
       }
