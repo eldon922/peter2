@@ -58,7 +58,9 @@ export async function GET(request: Request) {
   }
 
   const admin = supabaseAdmin();
-  const cutoff = new Date(Date.now() - maxLateMs()).toISOString();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const cutoff = new Date(now - maxLateMs()).toISOString();
 
   const { data: late, error: lateError } = await admin
     .from('broadcasts')
@@ -81,7 +83,7 @@ export async function GET(request: Request) {
     .select('id, account_id')
     .eq('status', 'scheduled')
     .gte('scheduled_at', cutoff)
-    .lte('scheduled_at', new Date().toISOString())
+    .lte('scheduled_at', nowIso)
     .order('scheduled_at', { ascending: true })
     .limit(MAX_PER_RUN);
   if (error) {
@@ -97,7 +99,7 @@ export async function GET(request: Request) {
         row.account_id as string,
         row.id as string,
         ['scheduled'],
-        new Date().toISOString()
+        nowIso
       );
       if (plan.planned.length > 0) {
         after(() => deliverBroadcast(admin, plan));
