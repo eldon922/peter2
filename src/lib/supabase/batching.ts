@@ -27,14 +27,17 @@ const IN_CLAUSE_MAX_CHARS = 3000;
  * Split ids into chunks whose joined length stays under the URL limit,
  * for feeding `.in(column, chunk)` one request at a time.
  */
-export function chunkIds(ids: string[]): string[][] {
+export function chunkIds(
+  ids: string[],
+  maxChars = IN_CLAUSE_MAX_CHARS
+): string[][] {
   const chunks: string[][] = [];
   let current: string[] = [];
   let currentLength = 0;
 
   for (const id of ids) {
     const addedLength = id.length + 1; // +1 for the joining comma
-    if (current.length > 0 && currentLength + addedLength > IN_CLAUSE_MAX_CHARS) {
+    if (current.length > 0 && currentLength + addedLength > maxChars) {
       chunks.push(current);
       current = [];
       currentLength = 0;

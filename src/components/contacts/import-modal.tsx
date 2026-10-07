@@ -331,7 +331,9 @@ export function ImportModal({
         string,
         { id: string; name: string | null }
       >();
-      const lookupChunks = chunkIds(importedKeys);
+      // Short URLs and a patient retry: a long filter that works once can
+      // still get dropped on the next request.
+      const lookupChunks = chunkIds(importedKeys, 1500);
       let checked = 0;
       for (let i = 0; i < lookupChunks.length; i++) {
         const slice = lookupChunks[i];
@@ -340,7 +342,8 @@ export function ImportModal({
             .from('contacts')
             .select('id, phone_normalized, name')
             .eq('account_id', accountId)
-            .in('phone_normalized', slice)
+            .in('phone_normalized', slice),
+          { attempts: 5 }
         );
         // Unlike the writes below, a failed lookup isn't safe to just
         // shrug off: silently treating "couldn't check" as "not found"

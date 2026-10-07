@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fetchAllRows, READ_PAGE_SIZE, withRetry } from './batching';
+import { chunkIds, fetchAllRows, READ_PAGE_SIZE, withRetry } from './batching';
 
 // A stand-in for PostgREST: serves `.range(from, to)` windows over a
 // table, but — like the real thing — never returns more than `maxRows`
@@ -161,5 +161,14 @@ describe('withRetry', () => {
 
     await expect(withRetry(fn, { attempts: 2, baseDelayMs: 0 })).rejects.toThrow('boom');
     expect(calls).toBe(2);
+  });
+});
+
+describe('chunkIds', () => {
+  it('keeps each chunk under a custom character limit', () => {
+    const ids = Array.from({ length: 500 }, (_, i) => String(6281000000000 + i));
+    const chunks = chunkIds(ids, 1500);
+    expect(chunks.flat()).toEqual(ids);
+    for (const c of chunks) expect(c.join(',').length).toBeLessThanOrEqual(1500);
   });
 });
