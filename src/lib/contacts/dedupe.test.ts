@@ -68,6 +68,17 @@ describe("dedupeByPhone", () => {
     ]);
   });
 
+  it("lets the caller fold a repeated row into the kept one", () => {
+    const { unique } = dedupeByPhone(
+      [
+        { phone: "+1 555-1111", tags: ["a"] },
+        { phone: "15551111", tags: ["b"] },
+      ],
+      (kept, repeat) => kept.tags.push(...repeat.tags),
+    );
+    expect(unique).toEqual([{ phone: "+1 555-1111", tags: ["a", "b"] }]);
+  });
+
   it("drops rows with no digits", () => {
     const { unique, duplicates } = dedupeByPhone([
       { phone: "   " },

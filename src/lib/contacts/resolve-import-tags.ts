@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { chunkRows, fetchAllRows, withRetry } from '@/lib/supabase/batching';
 
 const DEFAULT_TAG_COLOR = '#3b82f6';
 
@@ -46,15 +47,24 @@ export async function resolveImportTagIds(
     return { tagIdByKey: new Map(), skippedNames: [] };
   }
 
-  const { data: existing, error: fetchError } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('account_id', accountId);
+  // Paged: one response is capped at 1000 rows, and a tag missed here
+  // would be created a second time.
+  const { rows: existing, error: fetchError } = await fetchAllRows<{
+    id: string;
+    name: string;
+  }>((from, to) =>
+    supabase
+      .from('tags')
+      .select('id, name')
+      .eq('account_id', accountId)
+      .order('id')
+      .range(from, to)
+  );
 
-  if (fetchError) throw fetchError;
+  if (fetchError) throw new Error(fetchError.message);
 
   const tagIdByKey = new Map<string, string>();
-  for (const tag of existing ?? []) {
+  for (const tag of existing) {
     const key = tag.name.trim().toLowerCase();
     if (!tagIdByKey.has(key)) tagIdByKey.set(key, tag.id);
   }
@@ -69,11 +79,11 @@ export async function resolveImportTagIds(
     else skippedNames.push(name);
   }
 
-  if (toCreate.length > 0) {
+  for (const batch of chunkRows(toCreate)) {
     const { data: created, error: createError } = await supabase
       .from('tags')
       .insert(
-        toCreate.map((name) => ({
+        batch.map((name) => ({
           user_id: userId,
           account_id: accountId,
           name,
@@ -97,18 +107,22 @@ export interface ContactTagAssignment {
   tagNames: string[];
 }
 
+export interface AssignTagsResult {
+  /** Contact–tag pairs that were actually new. */
+  assigned: number;
+  /** Contacts that gained at least one tag. */
+  contactIds: Set<string>;
+}
+
 /**
- * Insert contact_tags rows for imported contacts (ignores duplicates).
- *
- * Returns the number of contact–tag pairs *requested* for upsert, not
- * rows actually inserted — `ignoreDuplicates` can drop pairs that already
- * exist without changing the returned count.
+ * Insert contact_tags rows for imported contacts. Pairs that already
+ * exist are ignored, and only the pairs really added are counted.
  */
 export async function assignImportedContactTags(
   supabase: SupabaseClient,
   assignments: ContactTagAssignment[],
   tagIdByKey: Map<string, string>
-): Promise<number> {
+): Promise<AssignTagsResult> {
   const rows: { contact_id: string; tag_id: string }[] = [];
 
   for (const { contactId, tagNames } of assignments) {
@@ -121,20 +135,22 @@ export async function assignImportedContactTags(
     }
   }
 
-  if (rows.length === 0) return 0;
+  const result: AssignTagsResult = { assigned: 0, contactIds: new Set() };
 
-  const chunkSize = 100;
-  let assigned = 0;
-
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabase.from('contact_tags').upsert(chunk, {
-      onConflict: 'contact_id,tag_id',
-      ignoreDuplicates: true,
-    });
+  for (const chunk of chunkRows(rows)) {
+    const { data, error } = await withRetry(() =>
+      supabase
+        .from('contact_tags')
+        .upsert(chunk, {
+          onConflict: 'contact_id,tag_id',
+          ignoreDuplicates: true,
+        })
+        .select('contact_id')
+    );
     if (error) throw error;
-    assigned += chunk.length;
+    for (const row of data ?? []) result.contactIds.add(row.contact_id);
+    result.assigned += data?.length ?? 0;
   }
 
-  return assigned;
+  return result;
 }

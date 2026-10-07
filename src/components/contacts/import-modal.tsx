@@ -24,7 +24,12 @@ import {
   type ReportRow,
 } from '@/lib/contacts/import-report';
 import { ImportReportDetails } from '@/components/contacts/import-report-details';
-import { chunkIds, withRetry } from '@/lib/supabase/batching';
+import {
+  chunkIds,
+  fetchAllRows,
+  INSERT_BATCH_SIZE,
+  withRetry,
+} from '@/lib/supabase/batching';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -216,7 +221,16 @@ export function ImportModal({
 
     // Collapse repeats of the same number now, so everything downstream —
     // preview, counts, insert — works from one list.
-    const { unique, dropped } = dedupeByPhone(rows);
+    // A repeated number still contributes its tags (and any blank fields).
+    const { unique, dropped } = dedupeByPhone(rows, (kept, repeat) => {
+      const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
+      for (const name of repeat.tagNames) {
+        if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
+      }
+      kept.name ??= repeat.name;
+      kept.email ??= repeat.email;
+      kept.company ??= repeat.company;
+    });
     setParsedRows(unique);
     setInFileDropped(
       dropped.map(({ row, reason }) => ({
@@ -229,13 +243,18 @@ export function ImportModal({
     setHasCompanyColumn(csvHasCompany);
 
     if (csvHasTags && accountId) {
-      const { data: tags } = await supabase
-        .from('tags')
-        .select('name, color')
-        .eq('account_id', accountId);
+      const { rows: tags } = await fetchAllRows<{ name: string; color: string }>(
+        (from, to) =>
+          supabase
+            .from('tags')
+            .select('name, color')
+            .eq('account_id', accountId)
+            .order('id')
+            .range(from, to)
+      );
 
       const colors = new Map<string, string>();
-      for (const tag of tags ?? []) {
+      for (const tag of tags) {
         const key = tag.name.trim().toLowerCase();
         if (!colors.has(key)) colors.set(key, tag.color);
       }
@@ -390,14 +409,14 @@ export function ImportModal({
       let doneWork = 0;
       setProgress({ stage: 'adding', done: 0, total: totalWork });
 
-      // 3) Batch insert the genuinely-new rows in chunks of 50. The DB
+      // 3) Batch insert the genuinely-new rows in chunks. The DB
       //    unique index is the backstop: a 23505 (race, or a format
       //    that normalizes equal) counts as skipped, not failed.
       //    Each chunk (and each per-row fallback) is retried a few
       //    times on transient failures before giving up — see
       //    withRetry. This is safe to retry because a repeat of an
       //    already-succeeded insert just comes back as a 23505.
-      const chunkSize = 50;
+      const chunkSize = INSERT_BATCH_SIZE;
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
         const chunk = toInsert.slice(i, i + chunkSize);
@@ -523,32 +542,45 @@ export function ImportModal({
       doneWork += toMerge.length - renames.length;
       setProgress({ stage: 'updating', done: doneWork, total: totalWork });
 
+      // 4) Wire tags onto the contacts we just created or merged. Failure
+      //    here must not mask a successful contact import.
+      setProgress({ stage: 'linking', done: 0 });
+      let linked: Set<string> | null = null;
+      try {
+        const assigned = await assignImportedContactTags(
+          supabase,
+          tagAssignments,
+          tagIdByKey
+        );
+        tagsAssigned = assigned.assigned;
+        linked = assigned.contactIds;
+      } catch {
+        toast.warning(t('toastTagsWarning'));
+      }
+
       // Counted once per row touched, whether it was renamed, re-tagged
       // or both — the summary reports rows, not writes. A row whose only
       // contribution was a rename that failed is reported as failed, not
-      // updated, so the two counts never describe the same row.
-      report.updated = toMerge
-        .filter(
-          (m) => !(renameFailures.has(m.id) && m.row.tagNames.length === 0)
-        )
-        .map((m) => ({
+      // updated, so the two counts never describe the same row. When the
+      // tags went in, a row that changed nothing (name the same, every
+      // tag already on the contact) is skipped, not updated.
+      for (const m of toMerge) {
+        const renameFailed = renameFailures.has(m.id);
+        const renamed = m.rename !== null && !renameFailed;
+        if (renameFailed && (m.row.tagNames.length === 0 || linked?.has(m.id) === false)) {
+          continue; // already reported as failed
+        }
+        if (linked && !renamed && !linked.has(m.id)) {
+          report.skipped.push({ ...toRow(m.row), reason: 'nothing_new' });
+          continue;
+        }
+        report.updated.push({
           ...toRow(m.row),
-          rename:
-            m.rename && !renameFailures.has(m.id)
-              ? { from: m.previousName, to: m.rename }
-              : undefined,
+          rename: renamed
+            ? { from: m.previousName, to: m.rename as string }
+            : undefined,
           tags: m.row.tagNames,
-        }));
-
-      // 4) Wire tags onto the contacts we just created. Failure here must
-      //    not mask a successful contact import.
-      setProgress({ stage: 'linking', done: 0 });
-      try {
-        tagsAssigned = await withRetry(() =>
-          assignImportedContactTags(supabase, tagAssignments, tagIdByKey)
-        );
-      } catch {
-        toast.warning(t('toastTagsWarning'));
+        });
       }
 
       setProgress(null);
