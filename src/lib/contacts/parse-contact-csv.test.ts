@@ -70,4 +70,26 @@ describe('parseContactCsv', () => {
       ],
     });
   });
+
+  it('keeps apostrophes in names', () => {
+    const { rows } = parseContactCsv(`phone,name\n+15551234567,O'Brien`);
+    expect(rows[0].name).toBe("O'Brien");
+  });
+
+  it('handles line breaks and escaped quotes inside quoted cells', () => {
+    const csv = 'phone,name,tags\r\n+1555,"Line\none ""Q""","a,b"\r\n+1556,Bob,c\r\n';
+    const { rows } = parseContactCsv(csv);
+    expect(rows.map((r) => [r.phone, r.name, r.tagNames])).toEqual([
+      ['+1555', 'Line\none "Q"', ['a', 'b']],
+      ['+1556', 'Bob', ['c']],
+    ]);
+  });
+
+  it('reads a BOM-prefixed file with thousands of rows', () => {
+    let csv = '\uFEFFphone,name,tags\n';
+    for (let i = 0; i < 5000; i++) csv += `+62811${i},N${i},"t${i % 9},t${i % 4}"\n`;
+    const { rows } = parseContactCsv(csv);
+    expect(rows).toHaveLength(5000);
+    expect(rows[4999].tagNames).toEqual(['t4', 't3']);
+  });
 });
