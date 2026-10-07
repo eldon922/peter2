@@ -15,8 +15,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Git
 - Always commit and push directly to the `dev` branch. Do not create or use any other branch unless told to.
 - One commit per feature or fix.
-- Use Conventional Commits and feature/location in parentheses (feat(sheet):, fix(attendees):, refactor:, docs:, chore:).
+- Use Conventional Commits and feature/location/scope in parentheses (feat(sheet):, fix(attendees):, refactor:, docs:, chore:).
 - No attribution and no Co-Authored-By lines in commits or pull requests.
+- if you revert a commit, don't change the message of it.
 
 ## Replies
 - Keep replies short and in plain, simple language.
