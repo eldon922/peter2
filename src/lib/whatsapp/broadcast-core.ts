@@ -968,7 +968,9 @@ export async function planBroadcastSend(
  * cancelled schedule keeps its recipients and can still be sent.
  *
  * The flip is a compare-and-set on status, so the cron and a "Start now"
- * click can't both start it — the loser gets a 409.
+ * click can't both start it — the loser gets a 409. With `dueBy` (the cron)
+ * it also needs the scheduled time to have come, so a schedule moved later
+ * after the cron looked is not started early.
  *
  * When planning fails the pending rows are failed with the reason and the
  * broadcast is closed. Retry can pick them up; otherwise the row would
@@ -978,7 +980,8 @@ export async function planBroadcastStart(
   db: SupabaseClient,
   accountId: string,
   broadcastId: string,
-  from: ('scheduled' | 'draft')[] = ['scheduled']
+  from: ('scheduled' | 'draft')[] = ['scheduled'],
+  dueBy?: string
 ): Promise<BroadcastPlan> {
   // The wizard saves the broadcast first and its recipients after, and sets
   // the total last. A broadcast whose saved recipients don't match its total
@@ -1011,13 +1014,14 @@ export async function planBroadcastStart(
     );
   }
 
-  const { data: claimed, error } = await db
+  let claim = db
     .from('broadcasts')
     .update({ status: 'sending', scheduled_at: null })
     .eq('id', broadcastId)
     .eq('account_id', accountId)
-    .in('status', from)
-    .select('id');
+    .in('status', from);
+  if (dueBy) claim = claim.lte('scheduled_at', dueBy);
+  const { data: claimed, error } = await claim.select('id');
   if (error) {
     console.error('[broadcast-core] start claim error:', error);
     throw new BroadcastError('internal', 'Failed to start broadcast', 500);

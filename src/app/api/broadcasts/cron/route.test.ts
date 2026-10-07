@@ -102,8 +102,22 @@ describe('GET /api/broadcasts/cron', () => {
     const res = await GET(request('shh'));
 
     expect(await res.json()).toEqual({ started: 2, skipped: 0 });
-    expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-1', 'b-1');
-    expect(planBroadcastStart).toHaveBeenCalledWith(admin, 'acc-2', 'b-2');
+    // Each claim carries the time it was made, so a schedule moved later
+    // after the scan is not started.
+    expect(planBroadcastStart).toHaveBeenCalledWith(
+      admin,
+      'acc-1',
+      'b-1',
+      ['scheduled'],
+      expect.any(String)
+    );
+    expect(planBroadcastStart).toHaveBeenCalledWith(
+      admin,
+      'acc-2',
+      'b-2',
+      ['scheduled'],
+      expect.any(String)
+    );
     expect(after).toHaveBeenCalledTimes(2);
     // Only scheduled broadcasts whose time has come.
     expect(filters).toContainEqual(['eq', 'status', 'scheduled']);

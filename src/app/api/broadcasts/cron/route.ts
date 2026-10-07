@@ -95,7 +95,9 @@ export async function GET(request: Request) {
       const plan = await planBroadcastStart(
         admin,
         row.account_id as string,
-        row.id as string
+        row.id as string,
+        ['scheduled'],
+        new Date().toISOString()
       );
       if (plan.planned.length > 0) {
         after(() => deliverBroadcast(admin, plan));
@@ -104,8 +106,9 @@ export async function GET(request: Request) {
       }
       started++;
     } catch (err) {
-      // A 409 means a "Start now" click or another run got there first.
-      // Anything else was already closed out as failed by the planner.
+      // A 409 means a "Start now" click, a cancel, a later time or another
+      // run got there first. Anything else was already closed out as failed
+      // by the planner.
       if (!(err instanceof BroadcastError && err.code === 'conflict')) {
         console.error(`[broadcasts-cron] could not start ${row.id}:`, err);
       }

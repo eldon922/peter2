@@ -184,6 +184,10 @@ function makeDb(
         if (op !== 'select') filters.push([col, vals]);
         return chain;
       },
+      lte: (col: string, val: unknown) => {
+        if (op !== 'select') filters.push([`${col} <=`, val]);
+        return chain;
+      },
       or: (expr: string) => {
         orSuffixes = expr
           .split(',')
@@ -1346,6 +1350,25 @@ describe('planBroadcastStart', () => {
     const claim = writes.find((w) => w.table === 'broadcasts');
     expect(claim!.filters).toContainEqual(['status', ['scheduled']]);
     expect(JSON.stringify(claim!.filters)).not.toContain('draft');
+  });
+
+  it('claims only a broadcast whose time has come when the caller says when it is due (the cron)', async () => {
+    const { db, writes } = scheduledDb();
+    const dueBy = new Date().toISOString();
+
+    await planBroadcastStart(db, 'acc', 'b-1', ['scheduled'], dueBy);
+
+    const claim = writes.find((w) => w.table === 'broadcasts');
+    expect(claim!.filters).toContainEqual(['scheduled_at <=', dueBy]);
+  });
+
+  it('puts no time condition on a start without a due time (Start now)', async () => {
+    const { db, writes } = scheduledDb();
+
+    await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+
+    const claim = writes.find((w) => w.table === 'broadcasts');
+    expect(JSON.stringify(claim!.filters)).not.toContain('scheduled_at');
   });
 
   it('also starts a draft when the caller allows it (Start now on a cancelled schedule)', async () => {
