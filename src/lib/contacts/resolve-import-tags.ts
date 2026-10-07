@@ -112,11 +112,14 @@ export interface AssignTagsResult {
   assigned: number;
   /** Contacts that gained at least one tag. */
   contactIds: Set<string>;
+  /** Contacts whose tags could not be saved, with the error. */
+  failed: Map<string, string>;
 }
 
 /**
  * Insert contact_tags rows for imported contacts. Pairs that already
- * exist are ignored, and only the pairs really added are counted.
+ * exist are ignored, and only the pairs really added are counted. A
+ * failed batch is reported in `failed` instead of stopping the rest.
  */
 export async function assignImportedContactTags(
   supabase: SupabaseClient,
@@ -135,21 +138,30 @@ export async function assignImportedContactTags(
     }
   }
 
-  const result: AssignTagsResult = { assigned: 0, contactIds: new Set() };
+  const result: AssignTagsResult = {
+    assigned: 0,
+    contactIds: new Set(),
+    failed: new Map(),
+  };
 
   for (const chunk of chunkRows(rows)) {
-    const { data, error } = await withRetry(() =>
-      supabase
-        .from('contact_tags')
-        .upsert(chunk, {
-          onConflict: 'contact_id,tag_id',
-          ignoreDuplicates: true,
-        })
-        .select('contact_id')
-    );
-    if (error) throw error;
-    for (const row of data ?? []) result.contactIds.add(row.contact_id);
-    result.assigned += data?.length ?? 0;
+    try {
+      const { data, error } = await withRetry(() =>
+        supabase
+          .from('contact_tags')
+          .upsert(chunk, {
+            onConflict: 'contact_id,tag_id',
+            ignoreDuplicates: true,
+          })
+          .select('contact_id')
+      );
+      if (error) throw error;
+      for (const row of data ?? []) result.contactIds.add(row.contact_id);
+      result.assigned += data?.length ?? 0;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String((err as { message?: unknown })?.message ?? err);
+      for (const row of chunk) result.failed.set(row.contact_id, message);
+    }
   }
 
   return result;

@@ -469,6 +469,7 @@
       "toastUpdated": "{count} kontak lama diperbarui",
       "toastUpdated_plural": "{count} kontak lama diperbarui",
       "resultSkipped": "{count} dilewati",
+      "resultTagFailed": "{count} tanpa tag",
       "resultFailed": "{count} gagal",
       "willBeCreated": "{name} (akan dibuat saat impor)",
       "columns": {
@@ -484,7 +485,7 @@
       "importBtn_plural": "Impor {count} kontak",
       "toastNoValidRows": "Tidak ada baris valid. Pastikan CSV memiliki kolom \"phone\".",
       "toastNotCsv": "Hanya berkas .csv yang dapat diimpor.",
-      "toastTagsWarning": "Kontak diimpor, tetapi sebagian penetapan tag gagal.",
+      "toastTagsWarning": "Kontak diimpor, tetapi tag gagal disimpan untuk {count} kontak. Lihat laporan di bawah.",
       "toastImported": "{count} kontak diimpor",
       "toastImported_plural": "{count} kontak diimpor",
       "toastTagsAssigned": "{count} penetapan tag diterapkan",
@@ -506,6 +507,7 @@
         "imported": "Ditambahkan ({count})",
         "updated": "Diperbarui ({count})",
         "skipped": "Dilewati ({count})",
+        "tagFailed": "Tag tidak tersimpan ({count})",
         "failed": "Gagal ({count})"
       },
       "reason": {

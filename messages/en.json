@@ -469,6 +469,7 @@
       "toastUpdated": "{count} existing contact updated",
       "toastUpdated_plural": "{count} existing contacts updated",
       "resultSkipped": "{count} skipped",
+      "resultTagFailed": "{count} without their tags",
       "resultFailed": "{count} failed",
       "willBeCreated": "{name} (will be created on import)",
       "columns": {
@@ -484,7 +485,7 @@
       "importBtn_plural": "Import {count} contacts",
       "toastNoValidRows": "No valid rows found. Ensure CSV has a \"phone\" column header.",
       "toastNotCsv": "Only .csv files can be imported.",
-      "toastTagsWarning": "Contacts imported, but some tag assignments failed.",
+      "toastTagsWarning": "Contacts imported, but tags could not be saved for {count, plural, =1 {# contact} other {# contacts}}. See the report below.",
       "toastImported": "{count} contact imported",
       "toastImported_plural": "{count} contacts imported",
       "toastTagsAssigned": "{count} tag assignment applied",
@@ -506,6 +507,7 @@
         "imported": "Added ({count})",
         "updated": "Updated ({count})",
         "skipped": "Skipped ({count})",
+        "tagFailed": "Tags not saved ({count})",
         "failed": "Failed ({count})"
       },
       "reason": {

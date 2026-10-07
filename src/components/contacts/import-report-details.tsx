@@ -9,13 +9,14 @@ import type { ImportReport, ReportRow } from '@/lib/contacts/import-report';
 
 const PAGE = 50;
 
-type SectionKey = 'imported' | 'updated' | 'skipped' | 'failed';
+type SectionKey = 'imported' | 'updated' | 'skipped' | 'failed' | 'tagFailed';
 
 const TONE: Record<SectionKey, string> = {
   imported: 'text-primary',
   updated: 'text-primary',
   skipped: 'text-amber-400',
   failed: 'text-red-400',
+  tagFailed: 'text-red-400',
 };
 
 function Section({
@@ -27,7 +28,7 @@ function Section({
 }) {
   const t = useTranslations('Contacts.importModal');
   // Problems are worth seeing straight away; the long happy-path lists aren't.
-  const [open, setOpen] = useState(sectionKey === 'failed' || sectionKey === 'skipped');
+  const [open, setOpen] = useState(sectionKey === 'failed' || sectionKey === 'tagFailed' || sectionKey === 'skipped');
   const [shown, setShown] = useState(PAGE);
 
   if (rows.length === 0) return null;
@@ -105,6 +106,7 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
         {t('reportTitle')}
       </p>
       <Section sectionKey="failed" rows={report.failed} />
+      <Section sectionKey="tagFailed" rows={report.tagFailed} />
       <Section sectionKey="skipped" rows={report.skipped} />
       <Section sectionKey="updated" rows={report.updated} />
       <Section sectionKey="imported" rows={report.imported} />

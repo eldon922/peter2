@@ -400,6 +400,11 @@ export function ImportModal({
       }
 
       const tagAssignments: ContactTagAssignment[] = [];
+      const rowByContactId = new Map<string, ParsedContactRow>();
+      const queueTags = (contactId: string, row: ParsedContactRow) => {
+        tagAssignments.push({ contactId, tagNames: row.tagNames });
+        rowByContactId.set(contactId, row);
+      };
 
       // Total units of work across both phases, for the progress
       // indicator — otherwise a multi-thousand-row import just shows a
@@ -458,10 +463,7 @@ export function ImportModal({
             if (!singleErr && singleData) {
               report.imported.push(toRow(source));
               if (source.tagNames.length > 0) {
-                tagAssignments.push({
-                  contactId: singleData.id,
-                  tagNames: source.tagNames,
-                });
+                queueTags(singleData.id, source);
               }
             } else if (isUniqueViolation(singleErr)) {
               report.skipped.push({ ...toRow(source), reason: 'already_exists' });
@@ -478,10 +480,7 @@ export function ImportModal({
           for (let j = 0; j < inserted.length; j++) {
             const source = chunk[j];
             if (!source || source.tagNames.length === 0) continue;
-            tagAssignments.push({
-              contactId: inserted[j].id,
-              tagNames: source.tagNames,
-            });
+            queueTags(inserted[j].id, source);
           }
         }
 
@@ -534,7 +533,7 @@ export function ImportModal({
 
       for (const m of toMerge) {
         if (m.row.tagNames.length > 0) {
-          tagAssignments.push({ contactId: m.id, tagNames: m.row.tagNames });
+          queueTags(m.id, m.row);
         }
       }
       // Merge rows that only needed tags (no rename) never went through
@@ -542,36 +541,43 @@ export function ImportModal({
       doneWork += toMerge.length - renames.length;
       setProgress({ stage: 'updating', done: doneWork, total: totalWork });
 
-      // 4) Wire tags onto the contacts we just created or merged. Failure
-      //    here must not mask a successful contact import.
+      // 4) Wire tags onto the contacts we just created or merged. A failure
+      //    here must not mask a successful contact import; the contacts
+      //    it hit are listed in the report.
       setProgress({ stage: 'linking', done: 0 });
-      let linked: Set<string> | null = null;
-      try {
-        const assigned = await assignImportedContactTags(
-          supabase,
-          tagAssignments,
-          tagIdByKey
+      const assigned = await assignImportedContactTags(
+        supabase,
+        tagAssignments,
+        tagIdByKey
+      );
+      tagsAssigned = assigned.assigned;
+      for (const [contactId, error] of assigned.failed) {
+        const row = rowByContactId.get(contactId);
+        if (row) {
+          report.tagFailed.push({ ...toRow(row), tags: row.tagNames, error });
+        }
+      }
+      if (report.tagFailed.length > 0) {
+        toast.warning(
+          t('toastTagsWarning', { count: report.tagFailed.length })
         );
-        tagsAssigned = assigned.assigned;
-        linked = assigned.contactIds;
-      } catch {
-        toast.warning(t('toastTagsWarning'));
       }
 
       // Counted once per row touched, whether it was renamed, re-tagged
       // or both — the summary reports rows, not writes. A row whose only
       // contribution was a rename that failed is reported as failed, not
-      // updated, so the two counts never describe the same row. When the
-      // tags went in, a row that changed nothing (name the same, every
-      // tag already on the contact) is skipped, not updated.
+      // updated, so the two counts never describe the same row. A row
+      // that changed nothing (name the same, every tag already on the
+      // contact) is skipped, not updated.
       for (const m of toMerge) {
         const renameFailed = renameFailures.has(m.id);
         const renamed = m.rename !== null && !renameFailed;
-        if (renameFailed && (m.row.tagNames.length === 0 || linked?.has(m.id) === false)) {
-          continue; // already reported as failed
-        }
-        if (linked && !renamed && !linked.has(m.id)) {
-          report.skipped.push({ ...toRow(m.row), reason: 'nothing_new' });
+        const tagged = assigned.contactIds.has(m.id);
+        if (!renamed && !tagged) {
+          const reported = renameFailed || assigned.failed.has(m.id);
+          if (!reported) {
+            report.skipped.push({ ...toRow(m.row), reason: 'nothing_new' });
+          }
           continue;
         }
         report.updated.push({
@@ -579,7 +585,7 @@ export function ImportModal({
           rename: renamed
             ? { from: m.previousName, to: m.rename as string }
             : undefined,
-          tags: m.row.tagNames,
+          tags: tagged ? m.row.tagNames : undefined,
         });
       }
 
@@ -629,7 +635,8 @@ export function ImportModal({
         report.imported.length +
           report.updated.length +
           report.skipped.length +
-          report.failed.length >
+          report.failed.length +
+          report.tagFailed.length >
         0
       ) {
         report.skippedTags = skippedNames;
@@ -923,6 +930,12 @@ export function ImportModal({
                   <div className="flex items-center gap-1.5 text-sm text-amber-400">
                     <AlertTriangle className="size-4 shrink-0" />
                     {t('resultSkipped', { count: result.report.skipped.length })}
+                  </div>
+                )}
+                {result.report.tagFailed.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-sm text-red-400">
+                    <XCircle className="size-4 shrink-0" />
+                    {t('resultTagFailed', { count: result.report.tagFailed.length })}
                   </div>
                 )}
                 {result.report.failed.length > 0 && (

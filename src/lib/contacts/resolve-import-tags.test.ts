@@ -72,4 +72,23 @@ describe('assignImportedContactTags', () => {
     expect(result.assigned).toBe(1);
     expect([...result.contactIds]).toEqual(['c2']);
   });
+
+  it('reports contacts whose tags could not be saved', async () => {
+    const db = {
+      from: () => ({
+        upsert: () => ({
+          select: () =>
+            Promise.resolve({ data: null, error: { message: 'boom' }, status: 400 }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    const result = await assignImportedContactTags(
+      db,
+      [{ contactId: 'c1', tagNames: ['vip'] }],
+      new Map([['vip', 't1']])
+    );
+    expect(result.assigned).toBe(0);
+    expect(result.failed.get('c1')).toBe('boom');
+  });
 });

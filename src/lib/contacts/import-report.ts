@@ -24,10 +24,12 @@ export interface ImportReport {
   updated: ReportRow[];
   skipped: ReportRow[];
   failed: ReportRow[];
+  /** Contacts that were saved but whose tags could not be. */
+  tagFailed: ReportRow[];
   /** Tag names from the file that couldn't be created (not an admin). */
   skippedTags: string[];
 }
 
 export function emptyReport(): ImportReport {
-  return { imported: [], updated: [], skipped: [], failed: [], skippedTags: [] };
+  return { imported: [], updated: [], skipped: [], failed: [], tagFailed: [], skippedTags: [] };
 }
