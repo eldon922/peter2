@@ -11,3 +11,8 @@ it('detects status, content and removed-field changes', () => {
   expect(templateSyncChanged({ body_text: 'Hi' }, { body_text: 'Hello' })).toBe(true);
   expect(templateSyncChanged({ footer_text: 'Old' }, { footer_text: null })).toBe(true);
 });
+it('ignores optional button values omitted by JSON serialization', () => {
+  expect(templateSyncChanged({ buttons: [{ type: 'URL', text: 'Open', url: 'https://example.com' }] }, {
+    buttons: [{ type: 'URL', text: 'Open', url: 'https://example.com', example: undefined }],
+  })).toBe(false);
+});
