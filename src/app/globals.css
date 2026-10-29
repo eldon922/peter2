@@ -230,6 +230,19 @@ html[data-theme="rose"] {
   --sidebar-ring: oklch(0.645 0.22 16);
 }
 
+html:not([data-mode="light"]):is([data-theme="red"], :not([data-theme])) {
+  --primary: oklch(0.72 0.17 24);
+  --primary-foreground: oklch(0.16 0.025 24);
+  --primary-hover: oklch(0.78 0.14 24);
+  --primary-soft: oklch(0.72 0.17 24 / 0.12);
+  --primary-soft-2: oklch(0.72 0.17 24 / 0.22);
+  --ring: oklch(0.72 0.17 24);
+  --chart-1: oklch(0.72 0.17 24);
+  --sidebar-primary: oklch(0.72 0.17 24);
+  --sidebar-primary-foreground: oklch(0.16 0.025 24);
+  --sidebar-ring: oklch(0.72 0.17 24);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

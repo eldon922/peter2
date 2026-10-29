@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
-import type { Message, MessageReaction } from "@/types";
+import { useState, useEffect, type ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import type { Message, MessageReaction } from '@/types';
 import {
   Clock,
   Check,
@@ -14,17 +14,21 @@ import {
   ImageOff,
   CornerDownLeft,
   Sparkles,
-} from "lucide-react";
-import { format } from "date-fns";
-import { ReplyQuote } from "./reply-quote";
-import { FormattedText } from "./formatted-text";
-import { ImageViewer } from "./image-viewer";
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { ReplyQuote } from './reply-quote';
+import { FormattedText } from './formatted-text';
+import { ImageViewer } from './image-viewer';
 import { MediaDownload } from './media-download';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getMediaObjectUrl, peekMediaObjectUrl } from "@/lib/inbox/media-cache";
-import { MessageReactions } from "./message-reactions";
-import { InteractivePreview } from "@/components/interactive/interactive-preview";
-import { useTranslations } from "next-intl";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { getMediaObjectUrl, peekMediaObjectUrl } from '@/lib/inbox/media-cache';
+import { MessageReactions } from './message-reactions';
+import { InteractivePreview } from '@/components/interactive/interactive-preview';
+import { useTranslations } from 'next-intl';
 
 interface MessageBubbleProps {
   message: Message;
@@ -35,17 +39,17 @@ interface MessageBubbleProps {
   onToggleReaction?: (emoji: string) => void;
 }
 
-function StatusIcon({ status }: { status: Message["status"] }) {
+function StatusIcon({ status }: { status: Message['status'] }) {
   switch (status) {
-    case "sending":
-      return <Clock className="h-3 w-3 text-muted-foreground" />;
-    case "sent":
-      return <Check className="h-3 w-3 text-muted-foreground" />;
-    case "delivered":
-      return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-    case "read":
+    case 'sending':
+      return <Clock className="text-muted-foreground h-3 w-3" />;
+    case 'sent':
+      return <Check className="text-muted-foreground h-3 w-3" />;
+    case 'delivered':
+      return <CheckCheck className="text-muted-foreground h-3 w-3" />;
+    case 'read':
       return <CheckCheck className="h-3 w-3 text-blue-400" />;
-    case "failed":
+    case 'failed':
       return <XCircle className="h-3 w-3 text-red-400" />;
     default:
       return null;
@@ -55,9 +59,9 @@ function StatusIcon({ status }: { status: Message["status"] }) {
 /** Marks a message that was sent from a template (e.g. a broadcast). */
 function TemplateBadge({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
-    <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary dark:bg-rose-400/15 dark:text-rose-300">
+    <span className="bg-primary/20 text-primary mb-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
       <LayoutTemplate className="h-3 w-3" />
-      {t("template")}
+      {t('template')}
     </span>
   );
 }
@@ -75,28 +79,32 @@ function EditedLabel({
   history: { text: string | null; at: string }[];
   className?: string;
 }) {
-  const t = useTranslations("Inbox.bubble");
-  const label = "text-[10px] italic leading-none";
+  const t = useTranslations('Inbox.bubble');
+  const label = 'text-[10px] italic leading-none';
   if (history.length === 0) {
-    return <span className={cn(label, className)}>{t("edited")}</span>;
+    return <span className={cn(label, className)}>{t('edited')}</span>;
   }
   return (
     <Popover>
       <PopoverTrigger
-        className={cn(label, "underline decoration-dotted underline-offset-2", className)}
+        className={cn(
+          label,
+          'underline decoration-dotted underline-offset-2',
+          className
+        )}
       >
-        {t("edited")}
+        {t('edited')}
       </PopoverTrigger>
-      <PopoverContent className="w-64 gap-2 p-3 text-popover-foreground">
-        <p className="text-xs font-medium">{t("previousVersions")}</p>
+      <PopoverContent className="text-popover-foreground w-64 gap-2 p-3">
+        <p className="text-xs font-medium">{t('previousVersions')}</p>
         <ul className="space-y-2">
           {[...history].reverse().map((h, i) => (
-            <li key={i} className="rounded-md bg-muted px-2 py-1.5">
-              <p className="whitespace-pre-wrap text-xs wrap-anywhere">
-                {h.text ? <FormattedText text={h.text} /> : t("noText")}
+            <li key={i} className="bg-muted rounded-md px-2 py-1.5">
+              <p className="text-xs wrap-anywhere whitespace-pre-wrap">
+                {h.text ? <FormattedText text={h.text} /> : t('noText')}
               </p>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                {format(new Date(h.at), "MMM d, HH:mm")}
+              <p className="text-muted-foreground mt-1 text-[10px]">
+                {format(new Date(h.at), 'MMM d, HH:mm')}
               </p>
             </li>
           ))}
@@ -106,22 +114,39 @@ function EditedLabel({
   );
 }
 
-function MediaUnavailable({ label, t }: { label: string, t: ReturnType<typeof useTranslations> }) {
+function MediaUnavailable({
+  label,
+  t,
+}: {
+  label: string;
+  t: ReturnType<typeof useTranslations>;
+}) {
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <ImageOff className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <span>{t("unavailable", { label })}</span>
+    <div className="bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg px-3 py-2 text-xs">
+      <ImageOff className="text-muted-foreground h-4 w-4 shrink-0" />
+      <span>{t('unavailable', { label })}</span>
     </div>
   );
 }
 
-function MediaImage({ url, alt, filename }: { url: string; alt: string; filename?: string | null }) {
+function MediaImage({
+  url,
+  alt,
+  filename,
+}: {
+  url: string;
+  alt: string;
+  filename?: string | null;
+}) {
   // Proxy URLs need the session, so they go through the shared media cache.
-  const isProxy = url.startsWith("/api/whatsapp/media/");
-  const [loaded, setLoaded] = useState<{ url: string; src: string | null } | null>(null);
+  const isProxy = url.startsWith('/api/whatsapp/media/');
+  const [loaded, setLoaded] = useState<{
+    url: string;
+    src: string | null;
+  } | null>(null);
   const [imgError, setImgError] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const t = useTranslations("Inbox.bubble");
+  const t = useTranslations('Inbox.bubble');
 
   useEffect(() => {
     if (!isProxy) return;
@@ -136,20 +161,21 @@ function MediaImage({ url, alt, filename }: { url: string; alt: string; filename
 
   const current = loaded?.url === url ? loaded : null;
   const src = isProxy ? (peekMediaObjectUrl(url) ?? current?.src ?? null) : url;
-  const failed = imgError || (isProxy && current !== null && current.src === null);
+  const failed =
+    imgError || (isProxy && current !== null && current.src === null);
 
   if (failed) {
     return (
-      <div className="flex h-40 w-60 items-center justify-center rounded-lg bg-muted">
-        <ImageOff className="h-8 w-8 text-muted-foreground" />
+      <div className="bg-muted flex h-40 w-60 items-center justify-center rounded-lg">
+        <ImageOff className="text-muted-foreground h-8 w-8" />
       </div>
     );
   }
 
   if (!src) {
     return (
-      <div className="flex h-40 w-60 items-center justify-center rounded-lg bg-muted">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="bg-muted flex h-40 w-60 items-center justify-center rounded-lg">
+        <div className="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -159,18 +185,24 @@ function MediaImage({ url, alt, filename }: { url: string; alt: string; filename
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
-        aria-label={t("openImage")}
-        title={t("openImage")}
+        aria-label={t('openImage')}
+        title={t('openImage')}
         className="block cursor-zoom-in"
       >
         <img
           src={src}
           alt={alt}
-          className="h-auto w-auto max-h-96 max-w-full rounded-lg object-contain"
+          className="h-auto max-h-96 w-auto max-w-full rounded-lg object-contain"
           onError={() => setImgError(true)}
         />
       </button>
-      <ImageViewer src={src} alt={alt} filename={filename} open={viewerOpen} onOpenChange={setViewerOpen} />
+      <ImageViewer
+        src={src}
+        alt={alt}
+        filename={filename}
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+      />
     </>
   );
 }
@@ -183,18 +215,18 @@ function MediaImage({ url, alt, filename }: { url: string; alt: string; filename
  */
 function endsInText(message: Message): boolean {
   switch (message.content_type) {
-    case "text":
+    case 'text':
       return true;
-    case "image":
-    case "video":
-    case "template":
+    case 'image':
+    case 'video':
+    case 'template':
       return Boolean(message.content_text);
-    case "document":
+    case 'document':
       return Boolean(message.template_name && message.content_text);
-    case "interactive":
+    case 'interactive':
       return !message.interactive_payload;
-    case "audio":
-    case "location":
+    case 'audio':
+    case 'location':
       return false;
     default:
       return true;
@@ -216,33 +248,37 @@ function MessageContent({
   trailing?: ReactNode;
 }) {
   switch (message.content_type) {
-    case "text":
+    case 'text':
       return (
-        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          <FormattedText text={message.content_text ?? ""} />
+        <p className="text-sm wrap-anywhere whitespace-pre-wrap">
+          <FormattedText text={message.content_text ?? ''} />
           {trailing}
         </p>
       );
 
-    case "image":
+    case 'image':
       return (
         <div>
           {message.template_name && <TemplateBadge t={t} />}
           {message.media_url ? (
-            <MediaImage url={message.media_url} alt="Shared image" filename={message.media_filename} />
+            <MediaImage
+              url={message.media_url}
+              alt="Shared image"
+              filename={message.media_filename}
+            />
           ) : (
-            <MediaUnavailable label={t("photo")} t={t} />
+            <MediaUnavailable label={t('photo')} t={t} />
           )}
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              <FormattedText text={message.content_text ?? ""} />
+            <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">
+              <FormattedText text={message.content_text ?? ''} />
               {trailing}
             </p>
           )}
         </div>
       );
 
-    case "video":
+    case 'video':
       return (
         <div>
           {message.template_name && <TemplateBadge t={t} />}
@@ -253,45 +289,50 @@ function MessageContent({
               className="max-h-64 max-w-60 rounded-lg"
             />
           ) : (
-            <MediaUnavailable label={t("video")} t={t} />
+            <MediaUnavailable label={t('video')} t={t} />
           )}
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              <FormattedText text={message.content_text ?? ""} />
+            <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">
+              <FormattedText text={message.content_text ?? ''} />
               {trailing}
             </p>
           )}
         </div>
       );
 
-    case "audio":
+    case 'audio':
       return (
         <div>
           {message.media_url ? (
             <audio src={message.media_url} controls className="max-w-60" />
           ) : (
-            <MediaUnavailable label={t("audio")} t={t} />
+            <MediaUnavailable label={t('audio')} t={t} />
           )}
         </div>
       );
 
-    case "document": {
+    case 'document': {
       // A template's body is its caption, not the file name.
       const fromTemplate = Boolean(message.template_name);
-      const fileLabel = message.media_filename || (fromTemplate ? t("document") : message.content_text || t("document"));
+      const fileLabel =
+        message.media_filename ||
+        (fromTemplate ? t('document') : message.content_text || t('document'));
       return (
         <div>
           {fromTemplate && <TemplateBadge t={t} />}
           {message.media_url ? (
-            <MediaDownload url={message.media_url} filename={message.media_filename || fileLabel}>
-              <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <MediaDownload
+              url={message.media_url}
+              filename={message.media_filename || fileLabel}
+            >
+              <FileText className="text-muted-foreground h-5 w-5 shrink-0" />
               <span className="truncate">{fileLabel}</span>
             </MediaDownload>
           ) : (
             <MediaUnavailable label={fileLabel} t={t} />
           )}
           {fromTemplate && message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
+            <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">
               <FormattedText text={message.content_text} />
               {trailing}
             </p>
@@ -300,28 +341,28 @@ function MessageContent({
       );
     }
 
-    case "template":
+    case 'template':
       return (
         <div>
           <TemplateBadge t={t} />
           {message.content_text && (
-            <p className="mt-1 whitespace-pre-wrap wrap-anywhere text-sm">
-              <FormattedText text={message.content_text ?? ""} />
+            <p className="mt-1 text-sm wrap-anywhere whitespace-pre-wrap">
+              <FormattedText text={message.content_text ?? ''} />
               {trailing}
             </p>
           )}
         </div>
       );
 
-    case "location":
+    case 'location':
       return (
         <div className="flex items-center gap-2 text-sm">
-          <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span>{message.content_text || t("locationShared")}</span>
+          <MapPin className="text-muted-foreground h-4 w-4 shrink-0" />
+          <span>{message.content_text || t('locationShared')}</span>
         </div>
       );
 
-    case "interactive": {
+    case 'interactive': {
       // Three cases share content_type='interactive':
       //  - OUTBOUND with payload (composer / automation / Flow send after
       //    migration 035): render the buttons/list as they appear on the phone.
@@ -334,23 +375,25 @@ function MessageContent({
       if (message.interactive_payload) {
         return <InteractivePreview payload={message.interactive_payload} />;
       }
-      if (message.sender_type === "customer") {
+      if (message.sender_type === 'customer') {
         return (
           <div className="flex flex-col gap-0.5">
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-[10px] font-medium tracking-wide uppercase">
               <CornerDownLeft className="h-3 w-3" />
-              {t("buttonReply")}
+              {t('buttonReply')}
             </span>
-            <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-              <FormattedText text={message.content_text || t("interactiveReply")} />
+            <p className="text-sm wrap-anywhere whitespace-pre-wrap">
+              <FormattedText
+                text={message.content_text || t('interactiveReply')}
+              />
               {trailing}
             </p>
           </div>
         );
       }
       return (
-        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          <FormattedText text={message.content_text || t("interactiveReply")} />
+        <p className="text-sm wrap-anywhere whitespace-pre-wrap">
+          <FormattedText text={message.content_text || t('interactiveReply')} />
           {trailing}
         </p>
       );
@@ -358,8 +401,8 @@ function MessageContent({
 
     default:
       return (
-        <p className="whitespace-pre-wrap wrap-anywhere text-sm">
-          <FormattedText text={message.content_text || t("unsupported")} />
+        <p className="text-sm wrap-anywhere whitespace-pre-wrap">
+          <FormattedText text={message.content_text || t('unsupported')} />
           {trailing}
         </p>
       );
@@ -373,10 +416,11 @@ export function MessageBubble({
   currentUserId,
   onToggleReaction,
 }: MessageBubbleProps) {
-  const t = useTranslations("Inbox.bubble");
+  const t = useTranslations('Inbox.bubble');
 
-  const isAgent = message.sender_type === "agent" || message.sender_type === "bot";
-  const time = format(new Date(message.created_at), "HH:mm");
+  const isAgent =
+    message.sender_type === 'agent' || message.sender_type === 'bot';
+  const time = format(new Date(message.created_at), 'HH:mm');
 
   // Timestamp + delivery ticks, as WhatsApp lays them out: tucked into
   // the bottom-right corner of the bubble, sharing the last line of text
@@ -396,27 +440,29 @@ export function MessageBubble({
           glance. */}
       {message.ai_generated && (
         <span
-          className="inline-flex items-center gap-0.5 rounded-full bg-primary-foreground/20 px-1.5 py-px text-[9px] font-semibold uppercase leading-none tracking-wide text-primary-foreground"
-          title={t("aiBadgeTitle")}
+          className="bg-primary-foreground/20 text-primary-foreground inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[9px] leading-none font-semibold tracking-wide uppercase"
+          title={t('aiBadgeTitle')}
         >
           <Sparkles className="h-2.5 w-2.5" />
-          {t("aiBadge")}
+          {t('aiBadge')}
         </span>
       )}
       {message.edited_at && (
         <EditedLabel
           history={interactive ? (message.edit_history ?? []) : []}
-          className={isAgent ? "text-primary-foreground/70" : "text-muted-foreground"}
+          className={
+            isAgent ? 'text-primary-foreground/70' : 'text-muted-foreground'
+          }
         />
       )}
       <span
         className={cn(
-          "text-[10px] leading-none",
+          'text-[10px] leading-none',
           // Outbound bubbles sit on the primary fill, so the
           // timestamp must read against that (not the neutral
           // foreground) — otherwise it goes low-contrast in light
           // mode. Inbound bubbles use the muted surface.
-          isAgent ? "text-primary-foreground/70" : "text-muted-foreground",
+          isAgent ? 'text-primary-foreground/70' : 'text-muted-foreground'
         )}
       >
         {time}
@@ -430,18 +476,13 @@ export function MessageBubble({
   // Row alignment + width cap are owned by <MessageActions> so its hover
   // group matches the bubble's content area, not the full row.
   return (
-    <div
-      className={cn(
-        "flex flex-col",
-        isAgent ? "items-end" : "items-start",
-      )}
-    >
+    <div className={cn('flex flex-col', isAgent ? 'items-end' : 'items-start')}>
       <div
         className={cn(
-          "relative rounded-2xl px-3 py-2",
+          'relative rounded-2xl px-3 py-2',
           isAgent
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-muted text-foreground",
+            ? 'bg-primary text-primary-foreground rounded-br-md'
+            : 'bg-muted text-foreground rounded-bl-md'
         )}
       >
         {reply && (
@@ -462,11 +503,15 @@ export function MessageBubble({
             ) : undefined
           }
         />
-        {message.media_url && ['image', 'video', 'audio'].includes(message.content_type) && (
-          <MediaDownload url={message.media_url} filename={message.media_filename} />
-        )}
+        {message.media_url &&
+          ['image', 'video', 'audio'].includes(message.content_type) && (
+            <MediaDownload
+              url={message.media_url}
+              filename={message.media_filename}
+            />
+          )}
         {inlineMeta ? (
-          <span className="absolute bottom-2 right-3">{renderMeta(true)}</span>
+          <span className="absolute right-3 bottom-2">{renderMeta(true)}</span>
         ) : (
           <div className="mt-1 flex justify-end">{renderMeta(true)}</div>
         )}
