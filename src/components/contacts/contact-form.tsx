@@ -74,6 +74,7 @@ export function ContactForm({
 
   useEffect(() => {
     if (open) {
+      duplicateRequest.current++;
       setName(contact?.name ?? '');
       setPhone(contact?.phone ?? '');
       setEmail(contact?.email ?? '');
