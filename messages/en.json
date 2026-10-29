@@ -345,7 +345,9 @@
       "toastBulkFailedDelete": "Failed to delete contacts",
       "toastBulkDeleted": "{count} contacts deleted",
       "fieldsAndTagsBtn": "Fields & tags",
-      "excludeTags": "Exclude tags"
+      "excludeTags": "Exclude tags",
+      "exportBtn": "Export contacts",
+      "exportHint": "Exports all contacts matching the current search and tag filters, including all their tags. Clear filters to export everyone."
     },
     "form": {
       "addTitle": "Add Contact",

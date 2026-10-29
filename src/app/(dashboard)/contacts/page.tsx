@@ -63,6 +63,8 @@ import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { TagMultiSelect, TagPickerList } from '@/components/ui/tag-multi-select';
 import { contactDisplayName } from '@/lib/contacts/display-name';
+import { contactsCsv } from '@/lib/contacts/export-csv';
+import { fetchAllRows } from '@/lib/supabase/batching';
 import { useTranslations } from 'next-intl';
 
 const PAGE_SIZE = 25;
@@ -146,6 +148,7 @@ export default function ContactsPage() {
 
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -365,6 +368,46 @@ export default function ContactsPage() {
     setDeleteConfirmOpen(true);
   }
 
+  async function exportContacts() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await fetchAllRows<{ contact: Contact; total_count: number }>((from, to) =>
+        supabase.rpc('filter_contacts_by_tags', {
+          p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
+          p_include_untagged: selectedTagIds.includes(UNTAGGED),
+          p_exclude_tag_ids: excludedTagIds.filter((id) => id !== UNTAGGED),
+          p_exclude_untagged: excludedTagIds.includes(UNTAGGED),
+          p_search: search.trim() || null,
+          p_sort_column: sortColumn,
+          p_sort_dir: sortDirection,
+          p_limit: to - from + 1,
+          p_offset: from,
+        }),
+      );
+      if (result.error) throw result.error;
+      const assignments = await fetchAllRows<{ contact_id: string; tags: { name: string } | null }>((from, to) =>
+        supabase.from('contact_tags').select('contact_id, tags(name)').order('id').range(from, to),
+      );
+      if (assignments.error) throw assignments.error;
+      const tags = new Map<string, string[]>();
+      for (const row of assignments.rows) {
+        if (!row.tags) continue;
+        tags.set(row.contact_id, [...(tags.get(row.contact_id) ?? []), row.tags.name]);
+      }
+      const url = URL.createObjectURL(new Blob([contactsCsv(result.rows.map((row) => row.contact), tags)], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'contacts.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error(t('toastFailedLoad'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -573,6 +616,10 @@ export default function ContactsPage() {
             Wrapping them keeps every action reachable; `justify-end`
             keeps the wrapped rows aligned with the primary action. */}
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" disabled={exporting} onClick={exportContacts} title={t('exportHint')}>
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4 rotate-180" />}
+            {t('exportBtn')}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setFieldsAndTagsOpen(true)}

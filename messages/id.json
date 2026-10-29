@@ -345,7 +345,9 @@
       "toastBulkFailedDelete": "Gagal menghapus kontak",
       "toastBulkDeleted": "{count} kontak dihapus",
       "fieldsAndTagsBtn": "Kolom & tag",
-      "excludeTags": "Kecualikan tag"
+      "excludeTags": "Kecualikan tag",
+      "exportBtn": "Ekspor kontak",
+      "exportHint": "Ekspor semua kontak yang cocok dengan pencarian dan filter tag, beserta semua tagnya. Hapus filter untuk mengekspor semua kontak."
     },
     "form": {
       "addTitle": "Tambah Kontak",
