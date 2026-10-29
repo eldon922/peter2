@@ -361,10 +361,13 @@ export async function POST(request: Request) {
  * but a row created before the constraint, or a race, would still land
  * here. Returns null in every failure case; the caller skips the event.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function resolveConfigByPhoneNumberId(
   phoneNumberId: string
-): Promise<any | null> {
+): Promise<{
+  account_id: string;
+  user_id: string;
+  access_token: string;
+} | null> {
   const { data: configRows, error } = await supabaseAdmin()
     .from('whatsapp_config')
     .select('*')
