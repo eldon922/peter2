@@ -960,7 +960,8 @@
           "saving": "수신자 저장 중…",
           "starting": "발송 시작 중…"
         },
-        "savingCounts": "{total}명 중 {done}명 저장됨 · {remaining}명 남음"
+        "savingCounts": "{total}명 중 {done}명 저장됨 · {remaining}명 남음",
+        "previewUnavailable": "메시지 미리보기를 불러올 수 없습니다. 대화 상자를 닫고 다시 시도하세요."
       },
       "contactList": {
         "title": "수신자",

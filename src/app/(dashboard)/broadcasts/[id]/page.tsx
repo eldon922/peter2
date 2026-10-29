@@ -56,6 +56,7 @@ import { TagChips } from '@/components/broadcasts/tag-chips';
 import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
+import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
 
 interface StatCardProps {
   label: string;
@@ -253,6 +254,7 @@ export default function BroadcastDetailPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryConfirmation, setRetryConfirmation] = useState<{ recipientId?: string } | null>(null);
   /**
    * Set right after the server accepts a retry, so the progress bar
    * below can track just *that* retry's slice rather than the whole
@@ -706,7 +708,7 @@ export default function BroadcastDetailPage() {
             variant="outline"
             size="sm"
             disabled={broadcast.status === 'sending' || retrying !== null}
-            onClick={() => handleRetry()}
+            onClick={() => setRetryConfirmation({})}
             title={
               broadcast.status === 'sending'
                 ? t('cannotRetrySending')
@@ -929,6 +931,10 @@ export default function BroadcastDetailPage() {
       <FunnelChart steps={funnelSteps} sent={broadcast.sent_count} />
 
       {/* Recipients Table */}
+      <SendConfirmationDialog open={retryConfirmation !== null} onOpenChange={(open) => { if (!open) setRetryConfirmation(null); }}
+        broadcast={broadcast} recipientId={retryConfirmation?.recipientId} retry busy={retrying !== null}
+        title={t('retryHover')} confirmLabel={t('retryRow')}
+        onConfirm={() => { const target = retryConfirmation?.recipientId; setRetryConfirmation(null); void handleRetry(target); }} />
       <div className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium text-foreground">
@@ -1174,7 +1180,7 @@ export default function BroadcastDetailPage() {
                             disabled={
                               broadcast.status === 'sending' || retrying !== null
                             }
-                            onClick={() => handleRetry(recipient.id)}
+                            onClick={() => setRetryConfirmation({ recipientId: recipient.id })}
                             title={
                               changed
                                 ? t('retryChangedNumber', {

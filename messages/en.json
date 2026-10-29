@@ -960,7 +960,8 @@
           "saving": "Saving recipients…",
           "starting": "Starting to send…"
         },
-        "savingCounts": "{done} of {total} saved · {remaining} remaining"
+        "savingCounts": "{done} of {total} saved · {remaining} remaining",
+        "previewUnavailable": "The message preview could not be loaded. Close this dialog and try again."
       },
       "contactList": {
         "title": "Recipients",

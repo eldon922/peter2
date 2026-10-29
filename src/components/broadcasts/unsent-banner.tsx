@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
+import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
 import { formatScheduledAt, missedItsTime } from '@/lib/broadcasts/schedule';
 
 interface UnsentBannerProps {
@@ -205,12 +206,11 @@ export function UnsentBanner({
         }
       />
 
-      <ConfirmDialog
+      <SendConfirmationDialog
         open={confirming === 'start'}
+        broadcast={broadcast}
         onOpenChange={(open) => !open && setConfirming(null)}
         title={t('startConfirmTitle')}
-        description={t('startConfirmDesc', { count: broadcast.total_recipients })}
-        cancelLabel={t('cancel')}
         confirmLabel={t('startNow')}
         busy={busy === 'start'}
         onConfirm={start}

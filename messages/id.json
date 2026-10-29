@@ -960,7 +960,8 @@
           "saving": "Menyimpan penerima…",
           "starting": "Memulai pengiriman…"
         },
-        "savingCounts": "{done} dari {total} tersimpan · {remaining} tersisa"
+        "savingCounts": "{done} dari {total} tersimpan · {remaining} tersisa",
+        "previewUnavailable": "Pratinjau pesan tidak dapat dimuat. Tutup dialog ini dan coba lagi."
       },
       "contactList": {
         "title": "Penerima",
