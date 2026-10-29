@@ -304,7 +304,7 @@ function InboxPageInner() {
                     unread_count:
                       canMarkRead && activeConversation?.id === newMsg.conversation_id
                         ? 0
-                        : c.unread_count + 1,
+                        : c.unread_count + (newMsg.sender_type === 'customer' ? 1 : 0),
                   }
                 : c,
             ),
@@ -441,8 +441,12 @@ function InboxPageInner() {
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener('online', onVisibility);
+    const timer = setInterval(onVisibility, 10_000);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener('online', onVisibility);
+      clearInterval(timer);
     };
   }, []);
 

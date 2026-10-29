@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { fetchAllRows } from '@/lib/supabase/batching';
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -123,10 +124,11 @@ export function ConversationList({
     let cancelled = false;
 
     (async () => {
-      const { data, error } = await supabase
+      const { rows: data, error } = await fetchAllRows<Conversation>((from, to) => supabase
         .from("conversations")
         .select(CONVERSATION_SELECT)
-        .order("last_message_at", { ascending: false });
+        .order('id')
+        .range(from, to));
 
       if (cancelled) return;
 
