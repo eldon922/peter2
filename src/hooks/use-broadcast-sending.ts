@@ -53,12 +53,7 @@ interface BroadcastPayload {
 }
 
 export type SendingStage =
-  | 'uploading'
-  | 'resolving'
-  | 'creating'
-  | 'preparing'
-  | 'saving'
-  | 'starting';
+  'uploading' | 'resolving' | 'creating' | 'preparing' | 'saving' | 'starting';
 
 interface UseBroadcastSendingReturn {
   createAndSendBroadcast: (payload: BroadcastPayload) => Promise<string>;
@@ -73,7 +68,7 @@ interface UseBroadcastSendingReturn {
 /** Bulk-fetch contacts by id, chunked to stay under the request-size limit. */
 async function fetchContactsByIds(
   supabase: ReturnType<typeof createClient>,
-  contactIds: string[],
+  contactIds: string[]
 ): Promise<Contact[]> {
   const contacts: Contact[] = [];
   for (const slice of chunkIds(contactIds)) {
@@ -119,15 +114,21 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<SendingStage | null>(null);
-  const [counts, setCounts] = useState<{ done: number; total: number } | null>(null);
+  const [counts, setCounts] = useState<{ done: number; total: number } | null>(
+    null
+  );
 
   async function resolveAudience(audience: AudienceConfig): Promise<Contact[]> {
     const supabase = createClient();
     const resolved = await resolveWizardAudience(supabase, audience);
     if (!resolved) return [];
-    if (resolved.kind === 'csv') return upsertCsvContacts(supabase, resolved.contacts);
-    if (resolved.kind === 'ids') return fetchContactsByIds(supabase, resolved.ids);
-    const { rows, error } = await fetchAllRows<Contact>((from, to) => supabase.from('contacts').select('*').order('id').range(from, to));
+    if (resolved.kind === 'csv')
+      return upsertCsvContacts(supabase, resolved.contacts);
+    if (resolved.kind === 'ids')
+      return fetchContactsByIds(supabase, resolved.ids);
+    const { rows, error } = await fetchAllRows<Contact>((from, to) =>
+      supabase.from('contacts').select('*').order('id').range(from, to)
+    );
     if (error) throw new Error(error.message);
     return rows;
   }
@@ -145,7 +146,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
    */
   async function upsertCsvContacts(
     supabase: ReturnType<typeof createClient>,
-    csvRows: { phone: string; name?: string }[],
+    csvRows: { phone: string; name?: string }[]
   ): Promise<Contact[]> {
     if (csvRows.length === 0) return [];
 
@@ -163,15 +164,25 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     // De-duplicate by phone within the CSV (users can paste duplicates).
     const uniqueByPhone = new Map<string, { phone: string; name?: string }>();
     for (const row of csvRows) {
-      if (normalizeKey(row.phone) && !uniqueByPhone.has(normalizeKey(row.phone))) uniqueByPhone.set(normalizeKey(row.phone), row);
+      if (
+        normalizeKey(row.phone) &&
+        !uniqueByPhone.has(normalizeKey(row.phone))
+      )
+        uniqueByPhone.set(normalizeKey(row.phone), row);
     }
     const phones = [...uniqueByPhone.keys()];
 
     const byPhone = new Map<string, Contact>();
     for (const chunk of chunkIds(phones)) {
-      const { data: existing, error } = await supabase.from('contacts').select('*').eq('account_id', accountId).in('phone_normalized', chunk);
-      if (error) throw new Error(`Failed to look up CSV contacts: ${error.message}`);
-      for (const contact of (existing ?? []) as Contact[]) byPhone.set(normalizeKey(contact.phone), contact);
+      const { data: existing, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('account_id', accountId)
+        .in('phone_normalized', chunk);
+      if (error)
+        throw new Error(`Failed to look up CSV contacts: ${error.message}`);
+      for (const contact of (existing ?? []) as Contact[])
+        byPhone.set(normalizeKey(contact.phone), contact);
     }
 
     // Insert only missing contacts, in one batch per 200 rows (PostgREST
@@ -204,7 +215,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .filter((c): c is Contact => Boolean(c));
   }
 
-  async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
+  async function createAndSendBroadcast(
+    payload: BroadcastPayload
+  ): Promise<string> {
     setIsProcessing(true);
     setProgress(0);
     setStage('resolving');
@@ -292,7 +305,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
           // notice an aged id. Stamped at insert, which trails the actual
           // upload by however long the user sat in the wizard — the check
           // keeps a 1-day margin for that.
-          header_media_uploaded_at: headerMediaId ? new Date().toISOString() : null,
+          header_media_uploaded_at: headerMediaId
+            ? new Date().toISOString()
+            : null,
           audience_filter: {
             type: payload.audience.type,
             tagIds: payload.audience.tagIds,
@@ -310,7 +325,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
       if (broadcastError || !broadcast) {
         throw new Error(
-          `Failed to create broadcast: ${broadcastError?.message ?? 'unknown error'}`,
+          `Failed to create broadcast: ${broadcastError?.message ?? 'unknown error'}`
         );
       }
 
@@ -323,7 +338,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       setStage('preparing');
       const customValueIndex = await fetchCustomValueIndex(
         supabase,
-        contacts.map((c) => c.id),
+        contacts.map((c) => c.id)
       );
       const paramsByContact = new Map<string, string[]>(
         contacts.map((contact) => [
@@ -331,9 +346,9 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
           resolveVariables(
             payload.variables,
             contact,
-            customValueIndex.get(contact.id),
+            customValueIndex.get(contact.id)
           ),
-        ]),
+        ])
       );
 
       const recipientRows = contacts.map((contact) => ({
@@ -362,7 +377,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
             .update({ status: 'failed' })
             .eq('id', broadcast.id);
           throw new Error(
-            `Failed to insert recipient batch ${batchIndex + 1}: ${recipientError.message}`,
+            `Failed to insert recipient batch ${batchIndex + 1}: ${recipientError.message}`
           );
         }
         saved += batch.length;
@@ -381,7 +396,12 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // the detail page polls for live progress.
       setProgress(40);
       if (!payload.scheduledAt) setStage('starting');
-      await finishBroadcast(supabase, broadcast.id, contacts.length, payload.scheduledAt);
+      await finishBroadcast(
+        supabase,
+        broadcast.id,
+        contacts.length,
+        payload.scheduledAt
+      );
 
       setProgress(100);
       return broadcast.id;

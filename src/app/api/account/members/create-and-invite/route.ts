@@ -131,8 +131,9 @@ export async function POST(request: Request) {
       password?: unknown;
     } | null;
 
-    const username = typeof body?.username === 'string' ? body.username.trim() : '';
-    const domain = process.env.USERNAME_EMAIL_DOMAIN || "";
+    const username =
+      typeof body?.username === 'string' ? body.username.trim() : '';
+    const domain = process.env.USERNAME_EMAIL_DOMAIN || '';
     const email = username.trim().toLowerCase() + domain;
     if (!email || !EMAIL_RE.test(email)) {
       return NextResponse.json(
@@ -173,13 +174,17 @@ export async function POST(request: Request) {
     if (typeof body?.password === 'string' && body.password.length > 0) {
       if (body.password.length < MIN_PASSWORD_LEN) {
         return NextResponse.json(
-          { error: `'password' must be at least ${MIN_PASSWORD_LEN} characters` },
+          {
+            error: `'password' must be at least ${MIN_PASSWORD_LEN} characters`,
+          },
           { status: 400 }
         );
       }
       if (body.password.length > MAX_PASSWORD_LEN) {
         return NextResponse.json(
-          { error: `'password' must be ${MAX_PASSWORD_LEN} characters or fewer` },
+          {
+            error: `'password' must be ${MAX_PASSWORD_LEN} characters or fewer`,
+          },
           { status: 400 }
         );
       }

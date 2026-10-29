@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -87,7 +87,7 @@
 /* ---- MODE: neutral surfaces ---- */
 
 :root,
-html[data-mode="dark"] {
+html[data-mode='dark'] {
   --background: oklch(0.13 0.01 260);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.18 0.01 260);
@@ -116,7 +116,7 @@ html[data-mode="dark"] {
   --sidebar-border: oklch(0.28 0.01 260);
 }
 
-html[data-mode="light"] {
+html[data-mode='light'] {
   --background: oklch(0.99 0.002 260);
   --foreground: oklch(0.21 0.01 260);
   --card: oklch(1 0 0);
@@ -148,7 +148,7 @@ html[data-mode="light"] {
 /* ---- ACCENT: primary color ---- */
 
 :root,
-html[data-theme="red"] {
+html[data-theme='red'] {
   --primary: oklch(0.3352 0.1352 28.19);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.66 0.22 25);
@@ -161,7 +161,7 @@ html[data-theme="red"] {
   --sidebar-ring: oklch(0.3352 0.1352 28.19);
 }
 
-html[data-theme="violet"] {
+html[data-theme='violet'] {
   --primary: oklch(0.526 0.247 293);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.6 0.22 293);
@@ -174,7 +174,7 @@ html[data-theme="violet"] {
   --sidebar-ring: oklch(0.526 0.247 293);
 }
 
-html[data-theme="emerald"] {
+html[data-theme='emerald'] {
   --primary: oklch(0.62 0.16 162);
   --primary-foreground: oklch(0.16 0.02 162);
   --primary-hover: oklch(0.68 0.15 162);
@@ -188,7 +188,7 @@ html[data-theme="emerald"] {
   --sidebar-ring: oklch(0.62 0.16 162);
 }
 
-html[data-theme="cobalt"] {
+html[data-theme='cobalt'] {
   --primary: oklch(0.585 0.2 254);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.66 0.18 254);
@@ -202,7 +202,7 @@ html[data-theme="cobalt"] {
   --sidebar-ring: oklch(0.585 0.2 254);
 }
 
-html[data-theme="amber"] {
+html[data-theme='amber'] {
   --primary: oklch(0.745 0.16 65);
   --primary-foreground: oklch(0.18 0.03 65);
   --primary-hover: oklch(0.8 0.15 65);
@@ -216,7 +216,7 @@ html[data-theme="amber"] {
   --sidebar-ring: oklch(0.745 0.16 65);
 }
 
-html[data-theme="rose"] {
+html[data-theme='rose'] {
   --primary: oklch(0.645 0.22 16);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.71 0.2 16);
@@ -230,7 +230,7 @@ html[data-theme="rose"] {
   --sidebar-ring: oklch(0.645 0.22 16);
 }
 
-html:not([data-mode="light"]):is([data-theme="red"], :not([data-theme])) {
+html:not([data-mode='light']):is([data-theme='red'], :not([data-theme])) {
   --primary: oklch(0.72 0.17 24);
   --primary-foreground: oklch(0.16 0.025 24);
   --primary-hover: oklch(0.78 0.14 24);

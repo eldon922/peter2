@@ -87,7 +87,11 @@ interface CreatedInvite {
   accountName: string;
   /** Only set in 'new' mode — the login credentials for the
    *  account we just provisioned, shown exactly once. */
-  newAccount?: { username: string; tempPassword: string; isCustomPassword: boolean };
+  newAccount?: {
+    username: string;
+    tempPassword: string;
+    isCustomPassword: boolean;
+  };
   /** True when `autoJoin` moved the user straight into the
    *  account server-side — no invite link exists for this one. */
   joined?: boolean;
@@ -152,7 +156,11 @@ export function InviteMemberDialog({
     // Mirror the server's bounds check (see MIN_PASSWORD_LEN comment
     // above) — same fail-fast-before-the-round-trip reasoning as the
     // label check just above.
-    if (mode === 'new' && setOwnPassword && password.length < MIN_PASSWORD_LEN) {
+    if (
+      mode === 'new' &&
+      setOwnPassword &&
+      password.length < MIN_PASSWORD_LEN
+    ) {
       toast.error(`Password must be at least ${MIN_PASSWORD_LEN} characters`);
       return;
     }
@@ -166,19 +174,19 @@ export function InviteMemberDialog({
       const payload =
         mode === 'new'
           ? {
-            username: trimmedUsername,
-            fullName: fullName.trim() || undefined,
-            role,
-            expiresInDays: Number(expiry),
-            label: trimmedLabel || undefined,
-            autoJoin,
-            password: setOwnPassword ? password : undefined,
-          }
+              username: trimmedUsername,
+              fullName: fullName.trim() || undefined,
+              role,
+              expiresInDays: Number(expiry),
+              label: trimmedLabel || undefined,
+              autoJoin,
+              password: setOwnPassword ? password : undefined,
+            }
           : {
-            role,
-            expiresInDays: Number(expiry),
-            label: trimmedLabel || undefined,
-          };
+              role,
+              expiresInDays: Number(expiry),
+              label: trimmedLabel || undefined,
+            };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -190,9 +198,9 @@ export function InviteMemberDialog({
         const responseBody = await res.json().catch(() => ({}));
         toast.error(
           responseBody.error ||
-          (mode === 'new'
-            ? 'Failed to create account and invitation'
-            : 'Failed to create invitation')
+            (mode === 'new'
+              ? 'Failed to create account and invitation'
+              : 'Failed to create invitation')
         );
         return;
       }
@@ -219,10 +227,10 @@ export function InviteMemberDialog({
         newAccount:
           data.user && data.tempPassword
             ? {
-              username: getUsernameFromEmail(data.user.email),
-              tempPassword: data.tempPassword,
-              isCustomPassword: data.isCustomPassword === true,
-            }
+                username: getUsernameFromEmail(data.user.email),
+                tempPassword: data.tempPassword,
+                isCustomPassword: data.isCustomPassword === true,
+              }
             : undefined,
         joined: data.joined === true,
       });
@@ -254,7 +262,11 @@ export function InviteMemberDialog({
     // for users in multi-team contexts where "our wacrm account"
     // wouldn't be enough to disambiguate.
     const accountName = result?.accountName ?? 'our wacrm account';
-    const message = t('whatsappMessage', { accountName, expiresInDays: result?.expiresInDays ?? 0, url });
+    const message = t('whatsappMessage', {
+      accountName,
+      expiresInDays: result?.expiresInDays ?? 0,
+      url,
+    });
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   }
 
@@ -272,16 +284,13 @@ export function InviteMemberDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={handleOpenChange}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="bg-popover border-border sm:max-w-lg">
         {result ? (
           <>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-popover-foreground">
-                <Sparkles className="size-4 text-primary" />
+              <DialogTitle className="text-popover-foreground flex items-center gap-2">
+                <Sparkles className="text-primary size-4" />
                 {result.joined
                   ? 'Account created & joined'
                   : result.newAccount
@@ -300,11 +309,15 @@ export function InviteMemberDialog({
                     teammate. They&apos;ll sign in, then accept the invite to
                     join as{' '}
                   </>
-                ) : t.rich('inviteCreatedDesc', {
-                  role: tRoles(result.role),
-                  days: result.expiresInDays,
-                  bold: (chunks: React.ReactNode) => <strong>{chunks}</strong>
-                })}
+                ) : (
+                  t.rich('inviteCreatedDesc', {
+                    role: tRoles(result.role),
+                    days: result.expiresInDays,
+                    bold: (chunks: React.ReactNode) => (
+                      <strong>{chunks}</strong>
+                    ),
+                  })
+                )}
               </DialogDescription>
             </DialogHeader>
 
@@ -312,7 +325,9 @@ export function InviteMemberDialog({
               {result.newAccount && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Login username</Label>
+                    <Label className="text-muted-foreground">
+                      Login username
+                    </Label>
                     <Input
                       readOnly
                       value={result.newAccount.username}
@@ -321,9 +336,7 @@ export function InviteMemberDialog({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">
-                      Password
-                    </Label>
+                    <Label className="text-muted-foreground">Password</Label>
                     <div className="flex gap-2">
                       <Input
                         readOnly
@@ -361,7 +374,10 @@ export function InviteMemberDialog({
               )}
 
               {result.url && (
-                <><Label className="text-muted-foreground">{t('inviteLink')}</Label>
+                <>
+                  <Label className="text-muted-foreground">
+                    {t('inviteLink')}
+                  </Label>
                   <div className="flex gap-2">
                     <Input
                       readOnly
@@ -403,13 +419,12 @@ export function InviteMemberDialog({
                     className={buttonVariants({
                       variant: 'outline',
                       className:
-                        'w-full border-border text-muted-foreground hover:bg-muted',
+                        'border-border text-muted-foreground hover:bg-muted w-full',
                     })}
                   >
                     <MessageCircle className="size-4" />
                     {t('sendViaWhatsApp')}
                   </a>
-
                 </>
               )}
             </div>
@@ -427,9 +442,7 @@ export function InviteMemberDialog({
           <>
             <DialogHeader>
               <DialogTitle className="text-popover-foreground">
-                {mode === 'new'
-                  ? 'Create account & invite'
-                  : t('dialogTitle')}
+                {mode === 'new' ? 'Create account & invite' : t('dialogTitle')}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {mode === 'new'
@@ -455,23 +468,30 @@ export function InviteMemberDialog({
 
               <TabsContent value={mode} className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">{t('roleLabel')}</Label>
+                  <Label className="text-muted-foreground">
+                    {t('roleLabel')}
+                  </Label>
                   <Select
                     value={role}
                     onValueChange={(v) => v && setRole(v as InviteRole)}
                   >
-                    <SelectTrigger className="w-full bg-muted border-border text-foreground">
+                    <SelectTrigger className="bg-muted border-border text-foreground w-full">
                       <SelectValue>{tRoles(role)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">{tRoles('admin')}</SelectItem>
                       <SelectItem value="agent">{tRoles('agent')}</SelectItem>
-                      <SelectItem value="replier">{tRoles('replier')}</SelectItem>
+                      <SelectItem value="replier">
+                        {tRoles('replier')}
+                      </SelectItem>
                       <SelectItem value="viewer">{tRoles('viewer')}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {tRoles(`${role}Hint` as 'adminHint' | 'agentHint' | 'replierHint' | 'viewerHint')}
+                  <p className="text-muted-foreground text-xs">
+                    {tRoles(
+                      `${role}Hint` as
+                        'adminHint' | 'agentHint' | 'replierHint' | 'viewerHint'
+                    )}
                   </p>
                 </div>
 
@@ -571,12 +591,14 @@ export function InviteMemberDialog({
 
                 {!(mode === 'new' && autoJoin) && (
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">{t('validForLabel')}</Label>
+                    <Label className="text-muted-foreground">
+                      {t('validForLabel')}
+                    </Label>
                     <Select
                       value={expiry}
                       onValueChange={(v) => v && setExpiry(v)}
                     >
-                      <SelectTrigger className="w-full bg-muted border-border text-foreground">
+                      <SelectTrigger className="bg-muted border-border text-foreground w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -593,7 +615,9 @@ export function InviteMemberDialog({
                 <div className="space-y-2">
                   <Label className="text-muted-foreground">
                     {t('labelTitle')}{' '}
-                    <span className="text-xs text-muted-foreground">{t('optional')}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {t('optional')}
+                    </span>
                   </Label>
                   <Input
                     placeholder={t('labelPlaceholder')}
@@ -602,7 +626,7 @@ export function InviteMemberDialog({
                     maxLength={MAX_LABEL_LEN}
                     className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {mode === 'new' && autoJoin
                       ? 'Helps you remember why this account was created, in the members audit log.'
                       : t('labelHint')}

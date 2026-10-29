@@ -5,8 +5,15 @@ import { Check, FileIcon, ImageIcon, Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { checkMediaFile, MEDIA_SPECS, type HeaderMediaKind } from '@/lib/media-specs';
-import { headerMediaError, type HeaderMedia } from '@/lib/broadcasts/header-media';
+import {
+  checkMediaFile,
+  MEDIA_SPECS,
+  type HeaderMediaKind,
+} from '@/lib/media-specs';
+import {
+  headerMediaError,
+  type HeaderMedia,
+} from '@/lib/broadcasts/header-media';
 import { uploadAccountMedia } from '@/lib/storage/upload-media';
 
 interface Props {
@@ -21,7 +28,9 @@ interface Props {
 
 const tabClass = (active: boolean) =>
   `inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-    active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+    active
+      ? 'bg-primary text-primary-foreground'
+      : 'text-muted-foreground hover:text-foreground'
   }`;
 
 /**
@@ -29,7 +38,13 @@ const tabClass = (active: boolean) =>
  * Both end up as a Meta media id when sending, so the choice is only about
  * where the file comes from.
  */
-export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit }: Props) {
+export function HeaderMediaPicker({
+  kind,
+  value,
+  onChange,
+  defaultUrl,
+  onSubmit,
+}: Props) {
   const t = useTranslations('Broadcasts.wizard.personalize');
   const [mode, setMode] = useState<'upload' | 'url'>(
     value.source ?? (value.url && !value.mediaId ? 'url' : 'upload')
@@ -52,7 +67,11 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
     } else {
       setPreviewUrl('');
       setFileName('');
-      onChange({ mediaId: '', url: value.url || defaultUrl || '', source: 'url' });
+      onChange({
+        mediaId: '',
+        url: value.url || defaultUrl || '',
+        source: 'url',
+      });
     }
   }
 
@@ -63,7 +82,9 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
       return;
     }
     if (issue?.problem === 'size') {
-      toast.error(t('toastMediaTooLarge', { size: issue.size, limit: issue.limit }));
+      toast.error(
+        t('toastMediaTooLarge', { size: issue.size, limit: issue.limit })
+      );
       return;
     }
 
@@ -82,23 +103,32 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
   }
 
   const error = headerMediaError(value);
-  const linkPreview = kind === 'image' && mode === 'url' && error === null && value.url.trim();
+  const linkPreview =
+    kind === 'image' && mode === 'url' && error === null && value.url.trim();
 
   return (
     <div>
-      <div className="mb-3 inline-flex rounded-lg border border-border bg-muted p-0.5">
-        <button type="button" onClick={() => switchMode('upload')} className={tabClass(mode === 'upload')}>
+      <div className="border-border bg-muted mb-3 inline-flex rounded-lg border p-0.5">
+        <button
+          type="button"
+          onClick={() => switchMode('upload')}
+          className={tabClass(mode === 'upload')}
+        >
           <Upload className="h-3.5 w-3.5" />
           {t('uploadTab')}
         </button>
-        <button type="button" onClick={() => switchMode('url')} className={tabClass(mode === 'url')}>
+        <button
+          type="button"
+          onClick={() => switchMode('url')}
+          className={tabClass(mode === 'url')}
+        >
           {t('urlTab')}
         </button>
       </div>
 
       {mode === 'upload' ? (
         <div>
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-muted">
+          <label className="border-border bg-muted/50 hover:border-primary/50 hover:bg-muted flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors">
             <input
               type="file"
               accept={MEDIA_SPECS[kind].mimeTypes.join(',')}
@@ -111,37 +141,46 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
               }}
             />
             {uploading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <Loader2 className="text-primary h-5 w-5 animate-spin" />
             ) : kind === 'image' ? (
-              <ImageIcon className="h-5 w-5 text-muted-foreground" />
+              <ImageIcon className="text-muted-foreground h-5 w-5" />
             ) : (
-              <FileIcon className="h-5 w-5 text-muted-foreground" />
+              <FileIcon className="text-muted-foreground h-5 w-5" />
             )}
-            <span className="text-sm font-medium text-foreground">
-              {uploading ? t('uploading') : value.mediaId ? t('replaceFile') : t('chooseFile')}
+            <span className="text-foreground text-sm font-medium">
+              {uploading
+                ? t('uploading')
+                : value.mediaId
+                  ? t('replaceFile')
+                  : t('chooseFile')}
             </span>
-            <span className="text-xs text-muted-foreground">{t(`${kind}Hint`)}</span>
+            <span className="text-muted-foreground text-xs">
+              {t(`${kind}Hint`)}
+            </span>
           </label>
 
-          {(value.mediaId || (mode === 'upload' && value.url)) && !uploading && (
-            <div className="mt-2 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs text-primary">
-              <Check className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{t('uploadedReady', { name: fileName || kind })}</span>
-            </div>
-          )}
+          {(value.mediaId || (mode === 'upload' && value.url)) &&
+            !uploading && (
+              <div className="bg-primary/10 text-primary mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-xs">
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {t('uploadedReady', { name: fileName || kind })}
+                </span>
+              </div>
+            )}
 
           {kind === 'image' && previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={previewUrl}
               alt={t('preview')}
-              className="mt-3 max-h-40 rounded-lg border border-border object-contain"
+              className="border-border mt-3 max-h-40 rounded-lg border object-contain"
             />
           )}
         </div>
       ) : (
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+          <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
             {t('imageUrl')}
           </label>
           <Input
@@ -159,7 +198,7 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
             <img
               src={linkPreview}
               alt={t('preview')}
-              className="mt-3 max-h-40 rounded-lg border border-border object-contain"
+              className="border-border mt-3 max-h-40 rounded-lg border object-contain"
             />
           )}
         </div>
@@ -167,7 +206,9 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
 
       {error && (
         <p className="mt-1.5 text-xs text-amber-300">
-          {error === 'missing' ? t('headerMediaMissing') : t('headerMediaInvalid')}
+          {error === 'missing'
+            ? t('headerMediaMissing')
+            : t('headerMediaInvalid')}
         </p>
       )}
     </div>

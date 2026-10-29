@@ -29,17 +29,18 @@ export function BroadcastMessagePreview({
     <div className="rounded-lg bg-[#EFEAE2] p-3 dark:bg-[#0B141A]">
       <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-sm bg-[#D9FDD3] px-3 py-2 shadow-sm dark:bg-[#005C4B]">
         {headerType === 'text' && template.header_content && (
-          <p className="mb-1 break-words text-sm font-semibold text-[#111B21] dark:text-[#E9EDEF]">
+          <p className="mb-1 text-sm font-semibold break-words text-[#111B21] dark:text-[#E9EDEF]">
             {template.header_content}
           </p>
         )}
-        {headerType && headerType !== 'text' && (
-          imageSrc ? (
+        {headerType &&
+          headerType !== 'text' &&
+          (imageSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imageSrc}
               alt=""
-              className="mb-1.5 h-auto w-auto max-h-80 max-w-full rounded-md object-contain"
+              className="mb-1.5 h-auto max-h-80 w-auto max-w-full rounded-md object-contain"
             />
           ) : (
             <div className="mb-1.5 flex h-20 items-center justify-center rounded-md bg-black/10 text-[#667781] dark:bg-white/10 dark:text-[#E9EDEF]/60">
@@ -49,13 +50,12 @@ export function BroadcastMessagePreview({
                 <FileIcon className="h-6 w-6" />
               )}
             </div>
-          )
-        )}
-        <p className="whitespace-pre-wrap break-words text-sm text-[#111B21] dark:text-[#E9EDEF]">
+          ))}
+        <p className="text-sm break-words whitespace-pre-wrap text-[#111B21] dark:text-[#E9EDEF]">
           {formatted ? <FormattedText text={bodyText} /> : bodyText}
         </p>
         {template.footer_text && (
-          <p className="mt-1 break-words text-xs text-[#667781] dark:text-[#E9EDEF]/60">
+          <p className="mt-1 text-xs break-words text-[#667781] dark:text-[#E9EDEF]/60">
             {template.footer_text}
           </p>
         )}
@@ -67,7 +67,7 @@ export function BroadcastMessagePreview({
         </div>
       </div>
       {template.buttons && template.buttons.length > 0 && (
-        <div className="ml-auto mt-1 flex max-w-[85%] flex-col gap-1">
+        <div className="mt-1 ml-auto flex max-w-[85%] flex-col gap-1">
           {template.buttons.map((b, i) => (
             <div
               key={i}

@@ -11,7 +11,10 @@
  */
 
 import type { TemplatePayload } from './template-validators';
-import { extractTemplateVariables, isNamedVariable } from './template-validators';
+import {
+  extractTemplateVariables,
+  isNamedVariable,
+} from './template-validators';
 import type { TemplateButton } from '@/types';
 
 export interface MetaComponent {
@@ -38,7 +41,8 @@ interface MetaButtonPayload {
 }
 
 function buildHeaderComponent(payload: TemplatePayload): MetaComponent | null {
-  const { header_type, header_content, header_media_url, header_handle } = payload;
+  const { header_type, header_content, header_media_url, header_handle } =
+    payload;
   if (!header_type) return null;
 
   if (header_type === 'text') {
@@ -51,7 +55,12 @@ function buildHeaderComponent(payload: TemplatePayload): MetaComponent | null {
     if (headerSample && headerSample.length > 0) {
       const keys = extractTemplateVariables(header_content ?? '');
       component.example = keys.some(isNamedVariable)
-        ? { header_text_named_params: keys.map((param_name, index) => ({ param_name, example: headerSample[index] })) }
+        ? {
+            header_text_named_params: keys.map((param_name, index) => ({
+              param_name,
+              example: headerSample[index],
+            })),
+          }
         : { header_text: headerSample };
     }
     return component;
@@ -84,7 +93,12 @@ function buildBodyComponent(payload: TemplatePayload): MetaComponent {
     // example row.
     const keys = extractTemplateVariables(payload.body_text);
     component.example = keys.some(isNamedVariable)
-      ? { body_text_named_params: keys.map((param_name, index) => ({ param_name, example: bodySample[index] })) }
+      ? {
+          body_text_named_params: keys.map((param_name, index) => ({
+            param_name,
+            example: bodySample[index],
+          })),
+        }
       : { body_text: [bodySample] };
   }
   return component;
@@ -109,7 +123,11 @@ function buildButtonPayload(b: TemplateButton): MetaButtonPayload {
       return payload;
     }
     case 'PHONE_NUMBER':
-      return { type: 'PHONE_NUMBER', text: b.text, phone_number: b.phone_number };
+      return {
+        type: 'PHONE_NUMBER',
+        text: b.text,
+        phone_number: b.phone_number,
+      };
     case 'COPY_CODE':
       return { type: 'COPY_CODE', text: b.text, example: [b.example] };
   }
@@ -145,7 +163,7 @@ const CATEGORY_TO_META: Record<
  * components in canonical order: HEADER → BODY → FOOTER → BUTTONS).
  */
 export function buildMetaTemplatePayload(
-  payload: TemplatePayload,
+  payload: TemplatePayload
 ): MetaTemplateSubmitPayload {
   const components: MetaComponent[] = [];
   const header = buildHeaderComponent(payload);
@@ -160,7 +178,11 @@ export function buildMetaTemplatePayload(
     name: payload.name,
     category: CATEGORY_TO_META[payload.category],
     language: payload.language,
-    ...(extractTemplateVariables(payload.body_text + (payload.header_content ?? '')).some(isNamedVariable) ? { parameter_format: 'NAMED' as const } : {}),
+    ...(extractTemplateVariables(
+      payload.body_text + (payload.header_content ?? '')
+    ).some(isNamedVariable)
+      ? { parameter_format: 'NAMED' as const }
+      : {}),
     components,
   };
 }

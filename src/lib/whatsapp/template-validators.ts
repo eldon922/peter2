@@ -53,7 +53,7 @@ export function validateTemplateName(name: string): void {
   if (!name) throw new Error('Template name is required.');
   if (!TEMPLATE_LIMITS.nameRegex.test(name)) {
     throw new Error(
-      'Template name must use only lowercase letters, digits, and underscores (1-512 chars).',
+      'Template name must use only lowercase letters, digits, and underscores (1-512 chars).'
     );
   }
 }
@@ -97,8 +97,15 @@ export function extractVariableIndices(text: string): number[] {
 }
 
 export function extractTemplateVariables(text: string): string[] {
-  return [...new Set([...text.matchAll(/\{\{([A-Za-z0-9_]+)\}\}/g)].map((match) => match[1]))]
-    .sort((a, b) => /^\d+$/.test(a) && /^\d+$/.test(b) ? Number(a) - Number(b) : a.localeCompare(b));
+  return [
+    ...new Set(
+      [...text.matchAll(/\{\{([A-Za-z0-9_]+)\}\}/g)].map((match) => match[1])
+    ),
+  ].sort((a, b) =>
+    /^\d+$/.test(a) && /^\d+$/.test(b)
+      ? Number(a) - Number(b)
+      : a.localeCompare(b)
+  );
 }
 
 export function isNamedVariable(key: string): boolean {
@@ -115,7 +122,7 @@ function assertContiguous(indices: number[], where: string): void {
       throw new Error(
         `${where} variables must be contiguous starting at {{1}} — found ${indices
           .map((n) => `{{${n}}}`)
-          .join(', ')}.`,
+          .join(', ')}.`
       );
     }
   }
@@ -125,7 +132,7 @@ export function validateBody(bodyText: string): number[] {
   if (!bodyText.trim()) throw new Error('Body text is required.');
   if (bodyText.length > TEMPLATE_LIMITS.bodyMaxLength) {
     throw new Error(
-      `Body text exceeds ${TEMPLATE_LIMITS.bodyMaxLength} chars (got ${bodyText.length}).`,
+      `Body text exceeds ${TEMPLATE_LIMITS.bodyMaxLength} chars (got ${bodyText.length}).`
     );
   }
   const indices = extractVariableIndices(bodyText);
@@ -133,7 +140,9 @@ export function validateBody(bodyText: string): number[] {
   const keys = extractTemplateVariables(bodyText);
   if (keys.some(isNamedVariable)) {
     if (indices.length || keys.some((key) => !/^[a-z_][a-z0-9_]*$/.test(key))) {
-      throw new Error('Use lowercase named variables or positional variables, without mixing formats.');
+      throw new Error(
+        'Use lowercase named variables or positional variables, without mixing formats.'
+      );
     }
     return keys.map((_, index) => index + 1);
   }
@@ -144,7 +153,7 @@ export function validateFooter(footerText: string | undefined): void {
   if (!footerText) return;
   if (footerText.length > TEMPLATE_LIMITS.footerMaxLength) {
     throw new Error(
-      `Footer text exceeds ${TEMPLATE_LIMITS.footerMaxLength} chars (got ${footerText.length}).`,
+      `Footer text exceeds ${TEMPLATE_LIMITS.footerMaxLength} chars (got ${footerText.length}).`
     );
   }
   if (extractTemplateVariables(footerText).length > 0) {
@@ -161,9 +170,10 @@ export function validateHeader(
   payload: Pick<
     TemplatePayload,
     'header_type' | 'header_content' | 'header_media_url' | 'header_handle'
-  >,
+  >
 ): HeaderValidationResult {
-  const { header_type, header_content, header_media_url, header_handle } = payload;
+  const { header_type, header_content, header_media_url, header_handle } =
+    payload;
   if (!header_type) return { variableCount: 0 };
 
   if (header_type === 'text') {
@@ -172,16 +182,20 @@ export function validateHeader(
     }
     if (header_content.length > TEMPLATE_LIMITS.headerTextMaxLength) {
       throw new Error(
-        `Header text exceeds ${TEMPLATE_LIMITS.headerTextMaxLength} chars (got ${header_content.length}).`,
+        `Header text exceeds ${TEMPLATE_LIMITS.headerTextMaxLength} chars (got ${header_content.length}).`
       );
     }
     const indices = extractTemplateVariables(header_content);
     if (indices.length > 1) {
       throw new Error(
-        `Text header supports at most one variable — found ${indices.length} (Meta rule).`,
+        `Text header supports at most one variable — found ${indices.length} (Meta rule).`
       );
     }
-    if (indices.length === 1 && !isNamedVariable(indices[0]) && indices[0] !== '1') {
+    if (
+      indices.length === 1 &&
+      !isNamedVariable(indices[0]) &&
+      indices[0] !== '1'
+    ) {
       throw new Error('Text header variable must be {{1}} (Meta rule).');
     }
     return { variableCount: indices.length };
@@ -191,7 +205,7 @@ export function validateHeader(
   // Upload handle. Either one — Meta accepts both example forms.
   if (!header_media_url && !header_handle) {
     throw new Error(
-      `${header_type} header requires either a public sample URL (header_media_url) or a Resumable Upload handle (header_handle).`,
+      `${header_type} header requires either a public sample URL (header_media_url) or a Resumable Upload handle (header_handle).`
     );
   }
   if (header_media_url) {
@@ -208,7 +222,7 @@ export function validateHeader(
 }
 
 function countButtonsByType(
-  buttons: TemplateButton[],
+  buttons: TemplateButton[]
 ): Record<TemplateButton['type'], number> {
   const counts: Record<TemplateButton['type'], number> = {
     QUICK_REPLY: 0,
@@ -224,24 +238,24 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
   if (!buttons || buttons.length === 0) return;
   if (buttons.length > TEMPLATE_LIMITS.maxButtonsTotal) {
     throw new Error(
-      `Templates can have at most ${TEMPLATE_LIMITS.maxButtonsTotal} buttons (got ${buttons.length}).`,
+      `Templates can have at most ${TEMPLATE_LIMITS.maxButtonsTotal} buttons (got ${buttons.length}).`
     );
   }
 
   const counts = countButtonsByType(buttons);
   if (counts.URL > TEMPLATE_LIMITS.maxUrlButtons) {
     throw new Error(
-      `At most ${TEMPLATE_LIMITS.maxUrlButtons} URL buttons allowed (got ${counts.URL}).`,
+      `At most ${TEMPLATE_LIMITS.maxUrlButtons} URL buttons allowed (got ${counts.URL}).`
     );
   }
   if (counts.PHONE_NUMBER > TEMPLATE_LIMITS.maxPhoneButtons) {
     throw new Error(
-      `At most ${TEMPLATE_LIMITS.maxPhoneButtons} PHONE_NUMBER button allowed (got ${counts.PHONE_NUMBER}).`,
+      `At most ${TEMPLATE_LIMITS.maxPhoneButtons} PHONE_NUMBER button allowed (got ${counts.PHONE_NUMBER}).`
     );
   }
   if (counts.COPY_CODE > TEMPLATE_LIMITS.maxCopyCodeButtons) {
     throw new Error(
-      `At most ${TEMPLATE_LIMITS.maxCopyCodeButtons} COPY_CODE button allowed (got ${counts.COPY_CODE}).`,
+      `At most ${TEMPLATE_LIMITS.maxCopyCodeButtons} COPY_CODE button allowed (got ${counts.COPY_CODE}).`
     );
   }
 
@@ -253,7 +267,7 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
     if (b.type === 'QUICK_REPLY') {
       if (sawNonQR) {
         throw new Error(
-          'QUICK_REPLY buttons cannot be interleaved with URL / PHONE_NUMBER / COPY_CODE buttons — group them at the start.',
+          'QUICK_REPLY buttons cannot be interleaved with URL / PHONE_NUMBER / COPY_CODE buttons — group them at the start.'
         );
       }
     } else {
@@ -268,7 +282,7 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
     }
     if (b.text.length > TEMPLATE_LIMITS.buttonTextMaxLength) {
       throw new Error(
-        `Button #${i + 1} text exceeds ${TEMPLATE_LIMITS.buttonTextMaxLength} chars.`,
+        `Button #${i + 1} text exceeds ${TEMPLATE_LIMITS.buttonTextMaxLength} chars.`
       );
     }
     switch (b.type) {
@@ -284,18 +298,18 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
         const urlVars = extractVariableIndices(b.url);
         if (urlVars.length > 1) {
           throw new Error(
-            `URL button #${i + 1} can have at most one variable (Meta rule).`,
+            `URL button #${i + 1} can have at most one variable (Meta rule).`
           );
         }
         if (urlVars.length === 1) {
           if (urlVars[0] !== 1) {
             throw new Error(
-              `URL button #${i + 1} variable must be {{1}} (Meta rule).`,
+              `URL button #${i + 1} variable must be {{1}} (Meta rule).`
             );
           }
           if (!b.example?.trim()) {
             throw new Error(
-              `URL button #${i + 1} uses {{1}} — Meta requires an example value.`,
+              `URL button #${i + 1} uses {{1}} — Meta requires an example value.`
             );
           }
         }
@@ -304,14 +318,14 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
       case 'PHONE_NUMBER':
         if (!b.phone_number?.trim()) {
           throw new Error(
-            `PHONE_NUMBER button #${i + 1} is missing phone_number.`,
+            `PHONE_NUMBER button #${i + 1} is missing phone_number.`
           );
         }
         break;
       case 'COPY_CODE':
         if (!b.example?.trim()) {
           throw new Error(
-            `COPY_CODE button #${i + 1} is missing example value.`,
+            `COPY_CODE button #${i + 1} is missing example value.`
           );
         }
         break;
@@ -326,7 +340,7 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
 export function validateSampleValues(
   payload: TemplatePayload,
   bodyVarCount: number,
-  headerVarCount: number,
+  headerVarCount: number
 ): void {
   const samples = payload.sample_values ?? {};
   const body = samples.body ?? [];
@@ -334,12 +348,12 @@ export function validateSampleValues(
 
   if (body.length !== bodyVarCount) {
     throw new Error(
-      `Body has ${bodyVarCount} variable(s) — supply exactly ${bodyVarCount} sample value(s) (got ${body.length}).`,
+      `Body has ${bodyVarCount} variable(s) — supply exactly ${bodyVarCount} sample value(s) (got ${body.length}).`
     );
   }
   if (header.length !== headerVarCount) {
     throw new Error(
-      `Header has ${headerVarCount} variable(s) — supply exactly ${headerVarCount} sample value(s) (got ${header.length}).`,
+      `Header has ${headerVarCount} variable(s) — supply exactly ${headerVarCount} sample value(s) (got ${header.length}).`
     );
   }
   for (let i = 0; i < body.length; i++) {
@@ -368,8 +382,13 @@ export function validateTemplatePayload(payload: TemplatePayload): {
     throw new Error('Language is required.');
   }
   const bodyVars = validateBody(payload.body_text);
-  const allKeys = extractTemplateVariables(payload.body_text + (payload.header_content ?? ''));
-  if (allKeys.some(isNamedVariable) && allKeys.some((key) => !isNamedVariable(key))) {
+  const allKeys = extractTemplateVariables(
+    payload.body_text + (payload.header_content ?? '')
+  );
+  if (
+    allKeys.some(isNamedVariable) &&
+    allKeys.some((key) => !isNamedVariable(key))
+  ) {
     throw new Error('Header and body must use the same variable format.');
   }
   validateFooter(payload.footer_text);

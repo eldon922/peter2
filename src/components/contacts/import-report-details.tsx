@@ -28,29 +28,37 @@ function Section({
 }) {
   const t = useTranslations('Contacts.importModal');
   // Problems are worth seeing straight away; the long happy-path lists aren't.
-  const [open, setOpen] = useState(sectionKey === 'failed' || sectionKey === 'tagFailed' || sectionKey === 'skipped');
+  const [open, setOpen] = useState(
+    sectionKey === 'failed' ||
+      sectionKey === 'tagFailed' ||
+      sectionKey === 'skipped'
+  );
   const [shown, setShown] = useState(PAGE);
 
   if (rows.length === 0) return null;
 
   function detail(row: ReportRow): string {
     const parts: string[] = [];
-    if (row.existingTags?.length) parts.push(t('detailExistingTags', { tags: row.existingTags.join(', ') }));
+    if (row.existingTags?.length)
+      parts.push(
+        t('detailExistingTags', { tags: row.existingTags.join(', ') })
+      );
     if (row.reason) parts.push(t(`reason.${row.reason}`));
     if (row.rename) {
       parts.push(
         row.rename.from
           ? t('detailRenamed', { from: row.rename.from, to: row.rename.to })
-          : t('detailNamed', { to: row.rename.to }),
+          : t('detailNamed', { to: row.rename.to })
       );
     }
-    if (row.tags?.length) parts.push(t('detailTags', { tags: row.tags.join(', ') }));
+    if (row.tags?.length)
+      parts.push(t('detailTags', { tags: row.tags.join(', ') }));
     if (row.error) parts.push(row.error);
     return parts.join(' · ');
   }
 
   return (
-    <div className="rounded-lg border border-border">
+    <div className="border-border rounded-lg border">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -61,24 +69,29 @@ function Section({
           {t(`section.${sectionKey}`, { count: rows.length })}
         </span>
         <ChevronDown
-          className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')}
+          className={cn(
+            'text-muted-foreground size-4 transition-transform',
+            open && 'rotate-180'
+          )}
         />
       </button>
       {open && (
-        <div className="border-t border-border">
-          <ul className="divide-y divide-border/70 text-xs">
+        <div className="border-border border-t">
+          <ul className="divide-border/70 divide-y text-xs">
             {rows.slice(0, shown).map((row, i) => (
               <li key={i} className="px-3 py-1.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-popover-foreground">
+                  <span className="text-popover-foreground min-w-0 truncate">
                     {row.name || '—'}
                   </span>
-                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                  <span className="text-muted-foreground shrink-0 font-mono text-[11px]">
                     {row.phone}
                   </span>
                 </div>
                 {detail(row) && (
-                  <p className="mt-0.5 wrap-anywhere text-muted-foreground">{detail(row)}</p>
+                  <p className="text-muted-foreground mt-0.5 wrap-anywhere">
+                    {detail(row)}
+                  </p>
                 )}
               </li>
             ))}
@@ -87,9 +100,11 @@ function Section({
             <button
               type="button"
               onClick={() => setShown(shown + PAGE)}
-              className="w-full border-t border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="border-border text-muted-foreground hover:text-foreground w-full border-t px-3 py-1.5 text-xs"
             >
-              {t('reportShowMore', { count: Math.min(PAGE, rows.length - shown) })}
+              {t('reportShowMore', {
+                count: Math.min(PAGE, rows.length - shown),
+              })}
             </button>
           )}
         </div>
@@ -103,7 +118,7 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
   const t = useTranslations('Contacts.importModal');
   return (
     <div className="mt-4 space-y-2">
-      <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+      <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
         {t('reportTitle')}
       </p>
       <Section sectionKey="failed" rows={report.failed} />

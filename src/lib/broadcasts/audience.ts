@@ -44,7 +44,11 @@ export interface AudienceContact {
 export type ResolvedAudience =
   | { kind: 'ids'; ids: string[]; excludedCount?: number }
   | { kind: 'all'; count: number; excludedCount?: number }
-  | { kind: 'csv'; contacts: { phone: string; name?: string }[]; excludedCount?: number }
+  | {
+      kind: 'csv';
+      contacts: { phone: string; name?: string }[];
+      excludedCount?: number;
+    }
   | null;
 
 export const AUDIENCE_PAGE_SIZE = 50;
@@ -53,17 +57,28 @@ type Supabase = Pick<SupabaseClient, 'from'>;
 
 async function contactIdsForTags(
   supabase: Supabase,
-  tagIds: string[],
+  tagIds: string[]
 ): Promise<string[]> {
   if (tagIds.includes(UNTAGGED)) {
     const [allIds, tagged, included] = await Promise.all([
       allContactIds(supabase),
-      fetchAllRows<{ contact_id: string }>((from, to) => supabase.from('contact_tags').select('contact_id').order('id').range(from, to)),
-      contactIdsForTags(supabase, tagIds.filter((id) => id !== UNTAGGED)),
+      fetchAllRows<{ contact_id: string }>((from, to) =>
+        supabase
+          .from('contact_tags')
+          .select('contact_id')
+          .order('id')
+          .range(from, to)
+      ),
+      contactIdsForTags(
+        supabase,
+        tagIds.filter((id) => id !== UNTAGGED)
+      ),
     ]);
     if (tagged.error) throw new Error(tagged.error.message);
     const taggedIds = new Set(tagged.rows.map((row) => row.contact_id));
-    return [...new Set([...included, ...allIds.filter((id) => !taggedIds.has(id))])];
+    return [
+      ...new Set([...included, ...allIds.filter((id) => !taggedIds.has(id))]),
+    ];
   }
   if (tagIds.length === 0) return [];
   const { rows, error } = await fetchAllRows<{ contact_id: string }>(
@@ -73,7 +88,7 @@ async function contactIdsForTags(
         .select('contact_id')
         .in('tag_id', tagIds)
         .order('id')
-        .range(from, to),
+        .range(from, to)
   );
   if (error) throw new Error(error.message);
   return [...new Set(rows.map((r) => r.contact_id))];
@@ -81,7 +96,7 @@ async function contactIdsForTags(
 
 async function contactIdsForCustomField(
   supabase: Supabase,
-  { fieldId, operator, value }: CustomFieldFilter,
+  { fieldId, operator, value }: CustomFieldFilter
 ): Promise<string[]> {
   // A function so each page gets a fresh (mutable) query builder.
   const buildQuery = () => {
@@ -95,7 +110,7 @@ async function contactIdsForCustomField(
     return q;
   };
   const { rows, error } = await fetchAllRows<{ contact_id: string }>(
-    (from, to) => buildQuery().order('id').range(from, to),
+    (from, to) => buildQuery().order('id').range(from, to)
   );
   if (error) throw new Error(error.message);
   return [...new Set(rows.map((r) => r.contact_id))];
@@ -103,7 +118,7 @@ async function contactIdsForCustomField(
 
 async function allContactIds(supabase: Supabase): Promise<string[]> {
   const { rows, error } = await fetchAllRows<{ id: string }>((from, to) =>
-    supabase.from('contacts').select('id').order('id').range(from, to),
+    supabase.from('contacts').select('id').order('id').range(from, to)
   );
   if (error) throw new Error(error.message);
   return rows.map((r) => r.id);
@@ -111,7 +126,7 @@ async function allContactIds(supabase: Supabase): Promise<string[]> {
 
 export async function resolveAudience(
   supabase: Supabase,
-  audience: AudienceConfig,
+  audience: AudienceConfig
 ): Promise<ResolvedAudience> {
   const excludeTagIds = audience.excludeTagIds ?? [];
   let ids: string[];
@@ -136,25 +151,50 @@ export async function resolveAudience(
   } else if (audience.type === 'csv' && audience.csvContacts?.length) {
     const excludedPhones = new Set<string>();
     if (excludeTagIds.length) {
-      for (const chunk of chunkIds(await contactIdsForTags(supabase, excludeTagIds))) {
-        const { data, error } = await supabase.from('contacts').select('phone').in('id', chunk);
+      for (const chunk of chunkIds(
+        await contactIdsForTags(supabase, excludeTagIds)
+      )) {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('phone')
+          .in('id', chunk);
         if (error) throw new Error(error.message);
-        for (const row of data ?? []) excludedPhones.add(normalizeKey(row.phone));
+        for (const row of data ?? [])
+          excludedPhones.add(normalizeKey(row.phone));
       }
     }
-    let contacts = audience.csvContacts.filter((row) => !excludedPhones.has(normalizeKey(row.phone)));
+    let contacts = audience.csvContacts.filter(
+      (row) => !excludedPhones.has(normalizeKey(row.phone))
+    );
     if (excludeTagIds.includes(UNTAGGED)) {
-      const tagged = await fetchAllRows<{ contact_id: string }>((from, to) => supabase.from('contact_tags').select('contact_id').order('id').range(from, to));
+      const tagged = await fetchAllRows<{ contact_id: string }>((from, to) =>
+        supabase
+          .from('contact_tags')
+          .select('contact_id')
+          .order('id')
+          .range(from, to)
+      );
       if (tagged.error) throw new Error(tagged.error.message);
       const taggedPhones = new Set<string>();
-      for (const chunk of chunkIds([...new Set(tagged.rows.map((row) => row.contact_id))])) {
-        const { data, error } = await supabase.from('contacts').select('phone').in('id', chunk);
+      for (const chunk of chunkIds([
+        ...new Set(tagged.rows.map((row) => row.contact_id)),
+      ])) {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('phone')
+          .in('id', chunk);
         if (error) throw new Error(error.message);
         for (const row of data ?? []) taggedPhones.add(normalizeKey(row.phone));
       }
-      contacts = contacts.filter((row) => taggedPhones.has(normalizeKey(row.phone)));
+      contacts = contacts.filter((row) =>
+        taggedPhones.has(normalizeKey(row.phone))
+      );
     }
-    return { kind: 'csv', contacts, excludedCount: audience.csvContacts.length - contacts.length };
+    return {
+      kind: 'csv',
+      contacts,
+      excludedCount: audience.csvContacts.length - contacts.length,
+    };
   } else {
     return null;
   }
@@ -179,7 +219,7 @@ export async function fetchAudiencePage(
   supabase: Supabase,
   resolved: NonNullable<ResolvedAudience>,
   offset: number,
-  limit = AUDIENCE_PAGE_SIZE,
+  limit = AUDIENCE_PAGE_SIZE
 ): Promise<AudienceContact[]> {
   if (resolved.kind === 'csv') {
     return resolved.contacts.slice(offset, offset + limit).map((c, i) => ({
@@ -211,6 +251,6 @@ export async function fetchAudiencePage(
     rows.push(...((data ?? []) as AudienceContact[]));
   }
   return rows.sort((a, b) =>
-    contactDisplayName(a).localeCompare(contactDisplayName(b)),
+    contactDisplayName(a).localeCompare(contactDisplayName(b))
   );
 }

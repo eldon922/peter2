@@ -32,5 +32,12 @@ export interface ImportReport {
 }
 
 export function emptyReport(): ImportReport {
-  return { imported: [], updated: [], skipped: [], failed: [], tagFailed: [], skippedTags: [] };
+  return {
+    imported: [],
+    updated: [],
+    skipped: [],
+    failed: [],
+    tagFailed: [],
+    skippedTags: [],
+  };
 }

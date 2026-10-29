@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import { extractTemplateVariables } from './template-validators'
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { extractTemplateVariables } from './template-validators';
 
 /**
  * Broadcast sends never write a `messages` row.
@@ -25,21 +25,21 @@ import { extractTemplateVariables } from './template-validators'
 
 export interface BroadcastSentMessage {
   /** The contact the broadcast went to — the reaction must match this. */
-  contactId: string
-  templateName: string
+  contactId: string;
+  templateName: string;
   /** Body with placeholders substituted, or null if the template is gone. */
-  bodyText: string | null
+  bodyText: string | null;
   /**
    * Where the inbox can load the header media from, when the template had
    * one: the broadcast's own URL, else the proxy route for the Meta media
    * id it was sent with, else the template's default.
    */
-  mediaUrl: string | null
+  mediaUrl: string | null;
   /** Kind of that media, so the bubble renders it as an image/video/file. */
-  mediaType: 'image' | 'video' | 'document' | null
+  mediaType: 'image' | 'video' | 'document' | null;
   /** Mapped onto the `messages.status` domain. */
-  status: 'sent' | 'delivered' | 'read'
-  sentAt: string | null
+  status: 'sent' | 'delivered' | 'read';
+  sentAt: string | null;
 }
 
 /**
@@ -53,14 +53,17 @@ export interface BroadcastSentMessage {
  */
 export function renderTemplateBody(
   bodyText: string | null | undefined,
-  params: string[],
+  params: string[]
 ): string | null {
-  if (!bodyText) return null
-  const keys = extractTemplateVariables(bodyText)
-  return bodyText.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (placeholder, key: string) => {
-    const value = params[keys.indexOf(key)]
-    return value === undefined ? placeholder : value
-  })
+  if (!bodyText) return null;
+  const keys = extractTemplateVariables(bodyText);
+  return bodyText.replace(
+    /\{\{([A-Za-z0-9_]+)\}\}/g,
+    (placeholder, key: string) => {
+      const value = params[keys.indexOf(key)];
+      return value === undefined ? placeholder : value;
+    }
+  );
 }
 
 /**
@@ -69,15 +72,17 @@ export function renderTemplateBody(
  * 'pending'/'failed' can't reach here at all, because a row only has a
  * wamid once Meta accepted the send.
  */
-function toMessageStatus(recipientStatus: string): 'sent' | 'delivered' | 'read' {
+function toMessageStatus(
+  recipientStatus: string
+): 'sent' | 'delivered' | 'read' {
   switch (recipientStatus) {
     case 'delivered':
-      return 'delivered'
+      return 'delivered';
     case 'read':
     case 'replied':
-      return 'read'
+      return 'read';
     default:
-      return 'sent'
+      return 'sent';
   }
 }
 
@@ -91,54 +96,59 @@ function toMessageStatus(recipientStatus: string): 'sent' | 'delivered' | 'read'
  * partial index on `whatsapp_message_id`.
  */
 interface BroadcastRef {
-  template_name: string
-  template_language: string | null
-  header_media_url: string | null
-  header_media_id: string | null
+  template_name: string;
+  template_language: string | null;
+  header_media_url: string | null;
+  header_media_id: string | null;
 }
 
 function isMediaType(value: unknown): value is 'image' | 'video' | 'document' {
-  return value === 'image' || value === 'video' || value === 'document'
+  return value === 'image' || value === 'video' || value === 'document';
 }
 
 interface RecipientRow {
-  contact_id: string
-  template_params: unknown
-  status: string
-  sent_at: string | null
+  contact_id: string;
+  template_params: unknown;
+  status: string;
+  sent_at: string | null;
   /** PostgREST returns an embedded to-one as an object; the untyped
    *  client widens it to a possible array, so handle both. */
-  broadcast: BroadcastRef | BroadcastRef[] | null
+  broadcast: BroadcastRef | BroadcastRef[] | null;
 }
 
 export async function findBroadcastSentMessage(
   db: SupabaseClient,
   accountId: string,
-  wamid: string,
+  wamid: string
 ): Promise<BroadcastSentMessage | null> {
   const { data: rawRow, error } = await db
     .from('broadcast_recipients')
     .select(
       'contact_id, template_params, status, sent_at, ' +
-        'broadcast:broadcasts!inner(account_id, template_name, template_language, header_media_url, header_media_id)',
+        'broadcast:broadcasts!inner(account_id, template_name, template_language, header_media_url, header_media_id)'
     )
     .eq('whatsapp_message_id', wamid)
     .eq('broadcast.account_id', accountId)
-    .maybeSingle()
+    .maybeSingle();
 
   if (error) {
-    console.error('[broadcast-message] recipient lookup failed:', error.message)
-    return null
+    console.error(
+      '[broadcast-message] recipient lookup failed:',
+      error.message
+    );
+    return null;
   }
-  if (!rawRow) return null
+  if (!rawRow) return null;
 
-  const row = rawRow as unknown as RecipientRow
-  const broadcast = Array.isArray(row.broadcast) ? row.broadcast[0] : row.broadcast
-  if (!broadcast) return null
+  const row = rawRow as unknown as RecipientRow;
+  const broadcast = Array.isArray(row.broadcast)
+    ? row.broadcast[0]
+    : row.broadcast;
+  if (!broadcast) return null;
 
   const params: string[] = Array.isArray(row.template_params)
     ? (row.template_params as string[])
-    : []
+    : [];
 
   // The template can have been deleted or re-synced since the send. That
   // costs us the body text, not the message — a bodyless template bubble
@@ -149,17 +159,17 @@ export async function findBroadcastSentMessage(
     .eq('account_id', accountId)
     .eq('name', broadcast.template_name)
     .eq('language', broadcast.template_language ?? 'en_US')
-    .maybeSingle()
+    .maybeSingle();
 
   const templateMediaType = isMediaType(template?.header_type)
     ? template.header_type
-    : null
+    : null;
   const mediaUrl =
     broadcast.header_media_url ||
     (broadcast.header_media_id
       ? `/api/whatsapp/media/${broadcast.header_media_id}`
       : null) ||
-    (templateMediaType ? template?.header_media_url || null : null)
+    (templateMediaType ? template?.header_media_url || null : null);
 
   return {
     contactId: row.contact_id,
@@ -171,5 +181,5 @@ export async function findBroadcastSentMessage(
     mediaType: mediaUrl ? (templateMediaType ?? 'image') : null,
     status: toMessageStatus(row.status),
     sentAt: row.sent_at ?? null,
-  }
+  };
 }

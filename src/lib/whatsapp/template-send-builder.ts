@@ -31,7 +31,11 @@
  */
 
 import type { MessageTemplate, TemplateButton } from '@/types';
-import { extractVariableIndices, extractTemplateVariables, isNamedVariable } from './template-validators';
+import {
+  extractVariableIndices,
+  extractTemplateVariables,
+  isNamedVariable,
+} from './template-validators';
 
 export interface SendTimeParams {
   /** Values for body {{1}}, {{2}}, … indexed by variable position. */
@@ -71,7 +75,7 @@ type MetaSendParameter =
 
 function buildHeaderComponent(
   template: MessageTemplate,
-  params: SendTimeParams,
+  params: SendTimeParams
 ): MetaSendComponent | null {
   const headerType = template.header_type;
   if (!headerType) return null;
@@ -86,12 +90,18 @@ function buildHeaderComponent(
     const value = params.headerText;
     if (!value || !value.trim()) {
       throw new Error(
-        'Header text variable {{1}} requires a value — pass headerText.',
+        'Header text variable {{1}} requires a value — pass headerText.'
       );
     }
     return {
       type: 'header',
-      parameters: [{ type: 'text', text: value, ...(isNamedVariable(keys[0]) ? { parameter_name: keys[0] } : {}) }],
+      parameters: [
+        {
+          type: 'text',
+          text: value,
+          ...(isNamedVariable(keys[0]) ? { parameter_name: keys[0] } : {}),
+        },
+      ],
     };
   }
 
@@ -108,7 +118,7 @@ function buildHeaderComponent(
   const id = params.headerMediaId;
   if (!link && !id) {
     throw new Error(
-      `${headerType} header requires a media link or id at send time — set header_media_url on the template or pass headerMediaUrl/headerMediaId.`,
+      `${headerType} header requires a media link or id at send time — set header_media_url on the template or pass headerMediaUrl/headerMediaId.`
     );
   }
   const mediaPayload: { link?: string; id?: string } = id ? { id } : { link };
@@ -126,7 +136,7 @@ function buildHeaderComponent(
 
 function buildBodyComponent(
   template: MessageTemplate,
-  params: SendTimeParams,
+  params: SendTimeParams
 ): MetaSendComponent | null {
   const keys = extractTemplateVariables(template.body_text);
   const varCount = keys.length;
@@ -134,7 +144,7 @@ function buildBodyComponent(
   if (varCount === 0 && body.length === 0) return null;
   if (body.length < varCount) {
     throw new Error(
-      `Body has ${varCount} variable(s) but only ${body.length} value(s) were supplied.`,
+      `Body has ${varCount} variable(s) but only ${body.length} value(s) were supplied.`
     );
   }
   // Trim to the variable count — extra values are dropped silently so
@@ -142,13 +152,17 @@ function buildBodyComponent(
   const values = body.slice(0, varCount);
   return {
     type: 'body',
-    parameters: values.map((text, index) => ({ type: 'text', text: String(text), ...(isNamedVariable(keys[index]) ? { parameter_name: keys[index] } : {}) })),
+    parameters: values.map((text, index) => ({
+      type: 'text',
+      text: String(text),
+      ...(isNamedVariable(keys[index]) ? { parameter_name: keys[index] } : {}),
+    })),
   };
 }
 
 function buttonNeedsSendParam(
   button: TemplateButton,
-  override: string | undefined,
+  override: string | undefined
 ): boolean {
   switch (button.type) {
     case 'URL':
@@ -167,7 +181,7 @@ function buttonNeedsSendParam(
 function buildButtonComponent(
   button: TemplateButton,
   index: number,
-  override: string | undefined,
+  override: string | undefined
 ): MetaSendComponent | null {
   if (!buttonNeedsSendParam(button, override)) return null;
 
@@ -177,7 +191,7 @@ function buildButtonComponent(
       // the button's index in the template's buttons array.
       if (!override || !override.trim()) {
         throw new Error(
-          `URL button #${index + 1} uses {{1}} — requires a buttonParams[${index}] value.`,
+          `URL button #${index + 1} uses {{1}} — requires a buttonParams[${index}] value.`
         );
       }
       return {
@@ -220,7 +234,7 @@ function buildButtonComponent(
  */
 export function buildSendComponents(
   template: MessageTemplate,
-  params: SendTimeParams = {},
+  params: SendTimeParams = {}
 ): MetaSendComponent[] {
   const out: MetaSendComponent[] = [];
   const header = buildHeaderComponent(template, params);

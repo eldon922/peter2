@@ -52,6 +52,7 @@ export const ROLE_META: Record<
     icon: UserCog,
     label: 'replier',
     variant: 'muted',
-    className: 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300',
+    className:
+      'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300',
   },
 };

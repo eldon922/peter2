@@ -157,17 +157,37 @@ export function ImportModal({
   useEffect(() => {
     if (!open || !accountId) return;
     let cancelled = false;
-    fetchAllRows<TagRecord>((from, to) => supabase.from('tags').select('*').eq('account_id', accountId).order('name').order('id').range(from, to))
-      .then(({ rows, error }) => {
-        if (cancelled) return;
-        if (error) { toast.error(t('toastError')); return; }
-        setAvailableTags(rows);
-      });
-    return () => { cancelled = true; };
+    fetchAllRows<TagRecord>((from, to) =>
+      supabase
+        .from('tags')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('name')
+        .order('id')
+        .range(from, to)
+    ).then(({ rows, error }) => {
+      if (cancelled) return;
+      if (error) {
+        toast.error(t('toastError'));
+        return;
+      }
+      setAvailableTags(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [open, accountId, supabase, t]);
   const importRows = useMemo(() => {
-    const added = [...availableTags.filter((tag) => selectedTagIds.includes(tag.id)).map((tag) => tag.name), ...parseTagCell(extraTags)];
-    return parsedRows.map((row) => ({ ...row, tagNames: parseTagCell([...row.tagNames, ...added].join(';')) }));
+    const added = [
+      ...availableTags
+        .filter((tag) => selectedTagIds.includes(tag.id))
+        .map((tag) => tag.name),
+      ...parseTagCell(extraTags),
+    ];
+    return parsedRows.map((row) => ({
+      ...row,
+      tagNames: parseTagCell([...row.tagNames, ...added].join(';')),
+    }));
   }, [parsedRows, selectedTagIds, availableTags, extraTags]);
   /**
    * In-file duplicates dropped at parse time, carried through to the
@@ -267,14 +287,16 @@ export function ImportModal({
     setHasCompanyColumn(csvHasCompany);
 
     if (csvHasTags && accountId) {
-      const { rows: tags } = await fetchAllRows<{ name: string; color: string }>(
-        (from, to) =>
-          supabase
-            .from('tags')
-            .select('name, color')
-            .eq('account_id', accountId)
-            .order('id')
-            .range(from, to)
+      const { rows: tags } = await fetchAllRows<{
+        name: string;
+        color: string;
+      }>((from, to) =>
+        supabase
+          .from('tags')
+          .select('name, color')
+          .eq('account_id', accountId)
+          .order('id')
+          .range(from, to)
       );
 
       const colors = new Map<string, string>();
@@ -349,7 +371,9 @@ export function ImportModal({
       //    silently reported existing contacts as new. The cost is now
       //    proportional to the file, not to the account.
       const importedKeys = [
-        ...new Set(unique.map((row) => normalizeKey(row.phone)).filter(Boolean)),
+        ...new Set(
+          unique.map((row) => normalizeKey(row.phone)).filter(Boolean)
+        ),
       ];
       const existingByPhone = new Map<
         string,
@@ -361,12 +385,13 @@ export function ImportModal({
       let checked = 0;
       for (let i = 0; i < lookupChunks.length; i++) {
         const slice = lookupChunks[i];
-        const { data: existingRows, error } = await withRetry(() =>
-          supabase
-            .from('contacts')
-            .select('id, phone_normalized, name')
-            .eq('account_id', accountId)
-            .in('phone_normalized', slice),
+        const { data: existingRows, error } = await withRetry(
+          () =>
+            supabase
+              .from('contacts')
+              .select('id, phone_normalized, name')
+              .eq('account_id', accountId)
+              .in('phone_normalized', slice),
           { attempts: 5 }
         );
         // Unlike the writes below, a failed lookup isn't safe to just
@@ -389,7 +414,11 @@ export function ImportModal({
           }
         }
         checked += slice.length;
-        setProgress({ stage: 'checking', done: checked, total: importedKeys.length });
+        setProgress({
+          stage: 'checking',
+          done: checked,
+          total: importedKeys.length,
+        });
       }
 
       // A number already on file is no longer dropped on the floor. The
@@ -401,13 +430,25 @@ export function ImportModal({
       );
       const existingTagsById = new Map<string, string[]>();
       for (const ids of chunkIds(toMerge.map((row) => row.id))) {
-        const result = await fetchAllRows<{ contact_id: string; tag_id: string }>((from, to) =>
-          supabase.from('contact_tags').select('contact_id, tag_id').in('contact_id', ids).order('id').range(from, to),
+        const result = await fetchAllRows<{
+          contact_id: string;
+          tag_id: string;
+        }>((from, to) =>
+          supabase
+            .from('contact_tags')
+            .select('contact_id, tag_id')
+            .in('contact_id', ids)
+            .order('id')
+            .range(from, to)
         );
         if (result.error) throw result.error;
         for (const row of result.rows) {
           const tag = availableTags.find((tag) => tag.id === row.tag_id);
-          if (tag) existingTagsById.set(row.contact_id, [...(existingTagsById.get(row.contact_id) ?? []), tag.name]);
+          if (tag)
+            existingTagsById.set(row.contact_id, [
+              ...(existingTagsById.get(row.contact_id) ?? []),
+              tag.name,
+            ]);
         }
       }
       report.skipped.push(
@@ -504,9 +545,15 @@ export function ImportModal({
                 queueTags(singleData.id, source);
               }
             } else if (isUniqueViolation(singleErr)) {
-              report.skipped.push({ ...toRow(source), reason: 'already_exists' });
+              report.skipped.push({
+                ...toRow(source),
+                reason: 'already_exists',
+              });
             } else {
-              report.failed.push({ ...toRow(source), error: messageOf(singleErr) });
+              report.failed.push({
+                ...toRow(source),
+                error: messageOf(singleErr),
+              });
             }
           }
         } else {
@@ -710,26 +757,32 @@ export function ImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden border-border/80 bg-popover p-0 text-popover-foreground sm:max-w-2xl">
-        <div className="shrink-0 space-y-4 border-b border-border/80 px-6 pt-6 pb-5">
+      <DialogContent className="border-border/80 bg-popover text-popover-foreground flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <div className="border-border/80 shrink-0 space-y-4 border-b px-6 pt-6 pb-5">
           <DialogHeader className="gap-1.5">
-            <DialogTitle className="text-lg text-popover-foreground">
+            <DialogTitle className="text-popover-foreground text-lg">
               {t('title')}
             </DialogTitle>
-            <DialogDescription className="leading-relaxed text-muted-foreground"
+            <DialogDescription
+              className="text-muted-foreground leading-relaxed"
               dangerouslySetInnerHTML={{
                 __html: t.markup('desc', {
-                  phoneCode: (chunks) => `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  nameCode: (chunks) => `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  emailCode: (chunks) => `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  companyCode: (chunks) => `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  tagsCode: (chunks) => `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                })
+                  phoneCode: (chunks) =>
+                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
+                  nameCode: (chunks) =>
+                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
+                  emailCode: (chunks) =>
+                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
+                  companyCode: (chunks) =>
+                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
+                  tagsCode: (chunks) =>
+                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
+                }),
               }}
             />
             {/* Says what happens to numbers already on file, because the
                 answer changed: they used to be skipped. */}
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground text-xs leading-relaxed">
               {t('mergeHint')}
             </p>
           </DialogHeader>
@@ -767,24 +820,24 @@ export function ImportModal({
                   <FileText className="text-primary size-5" />
                 </div>
                 <p
-                  className="max-w-full truncate px-2 text-sm font-medium text-popover-foreground"
+                  className="text-popover-foreground max-w-full truncate px-2 text-sm font-medium"
                   title={file.name}
                 >
                   {truncateFilename(file.name)}
                 </p>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-[11px] font-medium">
                   {t('rowsReady', { count: parsedRows.length })}
                 </span>
               </>
             ) : (
               <>
-                <div className="flex size-10 items-center justify-center rounded-lg bg-muted/80 ring-1 ring-border/80 transition-colors group-hover:bg-muted">
-                  <Upload className="size-5 text-muted-foreground group-hover:text-foreground" />
+                <div className="bg-muted/80 ring-border/80 group-hover:bg-muted flex size-10 items-center justify-center rounded-lg ring-1 transition-colors">
+                  <Upload className="text-muted-foreground group-hover:text-foreground size-5" />
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {t('uploadDropzone')}
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-muted-foreground text-[11px]">
                   {t('uploadHint')}
                 </p>
               </>
@@ -806,90 +859,109 @@ export function ImportModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {!result && (
             <div className="mb-4 space-y-2">
-              <p className="text-sm font-medium text-popover-foreground">{t('additionalTags')}</p>
-              <TagMultiSelect tags={availableTags} value={selectedTagIds}
+              <p className="text-popover-foreground text-sm font-medium">
+                {t('additionalTags')}
+              </p>
+              <TagMultiSelect
+                tags={availableTags}
+                value={selectedTagIds}
                 disabled={importing}
-                onToggle={(id) => setSelectedTagIds((prev) => prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id])}
-                onClear={() => setSelectedTagIds([])} />
-              <Input value={extraTags} disabled={importing || !canEditSettings} onChange={(event) => setExtraTags(event.target.value)}
-                aria-label={t('newTags')} placeholder={t('newTags')} />
+                onToggle={(id) =>
+                  setSelectedTagIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((tagId) => tagId !== id)
+                      : [...prev, id]
+                  )
+                }
+                onClear={() => setSelectedTagIds([])}
+              />
+              <Input
+                value={extraTags}
+                disabled={importing || !canEditSettings}
+                onChange={(event) => setExtraTags(event.target.value)}
+                aria-label={t('newTags')}
+                placeholder={t('newTags')}
+              />
             </div>
           )}
           {preview.length > 0 && !result && !importing && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
                   {t('preview', { count: preview.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {inFileDropped.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-muted/90 px-2 py-0.5 text-[11px] text-amber-500">
+                    <span className="bg-muted/90 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-amber-500">
                       <AlertTriangle className="size-3" />
                       {t('previewDuplicates', { count: inFileDropped.length })}
                     </span>
                   )}
                   {tagStats.rowsWithTags > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-muted/90 px-2 py-0.5 text-[11px] text-muted-foreground">
+                    <span className="bg-muted/90 text-muted-foreground inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px]">
                       <Tag className="text-primary/80 size-3" />
-                      {t('previewTags', { tags: tagStats.unique, contacts: tagStats.rowsWithTags })}
+                      {t('previewTags', {
+                        tags: tagStats.unique,
+                        contacts: tagStats.rowsWithTags,
+                      })}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-border ring-1 ring-border/50">
+              <div className="border-border ring-border/50 overflow-hidden rounded-xl border ring-1">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[32rem] text-xs">
                     <thead>
-                      <tr className="border-b border-border bg-background/60">
-                        <th className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">
+                      <tr className="border-border bg-background/60 border-b">
+                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
                           {t('columns.phone')}
                         </th>
-                        <th className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">
+                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
                           {t('columns.name')}
                         </th>
-                        <th className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">
+                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
                           {t('columns.email')}
                         </th>
                         {previewHasCompany && (
-                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">
+                          <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
                             {t('columns.company')}
                           </th>
                         )}
                         {previewHasTags && (
-                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap text-muted-foreground">
+                          <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
                             {t('columns.tags')}
                           </th>
                         )}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/70">
+                    <tbody className="divide-border/70 divide-y">
                       {preview.map((row, i) => (
                         <tr
                           key={i}
-                          className="bg-popover/40 transition-colors hover:bg-muted/30"
+                          className="bg-popover/40 hover:bg-muted/30 transition-colors"
                         >
-                          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
                             <PreviewCell
                               value={row.phone}
                               mono
                               maxWidth="max-w-[7.5rem]"
                             />
                           </td>
-                          <td className="px-3 py-2 text-popover-foreground">
+                          <td className="text-popover-foreground px-3 py-2">
                             <PreviewCell
                               value={row.name || '—'}
                               maxWidth="max-w-[8.5rem]"
                             />
                           </td>
-                          <td className="px-3 py-2 text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2">
                             <PreviewCell
                               value={row.email || '—'}
                               maxWidth="max-w-[10rem]"
                             />
                           </td>
                           {previewHasCompany && (
-                            <td className="px-3 py-2 text-muted-foreground">
+                            <td className="text-muted-foreground px-3 py-2">
                               <PreviewCell
                                 value={row.company || '—'}
                                 maxWidth="max-w-[7rem]"
@@ -912,7 +984,7 @@ export function ImportModal({
               </div>
 
               {parsedRows.length > PREVIEW_LIMIT && (
-                <p className="text-center text-[11px] text-muted-foreground">
+                <p className="text-muted-foreground text-center text-[11px]">
                   {t('moreRows', { count: parsedRows.length - PREVIEW_LIMIT })}
                 </p>
               )}
@@ -922,12 +994,12 @@ export function ImportModal({
           {!result && importing && progress && (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <Loader2 className="text-primary size-5 animate-spin" />
-              <p className="text-sm font-medium text-popover-foreground">
+              <p className="text-popover-foreground text-sm font-medium">
                 {t(`stage.${progress.stage}`)}
               </p>
               {progress.total !== undefined && progress.total > 0 && (
                 <div className="w-full max-w-sm space-y-1.5">
-                  <div className="h-1.5 w-full rounded-full bg-muted">
+                  <div className="bg-muted h-1.5 w-full rounded-full">
                     <div
                       className="bg-primary h-1.5 rounded-full transition-all duration-300"
                       style={{
@@ -935,7 +1007,7 @@ export function ImportModal({
                       }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     {t('progressCounts', {
                       done: progress.done,
                       total: progress.total,
@@ -948,8 +1020,8 @@ export function ImportModal({
           )}
 
           {result && (
-            <div className="rounded-xl border border-border bg-background/50 p-4">
-              <p className="text-sm font-medium text-popover-foreground">
+            <div className="border-border bg-background/50 rounded-xl border p-4">
+              <p className="text-popover-foreground text-sm font-medium">
                 {result.partial ? t('importPartial') : t('importComplete')}
               </p>
               {result.partial && (
@@ -961,13 +1033,17 @@ export function ImportModal({
                 {result.report.imported.length > 0 && (
                   <div className="text-primary flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
-                    {t('resultImported', { count: result.report.imported.length })}
+                    {t('resultImported', {
+                      count: result.report.imported.length,
+                    })}
                   </div>
                 )}
                 {result.report.updated.length > 0 && (
                   <div className="text-primary flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
-                    {t('resultUpdated', { count: result.report.updated.length })}
+                    {t('resultUpdated', {
+                      count: result.report.updated.length,
+                    })}
                   </div>
                 )}
                 {result.tagsAssigned > 0 && (
@@ -979,13 +1055,17 @@ export function ImportModal({
                 {result.report.skipped.length > 0 && (
                   <div className="flex items-center gap-1.5 text-sm text-amber-400">
                     <AlertTriangle className="size-4 shrink-0" />
-                    {t('resultSkipped', { count: result.report.skipped.length })}
+                    {t('resultSkipped', {
+                      count: result.report.skipped.length,
+                    })}
                   </div>
                 )}
                 {result.report.tagFailed.length > 0 && (
                   <div className="flex items-center gap-1.5 text-sm text-red-400">
                     <XCircle className="size-4 shrink-0" />
-                    {t('resultTagFailed', { count: result.report.tagFailed.length })}
+                    {t('resultTagFailed', {
+                      count: result.report.tagFailed.length,
+                    })}
                   </div>
                 )}
                 {result.report.failed.length > 0 && (
@@ -1000,7 +1080,7 @@ export function ImportModal({
           )}
         </div>
 
-        <DialogFooter className="mt-0 mb-4 shrink-0 gap-2 border-t border-border/80 bg-background/50 px-6 py-4 sm:justify-end">
+        <DialogFooter className="border-border/80 bg-background/50 mt-0 mb-4 shrink-0 gap-2 border-t px-6 py-4 sm:justify-end">
           <Button
             type="button"
             variant="outline"
@@ -1017,7 +1097,9 @@ export function ImportModal({
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {importing && <Loader2 className="size-4 animate-spin" />}
-              {parsedRows.length > 0 ? t('importBtn', { count: parsedRows.length }) : t('importBtn', { count: 0 })}
+              {parsedRows.length > 0
+                ? t('importBtn', { count: parsedRows.length })
+                : t('importBtn', { count: 0 })}
             </Button>
           )}
         </DialogFooter>

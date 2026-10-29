@@ -23,7 +23,7 @@ const SEND_BATCH_SIZE_HIGH = 1000;
 // computed inline rather than through a standalone exported function,
 // so these tests mirror the same formula to check against it.
 const DEFAULT_RECIPIENT_LIMIT = Math.floor(
-  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE),
+  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE)
 );
 
 // broadcast-limits.ts is the single source of truth for the send
@@ -53,7 +53,7 @@ function readMaxDurationLiteral(relPath: string): number {
   if (!match) {
     throw new Error(
       `${relPath} declares no literal \`export const maxDuration\`. ` +
-        'Route segment config must be a literal — an imported binding is ignored by Next.',
+        'Route segment config must be a literal — an imported binding is ignored by Next.'
     );
   }
   return Number(match[1].replaceAll('_', ''));
@@ -78,7 +78,7 @@ describe('maxDuration mirrors ROUTE_MAX_DURATION_SECONDS', () => {
 describe('DELIVER_BUDGET_MS follows the route ceiling', () => {
   it('is derived from ROUTE_MAX_DURATION_SECONDS, not hard-coded', () => {
     expect(DELIVER_BUDGET_MS).toBe(
-      ROUTE_MAX_DURATION_SECONDS * 1000 - DELIVERY_WRITE_RESERVE_MS,
+      ROUTE_MAX_DURATION_SECONDS * 1000 - DELIVERY_WRITE_RESERVE_MS
     );
   });
 
@@ -115,22 +115,48 @@ describe('recipientLimitForTier converts Meta live messaging-limit tier into a r
     // Neither is true anymore — the docs must not claim a hard cap, and
     // must not quote a number that goes stale the moment the timing
     // constants change.
-    const docs = readFileSync(join(process.cwd(), 'docs/public-api.md'), 'utf8');
+    const docs = readFileSync(
+      join(process.cwd(), 'docs/public-api.md'),
+      'utf8'
+    );
     expect(docs).toContain('no hard cap');
-    expect(docs).not.toContain(`${DEFAULT_RECIPIENT_LIMIT} at the shipped defaults`);
+    expect(docs).not.toContain(
+      `${DEFAULT_RECIPIENT_LIMIT} at the shipped defaults`
+    );
   });
 
   it('maps each documented tier to its recipient count', () => {
-    expect(recipientLimitForTier('TIER_50')).toEqual({ limit: 50, source: 'meta' });
-    expect(recipientLimitForTier('TIER_250')).toEqual({ limit: 250, source: 'meta' });
-    expect(recipientLimitForTier('TIER_1K')).toEqual({ limit: 1_000, source: 'meta' });
-    expect(recipientLimitForTier('TIER_2K')).toEqual({ limit: 2_000, source: 'meta' });
-    expect(recipientLimitForTier('TIER_10K')).toEqual({ limit: 10_000, source: 'meta' });
-    expect(recipientLimitForTier('TIER_100K')).toEqual({ limit: 100_000, source: 'meta' });
+    expect(recipientLimitForTier('TIER_50')).toEqual({
+      limit: 50,
+      source: 'meta',
+    });
+    expect(recipientLimitForTier('TIER_250')).toEqual({
+      limit: 250,
+      source: 'meta',
+    });
+    expect(recipientLimitForTier('TIER_1K')).toEqual({
+      limit: 1_000,
+      source: 'meta',
+    });
+    expect(recipientLimitForTier('TIER_2K')).toEqual({
+      limit: 2_000,
+      source: 'meta',
+    });
+    expect(recipientLimitForTier('TIER_10K')).toEqual({
+      limit: 10_000,
+      source: 'meta',
+    });
+    expect(recipientLimitForTier('TIER_100K')).toEqual({
+      limit: 100_000,
+      source: 'meta',
+    });
   });
 
   it('treats TIER_NOT_SET as the starting tier, not unlimited', () => {
-    expect(recipientLimitForTier('TIER_NOT_SET')).toEqual({ limit: 250, source: 'meta' });
+    expect(recipientLimitForTier('TIER_NOT_SET')).toEqual({
+      limit: 250,
+      source: 'meta',
+    });
   });
 
   it('represents TIER_UNLIMITED as a large finite number, not Infinity', () => {
@@ -145,7 +171,7 @@ describe('recipientLimitForTier converts Meta live messaging-limit tier into a r
   });
 });
 
-describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
+describe("the fan-out paces from getSendPacing's shared batch sizes", () => {
   // Both send paths (a fresh wizard send and a retry) now go through
   // `deliverBroadcast` in `after()` — the dashboard hook no longer
   // loops batches from the browser itself (see
@@ -174,15 +200,17 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
     // budget buys exactly one batch. Tuning either constant moves the
     // recipient limit with it rather than leaving the cap describing
     // pacing that no longer runs.
-    expect(Math.floor(SEND_BATCH_DELAY_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE))).toBe(
-      SEND_BATCH_SIZE,
-    );
     expect(
-      Math.floor((SEND_BATCH_DELAY_MS * 10) / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE)),
+      Math.floor(SEND_BATCH_DELAY_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE))
+    ).toBe(SEND_BATCH_SIZE);
+    expect(
+      Math.floor(
+        (SEND_BATCH_DELAY_MS * 10) / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE)
+      )
     ).toBe(SEND_BATCH_SIZE * 10);
   });
 
-  it('getSendPacing keeps the conservative default within Meta\'s lowest documented ceiling', () => {
+  it("getSendPacing keeps the conservative default within Meta's lowest documented ceiling", () => {
     for (const level of [null, undefined, ''] as const) {
       const pacing = getSendPacing(level);
       const optimisticMps = pacing.batchSize / (pacing.batchDelayMs / 1000);
@@ -191,7 +219,7 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
     }
   });
 
-  it('getSendPacing scales batch size with Meta\'s live-reported tier', () => {
+  it("getSendPacing scales batch size with Meta's live-reported tier", () => {
     const unknown = getSendPacing(null);
     const standard = getSendPacing('STANDARD');
     const high = getSendPacing('HIGH');
@@ -214,7 +242,13 @@ describe('the fan-out paces from getSendPacing\'s shared batch sizes', () => {
   });
 
   it('getSendPacing clamps to the coexistence ceiling regardless of the reported tier', () => {
-    for (const level of ['STANDARD', 'HIGH', 'some-new-tier', null, undefined] as const) {
+    for (const level of [
+      'STANDARD',
+      'HIGH',
+      'some-new-tier',
+      null,
+      undefined,
+    ] as const) {
       const pacing = getSendPacing(level, true);
       expect(pacing.batchSize).toBeLessThanOrEqual(SEND_BATCH_SIZE);
     }

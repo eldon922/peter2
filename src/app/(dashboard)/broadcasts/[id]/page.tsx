@@ -1,6 +1,13 @@
 'use client';
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast, BroadcastRecipient, RecipientStatus, Tag } from '@/types';
@@ -8,7 +15,11 @@ import { Button } from '@/components/ui/button';
 import { GatedButton } from '@/components/ui/gated-button';
 import { useCan } from '@/hooks/use-can';
 import { numberChanged } from '@/lib/broadcasts/variables';
-import { headerMediaError, NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media';
+import {
+  headerMediaError,
+  NO_HEADER_MEDIA,
+  type HeaderMedia,
+} from '@/lib/broadcasts/header-media';
 import { isHeaderMediaKind, type HeaderMediaKind } from '@/lib/media-specs';
 import { HeaderMediaPicker } from '@/components/broadcasts/header-media-picker';
 import {
@@ -73,15 +84,19 @@ interface StatCardProps {
 function StatCard({ label, value, total, icon, color }: StatCardProps) {
   const pct = percentOfRecipients(value, total);
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="border-border bg-card rounded-xl border p-4">
       <div className="flex items-center justify-between">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}>
+        <div
+          className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}
+        >
           {icon}
         </div>
-        <span className="text-xs text-muted-foreground">{pct}%</span>
+        <span className="text-muted-foreground text-xs">{pct}%</span>
       </div>
-      <p className="mt-3 text-2xl font-bold text-foreground">{value.toLocaleString()}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-foreground mt-3 text-2xl font-bold">
+        {value.toLocaleString()}
+      </p>
+      <p className="text-muted-foreground text-xs">{label}</p>
     </div>
   );
 }
@@ -123,10 +138,10 @@ interface FunnelStep {
  */
 function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <h3 className="mb-4 text-sm font-medium text-foreground">
+    <div className="border-border bg-card rounded-xl border p-4">
+      <h3 className="text-foreground mb-4 text-sm font-medium">
         Funnel
-        <span className="ml-2 text-xs font-normal text-muted-foreground">
+        <span className="text-muted-foreground ml-2 text-xs font-normal">
           % of sent
         </span>
       </h3>
@@ -148,15 +163,15 @@ function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
             // eating the row and leaving the bar a stub — it shrinks
             // below sm to give the bar room.
             <div key={step.label} className="flex items-center gap-2 sm:gap-3">
-              <span className="w-16 shrink-0 text-xs text-muted-foreground sm:w-20">
+              <span className="text-muted-foreground w-16 shrink-0 text-xs sm:w-20">
                 {step.label}
               </span>
-              <div className="relative h-7 flex-1 overflow-hidden rounded-full bg-muted">
+              <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded-full">
                 <div
                   className={`h-full rounded-full ${step.color} transition-[width] duration-500`}
                   style={{ width: `${width}%` }}
                 />
-                <span className="absolute inset-y-0 left-0 flex items-center whitespace-nowrap px-3 text-xs font-semibold tabular-nums text-foreground">
+                <span className="text-foreground absolute inset-y-0 left-0 flex items-center px-3 text-xs font-semibold whitespace-nowrap tabular-nums">
                   {label}
                 </span>
                 {/* Same label, same position, clipped to the fill. Purely
@@ -168,7 +183,7 @@ function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
                   style={{ width: `${width}%` }}
                 >
                   <span
-                    className={`flex h-full items-center whitespace-nowrap px-3 text-xs font-semibold tabular-nums ${step.onColor}`}
+                    className={`flex h-full items-center px-3 text-xs font-semibold whitespace-nowrap tabular-nums ${step.onColor}`}
                   >
                     {label}
                   </span>
@@ -255,7 +270,7 @@ export default function BroadcastDetailPage() {
   const [filtering, startFiltering] = useTransition();
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [statusFilter, setStatusFilter] = useState<RecipientStatus | 'all'>(
-    'all',
+    'all'
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -263,7 +278,9 @@ export default function BroadcastDetailPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [retryConfirmation, setRetryConfirmation] = useState<{ recipientId?: string } | null>(null);
+  const [retryConfirmation, setRetryConfirmation] = useState<{
+    recipientId?: string;
+  } | null>(null);
   /**
    * Set when the server refused a retry because it can't tell which
    * media this broadcast sent. Holds the pending retry's scope so
@@ -299,8 +316,13 @@ export default function BroadcastDetailPage() {
       // Each recipient's tags are only needed when the broadcast was aimed
       // at tags (they're what the Tags column shows).
       const aimedAtTags =
-        ((bc.audience_filter as { tagIds?: string[] } | null)?.tagIds?.length ?? 0) > 0;
-      const recs = await fetchBroadcastRecipients(supabase, broadcastId, aimedAtTags);
+        ((bc.audience_filter as { tagIds?: string[] } | null)?.tagIds?.length ??
+          0) > 0;
+      const recs = await fetchBroadcastRecipients(
+        supabase,
+        broadcastId,
+        aimedAtTags
+      );
       setRecipients(recs);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('notFound'));
@@ -316,13 +338,37 @@ export default function BroadcastDetailPage() {
 
   useEffect(() => {
     const db = createClient();
-    const channel = db.channel(`broadcast-detail:${broadcastId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcasts', filter: `id=eq.${broadcastId}` }, (event) => setBroadcast(event.new as Broadcast))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcast_recipients', filter: `broadcast_id=eq.${broadcastId}` }, (event) => {
-        const next = event.new as BroadcastRecipient;
-        setRecipients((rows) => rows.map((row) => row.id === next.id ? { ...row, ...next } : row));
-      }).subscribe();
-    return () => { void db.removeChannel(channel); };
+    const channel = db
+      .channel(`broadcast-detail:${broadcastId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'broadcasts',
+          filter: `id=eq.${broadcastId}`,
+        },
+        (event) => setBroadcast(event.new as Broadcast)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'broadcast_recipients',
+          filter: `broadcast_id=eq.${broadcastId}`,
+        },
+        (event) => {
+          const next = event.new as BroadcastRecipient;
+          setRecipients((rows) =>
+            rows.map((row) => (row.id === next.id ? { ...row, ...next } : row))
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      void db.removeChannel(channel);
+    };
   }, [broadcastId]);
 
   // Tag names for the "Target" line under the title.
@@ -384,11 +430,20 @@ export default function BroadcastDetailPage() {
 
   const filteredRecipients = useMemo(
     () =>
-      recipients.filter((recipient) => (statusFilter === 'all' || recipient.status === statusFilter)
-        && `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`.toLowerCase().includes(deferredRecipientSearch.trim().toLowerCase())),
-    [recipients, statusFilter, deferredRecipientSearch],
+      recipients.filter(
+        (recipient) =>
+          (statusFilter === 'all' || recipient.status === statusFilter) &&
+          `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`
+            .toLowerCase()
+            .includes(deferredRecipientSearch.trim().toLowerCase())
+      ),
+    [recipients, statusFilter, deferredRecipientSearch]
   );
-  const { page: recipientPage, setPage: setRecipientPage } = useListPage(filteredRecipients.length, 50, `${statusFilter}:${recipientSearch}`);
+  const { page: recipientPage, setPage: setRecipientPage } = useListPage(
+    filteredRecipients.length,
+    50,
+    `${statusFilter}:${recipientSearch}`
+  );
 
   /**
    * Retry every failed recipient, or just one when `recipientId` is
@@ -419,12 +474,17 @@ export default function BroadcastDetailPage() {
         // The server refuses rather than guessing whenever it can't
         // reproduce the original message. Two of those refusals are
         // answerable by the user, so ask instead of just reporting.
-        if (data.code === 'header_media_required' || data.code === 'header_media_expired') {
+        if (
+          data.code === 'header_media_required' ||
+          data.code === 'header_media_expired'
+        ) {
           setMediaPrompt({
             recipientId,
             media: NO_HEADER_MEDIA,
             error: data.error,
-            headerType: isHeaderMediaKind(data.headerType) ? data.headerType : 'image',
+            headerType: isHeaderMediaKind(data.headerType)
+              ? data.headerType
+              : 'image',
           });
           return;
         }
@@ -433,7 +493,7 @@ export default function BroadcastDetailPage() {
             ? t('toastRetryUnrecoverable')
             : data.code === 'template_missing'
               ? t('toastRetryTemplateMissing')
-              : t('toastRetryFailed', { error: data.error ?? 'Unknown error' }),
+              : t('toastRetryFailed', { error: data.error ?? 'Unknown error' })
         );
         return;
       }
@@ -447,7 +507,7 @@ export default function BroadcastDetailPage() {
           t('toastRetryPartial', {
             count: data.retrying,
             remaining: data.remaining,
-          }),
+          })
         );
       } else {
         toast.success(t('toastRetryStarted', { count: data.retrying }));
@@ -457,7 +517,7 @@ export default function BroadcastDetailPage() {
       toast.error(
         t('toastRetryFailed', {
           error: err instanceof Error ? err.message : 'Unknown error',
-        }),
+        })
       );
     } finally {
       setRetrying(null);
@@ -467,10 +527,14 @@ export default function BroadcastDetailPage() {
   async function handleStop() {
     setStopping(true);
     try {
-      const res = await fetch(`/api/broadcasts/${broadcastId}/stop`, { method: 'POST' });
+      const res = await fetch(`/api/broadcasts/${broadcastId}/stop`, {
+        method: 'POST',
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(t('toastStopFailed', { error: data.error ?? 'Unknown error' }));
+        toast.error(
+          t('toastStopFailed', { error: data.error ?? 'Unknown error' })
+        );
         return;
       }
       toast.success(t('toastStopped'));
@@ -479,7 +543,7 @@ export default function BroadcastDetailPage() {
       toast.error(
         t('toastStopFailed', {
           error: err instanceof Error ? err.message : 'Unknown error',
-        }),
+        })
       );
     } finally {
       setStopping(false);
@@ -489,13 +553,17 @@ export default function BroadcastDetailPage() {
   // The tags the broadcast was aimed at, and which of them each recipient
   // carries — i.e. why they're on the list. Empty unless it targeted tags.
   const targetTagIds =
-    (broadcast?.audience_filter as { tagIds?: string[] } | undefined)?.tagIds ?? [];
+    (broadcast?.audience_filter as { tagIds?: string[] } | undefined)?.tagIds ??
+    [];
   const showTagsColumn = targetTagIds.length > 0;
   function recipientTags(recipient: BroadcastRecipient): Tag[] {
-    const carried = (recipient.contact as { contact_tags?: { tag_id: string }[] } | undefined)
-      ?.contact_tags;
+    const carried = (
+      recipient.contact as { contact_tags?: { tag_id: string }[] } | undefined
+    )?.contact_tags;
     return tags.filter(
-      (tag) => targetTagIds.includes(tag.id) && carried?.some((ct) => ct.tag_id === tag.id),
+      (tag) =>
+        targetTagIds.includes(tag.id) &&
+        carried?.some((ct) => ct.tag_id === tag.id)
     );
   }
 
@@ -516,7 +584,13 @@ export default function BroadcastDetailPage() {
     const rows = recipients.map((r) => [
       r.contact?.name ?? '',
       r.contact?.phone ?? '',
-      ...(showTagsColumn ? [recipientTags(r).map((tag) => tag.name).join('; ')] : []),
+      ...(showTagsColumn
+        ? [
+            recipientTags(r)
+              .map((tag) => tag.name)
+              .join('; '),
+          ]
+        : []),
       r.phone_attempted ?? '',
       r.status,
       String(r.attempt_count ?? 1),
@@ -526,7 +600,9 @@ export default function BroadcastDetailPage() {
       r.error_message ?? '',
     ]);
     const csv = toCsv([header, ...rows]);
-    const safeName = broadcast.name.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+    const safeName = broadcast.name
+      .replace(/[^a-z0-9-_]+/gi, '-')
+      .toLowerCase();
     downloadBlob(`broadcast-${safeName}-${broadcastId.slice(0, 8)}.csv`, csv);
   }
 
@@ -553,7 +629,7 @@ export default function BroadcastDetailPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <Loader2 className="text-primary h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -575,9 +651,11 @@ export default function BroadcastDetailPage() {
     tagIds?: string[];
     excludeTagIds?: string[];
   };
-  const targetTags = tags.filter((tag) => audienceFilter.tagIds?.includes(tag.id));
+  const targetTags = tags.filter((tag) =>
+    audienceFilter.tagIds?.includes(tag.id)
+  );
   const excludedTags = tags.filter((tag) =>
-    audienceFilter.excludeTagIds?.includes(tag.id),
+    audienceFilter.excludeTagIds?.includes(tag.id)
   );
   const targetLabel =
     audienceFilter.type === 'custom_field'
@@ -587,16 +665,40 @@ export default function BroadcastDetailPage() {
         : t('targetAll');
   const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
 
-  const { total: progressTotal, done: progressDone, percent: sendProgress } = broadcastRunProgress(broadcast);
+  const {
+    total: progressTotal,
+    done: progressDone,
+    percent: sendProgress,
+  } = broadcastRunProgress(broadcast);
 
   // `onColor` is the text colour drawn on top of each fill. The primary
   // bar uses the theme's paired token; the three raw Tailwind fills are
   // saturated enough at 500 that white reads on them in both themes.
   const funnelSteps: FunnelStep[] = [
-    { label: t('stats.sent'), value: broadcast.sent_count, color: 'bg-primary', onColor: 'text-primary-foreground' },
-    { label: t('stats.delivered'), value: broadcast.delivered_count, color: 'bg-green-500', onColor: 'text-white' },
-    { label: t('stats.read'), value: broadcast.read_count, color: 'bg-blue-500', onColor: 'text-white' },
-    { label: t('stats.replied'), value: broadcast.replied_count, color: 'bg-indigo-500', onColor: 'text-white' },
+    {
+      label: t('stats.sent'),
+      value: broadcast.sent_count,
+      color: 'bg-primary',
+      onColor: 'text-primary-foreground',
+    },
+    {
+      label: t('stats.delivered'),
+      value: broadcast.delivered_count,
+      color: 'bg-green-500',
+      onColor: 'text-white',
+    },
+    {
+      label: t('stats.read'),
+      value: broadcast.read_count,
+      color: 'bg-blue-500',
+      onColor: 'text-white',
+    },
+    {
+      label: t('stats.replied'),
+      value: broadcast.replied_count,
+      color: 'bg-indigo-500',
+      onColor: 'text-white',
+    },
   ];
 
   return (
@@ -616,10 +718,10 @@ export default function BroadcastDetailPage() {
             {/* Wraps rather than truncates — the name is the thing you
                 came here to identify, so it gets as many lines as it
                 needs. `break-words` handles an unspaced run. */}
-            <h1 className="text-2xl font-bold break-words text-foreground">
+            <h1 className="text-foreground text-2xl font-bold break-words">
               {broadcast.name}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span>{t('template', { name: broadcast.template_name })}</span>
               <span>-</span>
               <span className="flex flex-wrap items-center gap-1.5">
@@ -636,12 +738,15 @@ export default function BroadcastDetailPage() {
                   </>
                 )}
                 <span>
-                  · {t('targetRecipients', { count: broadcast.total_recipients })}
+                  ·{' '}
+                  {t('targetRecipients', { count: broadcast.total_recipients })}
                 </span>
               </span>
               <span>-</span>
               <span>
-                {t('createdAt', { date: new Date(broadcast.created_at).toLocaleDateString() })}
+                {t('createdAt', {
+                  date: new Date(broadcast.created_at).toLocaleDateString(),
+                })}
               </span>
             </div>
           </div>
@@ -653,103 +758,103 @@ export default function BroadcastDetailPage() {
             (with the chip at its left end) instead of wrapping
             unpredictably; from md up it shrinks to sit beside the title. */}
         <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-        <span className={`inline-flex shrink-0 ${statusChipClass}`}>
-          {tStatus(status.label)}
-        </span>
+          <span className={`inline-flex shrink-0 ${statusChipClass}`}>
+            {tStatus(status.label)}
+          </span>
 
-        <div className="flex items-center gap-2">
-        {/* Stop — unsent recipients become failed, so Retry resumes them. */}
-        {broadcast.status === 'sending' && (
-          <GatedButton
-            canAct={canSend}
-            gateReason="stop broadcasts"
-            variant="outline"
-            size="sm"
-            disabled={stopping}
-            onClick={handleStop}
-            title={t('stopHover')}
-            className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 disabled:opacity-40"
-          >
-            {stopping ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Square className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2">
+            {/* Stop — unsent recipients become failed, so Retry resumes them. */}
+            {broadcast.status === 'sending' && (
+              <GatedButton
+                canAct={canSend}
+                gateReason="stop broadcasts"
+                variant="outline"
+                size="sm"
+                disabled={stopping}
+                onClick={handleStop}
+                title={t('stopHover')}
+                className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+              >
+                {stopping ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Square className="h-3.5 w-3.5" />
+                )}
+                {stopping ? t('stopping') : t('stop')}
+              </GatedButton>
             )}
-            {stopping ? t('stopping') : t('stop')}
-          </GatedButton>
-        )}
-        {/* Retry failed — re-sends only the failed rows, folding the
+            {/* Retry failed — re-sends only the failed rows, folding the
             results back into this broadcast's funnel. Disabled while a
             fan-out is live so we never race the in-flight send. */}
-        {broadcast.failed_count > 0 && (
-          <GatedButton
-            canAct={canSend}
-            gateReason="send messages"
-            variant="outline"
-            size="sm"
-            disabled={broadcast.status === 'sending' || retrying !== null}
-            onClick={() => setRetryConfirmation({})}
-            title={
-              broadcast.status === 'sending'
-                ? t('cannotRetrySending')
-                : t('retryHover')
-            }
-            className="border-amber-500/30 bg-transparent text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
-          >
-            <RotateCw
-              className={`h-3.5 w-3.5 ${retrying === broadcast.id ? 'animate-spin' : ''}`}
-            />
-            {retrying === broadcast.id
-              ? t('retrying')
-              : t('retryFailed', { count: broadcast.failed_count })}
-          </GatedButton>
-        )}
+            {broadcast.failed_count > 0 && (
+              <GatedButton
+                canAct={canSend}
+                gateReason="send messages"
+                variant="outline"
+                size="sm"
+                disabled={broadcast.status === 'sending' || retrying !== null}
+                onClick={() => setRetryConfirmation({})}
+                title={
+                  broadcast.status === 'sending'
+                    ? t('cannotRetrySending')
+                    : t('retryHover')
+                }
+                className="border-amber-500/30 bg-transparent text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+              >
+                <RotateCw
+                  className={`h-3.5 w-3.5 ${retrying === broadcast.id ? 'animate-spin' : ''}`}
+                />
+                {retrying === broadcast.id
+                  ? t('retrying')
+                  : t('retryFailed', { count: broadcast.failed_count })}
+              </GatedButton>
+            )}
 
-        {/* Delete — inline-confirm pattern matches the pipeline-settings
+            {/* Delete — inline-confirm pattern matches the pipeline-settings
             "Delete Pipeline" flow. Mid-send broadcasts can't be deleted
             because orphaning in-flight Meta messages would leave the
             funnel inconsistent. */}
-        {confirmDelete ? (
-          <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm">
-            <span className="text-red-300">{t('deletePrompt')}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmDelete(false)}
-              disabled={deleting}
-              className="h-7 border-border bg-transparent text-muted-foreground hover:bg-muted"
-            >
-              {t('cancel')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="h-7 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-            >
-              {deleting ? t('deleting') : t('confirm')}
-            </Button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm">
+                <span className="text-red-300">{t('deletePrompt')}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="border-border text-muted-foreground hover:bg-muted h-7 bg-transparent"
+                >
+                  {t('cancel')}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="h-7 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? t('deleting') : t('confirm')}
+                </Button>
+              </div>
+            ) : (
+              <GatedButton
+                canAct={canSend}
+                gateReason="delete broadcasts"
+                variant="outline"
+                size="sm"
+                disabled={broadcast.status === 'sending'}
+                onClick={() => setConfirmDelete(true)}
+                title={
+                  broadcast.status === 'sending'
+                    ? t('cannotDeleteSending')
+                    : t('deleteHover')
+                }
+                className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t('delete')}
+              </GatedButton>
+            )}
           </div>
-        ) : (
-          <GatedButton
-            canAct={canSend}
-            gateReason="delete broadcasts"
-            variant="outline"
-            size="sm"
-            disabled={broadcast.status === 'sending'}
-            onClick={() => setConfirmDelete(true)}
-            title={
-              broadcast.status === 'sending'
-                ? t('cannotDeleteSending')
-                : t('deleteHover')
-            }
-            className="border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 disabled:opacity-40"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {t('delete')}
-          </GatedButton>
-        )}
-        </div>
         </div>
       </div>
 
@@ -771,23 +876,25 @@ export default function BroadcastDetailPage() {
           overlay (Step4ScheduleSend), driven by polling instead of a
           client-side counter. */}
       {broadcast.status === 'sending' && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div className="border-primary/20 bg-primary/5 rounded-xl border p-4">
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="text-sm font-medium text-foreground">
+              <Loader2 className="text-primary h-4 w-4 animate-spin" />
+              <p className="text-foreground text-sm font-medium">
                 {t('sendingProgress')}
               </p>
             </div>
-            <span className="text-xs font-medium text-primary">{sendProgress}%</span>
+            <span className="text-primary text-xs font-medium">
+              {sendProgress}%
+            </span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-muted">
+          <div className="bg-muted h-1.5 w-full rounded-full">
             <div
-              className="h-1.5 rounded-full bg-primary transition-all duration-300"
+              className="bg-primary h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${sendProgress}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="text-muted-foreground mt-2 text-xs">
             {t('sendingCounts', {
               done: progressDone,
               total: progressTotal,
@@ -812,18 +919,18 @@ export default function BroadcastDetailPage() {
                 <p className="text-sm font-medium text-amber-300">
                   {t('mediaPromptTitle')}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-xs">
                   {mediaPrompt.error}
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4 text-primary" />
-                  <label className="text-xs font-medium text-muted-foreground">
+                  <ImageIcon className="text-primary h-4 w-4" />
+                  <label className="text-muted-foreground text-xs font-medium">
                     {t('mediaPromptLabel')}
                   </label>
-                  <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium uppercase text-primary">
+                  <span className="bg-primary/10 text-primary inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium uppercase">
                     {mediaPrompt.headerType}
                   </span>
                 </div>
@@ -831,32 +938,41 @@ export default function BroadcastDetailPage() {
                 <HeaderMediaPicker
                   kind={mediaPrompt.headerType}
                   value={mediaPrompt.media}
-                  onChange={(media) => setMediaPrompt({ ...mediaPrompt, media })}
+                  onChange={(media) =>
+                    setMediaPrompt({ ...mediaPrompt, media })
+                  }
                   onSubmit={() => handleRetry(mediaPrompt.recipientId)}
                 />
 
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    disabled={headerMediaError(mediaPrompt.media) !== null || retrying !== null}
+                    disabled={
+                      headerMediaError(mediaPrompt.media) !== null ||
+                      retrying !== null
+                    }
                     onClick={() => handleRetry(mediaPrompt.recipientId)}
                     className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
                   >
-                    {retrying !== null ? t('retrying') : t('mediaPromptConfirm')}
+                    {retrying !== null
+                      ? t('retrying')
+                      : t('mediaPromptConfirm')}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={retrying !== null}
                     onClick={() => setMediaPrompt(null)}
-                    className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+                    className="border-border text-muted-foreground hover:bg-muted bg-transparent"
                   >
                     {t('cancel')}
                   </Button>
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground">{t('mediaPromptHint')}</p>
+              <p className="text-muted-foreground text-xs">
+                {t('mediaPromptHint')}
+              </p>
             </div>
           </div>
         </div>
@@ -912,21 +1028,57 @@ export default function BroadcastDetailPage() {
 
       {/* Recipients Table */}
       <BroadcastDuration broadcast={broadcast} />
-      <SendConfirmationDialog open={retryConfirmation !== null} onOpenChange={(open) => { if (!open) setRetryConfirmation(null); }}
-        broadcast={broadcast} recipientId={retryConfirmation?.recipientId} retry busy={retrying !== null}
-        title={t('retryHover')} confirmLabel={t('retryRow')}
-        onConfirm={() => { const target = retryConfirmation?.recipientId; setRetryConfirmation(null); void handleRetry(target); }} />
-      <div className="rounded-xl border border-border bg-card" aria-busy={loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 className="text-sm font-medium text-foreground">
+      <SendConfirmationDialog
+        open={retryConfirmation !== null}
+        onOpenChange={(open) => {
+          if (!open) setRetryConfirmation(null);
+        }}
+        broadcast={broadcast}
+        recipientId={retryConfirmation?.recipientId}
+        retry
+        busy={retrying !== null}
+        title={t('retryHover')}
+        confirmLabel={t('retryRow')}
+        onConfirm={() => {
+          const target = retryConfirmation?.recipientId;
+          setRetryConfirmation(null);
+          void handleRetry(target);
+        }}
+      />
+      <div
+        className="border-border bg-card rounded-xl border"
+        aria-busy={
+          loadingRecipients ||
+          filtering ||
+          recipientSearch !== deferredRecipientSearch
+        }
+      >
+        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+          <h2 className="text-foreground text-sm font-medium">
             {statusFilter !== 'all'
-              ? t('recipientsHeader', { filtered: filteredRecipients.length, total: recipients.length })
+              ? t('recipientsHeader', {
+                  filtered: filteredRecipients.length,
+                  total: recipients.length,
+                })
               : t('recipientsHeaderAll', { total: recipients.length })}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
-            <Input value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)}
-              placeholder={t('searchRecipients')} aria-label={t('searchRecipients')} className="h-8 w-56" />
-            {(loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch) && <Loader2 className="size-4 animate-spin text-primary" role="status" aria-label={tActivity('loading')} />}
+            <Input
+              value={recipientSearch}
+              onChange={(event) => setRecipientSearch(event.target.value)}
+              placeholder={t('searchRecipients')}
+              aria-label={t('searchRecipients')}
+              className="h-8 w-56"
+            />
+            {(loadingRecipients ||
+              filtering ||
+              recipientSearch !== deferredRecipientSearch) && (
+              <Loader2
+                className="text-primary size-4 animate-spin"
+                role="status"
+                aria-label={tActivity('loading')}
+              />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -947,7 +1099,9 @@ export default function BroadcastDetailPage() {
                 <DropdownMenuItem
                   onClick={() => startFiltering(() => setStatusFilter('all'))}
                   className={
-                    statusFilter === 'all' ? 'text-primary' : 'text-popover-foreground'
+                    statusFilter === 'all'
+                      ? 'text-primary'
+                      : 'text-popover-foreground'
                   }
                 >
                   {t('allStatuses')}
@@ -983,7 +1137,7 @@ export default function BroadcastDetailPage() {
 
         {filteredRecipients.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               {recipients.length === 0
                 ? t('noRecipients')
                 : t('noRecipientsFilter')}
@@ -1001,195 +1155,230 @@ export default function BroadcastDetailPage() {
                       can't act without, the number dialled and the
                       failure reason, reappear stacked inside the cells
                       that stay. */}
-                  <TableHead className="text-muted-foreground">{t('table.contact')}</TableHead>
-                  <TableHead className="hidden text-muted-foreground sm:table-cell">{t('table.phone')}</TableHead>
+                  <TableHead className="text-muted-foreground">
+                    {t('table.contact')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden sm:table-cell">
+                    {t('table.phone')}
+                  </TableHead>
                   {showTagsColumn && (
-                    <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.tags')}</TableHead>
+                    <TableHead className="text-muted-foreground hidden md:table-cell">
+                      {t('table.tags')}
+                    </TableHead>
                   )}
-                  <TableHead className="text-muted-foreground">{t('table.status')}</TableHead>
+                  <TableHead className="text-muted-foreground">
+                    {t('table.status')}
+                  </TableHead>
                   {/* Cells here only ever hold "×2", so the word
                       "Attempts" was setting this column's width by
                       itself. Icon + tooltip keeps it narrow. */}
-                  <TableHead className="hidden text-muted-foreground lg:table-cell">
+                  <TableHead className="text-muted-foreground hidden lg:table-cell">
                     <span className="inline-flex" title={t('table.attempts')}>
                       <RotateCw className="h-3.5 w-3.5" aria-hidden />
                       <span className="sr-only">{t('table.attempts')}</span>
                     </span>
                   </TableHead>
-                  <TableHead className="hidden text-muted-foreground lg:table-cell">{t('table.timestamps')}</TableHead>
-                  <TableHead className="hidden text-muted-foreground md:table-cell">{t('table.error')}</TableHead>
+                  <TableHead className="text-muted-foreground hidden lg:table-cell">
+                    {t('table.timestamps')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden md:table-cell">
+                    {t('table.error')}
+                  </TableHead>
                   <TableHead className="text-muted-foreground" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecipients.slice(recipientPage * 50, (recipientPage + 1) * 50).map((recipient) => {
-                  const rStatus = getRecipientStatus(recipient.status);
-                  // The contact was edited since this row was dialled,
-                  // so what's displayed is NOT what was messaged. Shown
-                  // on any status — a delivered row whose contact moved
-                  // is just as misleading as a failed one.
-                  const changed = numberChanged(recipient);
-                  const attempts = recipient.attempt_count ?? 1;
-                  // Sent/delivered/read share one column, one line per
-                  // step the message actually reached — a missing line
-                  // means that step never happened, not that it's late.
-                  const stamps = [
-                    {
-                      label: t('table.sent'),
-                      at: recipient.sent_at,
-                      tint: STAMP_TINTS.sent,
-                    },
-                    {
-                      label: t('table.delivered'),
-                      at: recipient.delivered_at,
-                      tint: STAMP_TINTS.delivered,
-                    },
-                    {
-                      label: t('table.read'),
-                      at: recipient.read_at,
-                      tint: STAMP_TINTS.read,
-                    },
-                  ].flatMap(({ label, at, tint }) =>
-                    at
-                      ? [{ label, tint, value: new Date(at).toLocaleString() }]
-                      : [],
-                  );
-                  // Rendered in the phone column at sm+, and stacked under
-                  // the contact name below it. The number-changed warning
-                  // has to travel with whichever one is showing — it's the
-                  // only signal that the row was dialled at a number the
-                  // contact no longer has.
-                  const phoneBlock = (
-                    <>
-                      {recipient.contact?.phone ?? '-'}
-                      {changed && (
-                        <span
-                          className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
-                          title={t('numberChangedHint', {
-                            phone: recipient.phone_attempted ?? '',
-                          })}
-                        >
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          {t('triedNumber', {
-                            phone: recipient.phone_attempted ?? '',
-                          })}
-                        </span>
-                      )}
-                    </>
-                  );
-                  const errorText = recipient.error_message?.trim();
-                  return (
-                    <TableRow key={recipient.id} className="border-border">
-                      <TableCell className="max-w-[9rem] truncate font-medium text-foreground sm:max-w-xs">
-                        {recipient.contact ? contactDisplayName(recipient.contact) : 'Unknown'}
-                        <span className="mt-0.5 block whitespace-normal text-xs font-normal text-muted-foreground sm:hidden">
-                          {phoneBlock}
-                        </span>
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">
-                        {phoneBlock}
-                      </TableCell>
-                      {showTagsColumn && (
-                        <TableCell className="hidden whitespace-normal md:table-cell">
-                          <TagChips tags={recipientTags(recipient)} />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}
-                        >
-                          {tStatus(rStatus.label)}
-                        </span>
-                        {/* The error column is hidden below md, and
-                            "Failed" with no reason is not actionable. */}
-                        {errorText && (
-                          <span className="mt-1 block max-w-[14rem] whitespace-normal break-words text-xs text-red-400 md:hidden">
-                            {errorText}
+                {filteredRecipients
+                  .slice(recipientPage * 50, (recipientPage + 1) * 50)
+                  .map((recipient) => {
+                    const rStatus = getRecipientStatus(recipient.status);
+                    // The contact was edited since this row was dialled,
+                    // so what's displayed is NOT what was messaged. Shown
+                    // on any status — a delivered row whose contact moved
+                    // is just as misleading as a failed one.
+                    const changed = numberChanged(recipient);
+                    const attempts = recipient.attempt_count ?? 1;
+                    // Sent/delivered/read share one column, one line per
+                    // step the message actually reached — a missing line
+                    // means that step never happened, not that it's late.
+                    const stamps = [
+                      {
+                        label: t('table.sent'),
+                        at: recipient.sent_at,
+                        tint: STAMP_TINTS.sent,
+                      },
+                      {
+                        label: t('table.delivered'),
+                        at: recipient.delivered_at,
+                        tint: STAMP_TINTS.delivered,
+                      },
+                      {
+                        label: t('table.read'),
+                        at: recipient.read_at,
+                        tint: STAMP_TINTS.read,
+                      },
+                    ].flatMap(({ label, at, tint }) =>
+                      at
+                        ? [
+                            {
+                              label,
+                              tint,
+                              value: new Date(at).toLocaleString(),
+                            },
+                          ]
+                        : []
+                    );
+                    // Rendered in the phone column at sm+, and stacked under
+                    // the contact name below it. The number-changed warning
+                    // has to travel with whichever one is showing — it's the
+                    // only signal that the row was dialled at a number the
+                    // contact no longer has.
+                    const phoneBlock = (
+                      <>
+                        {recipient.contact?.phone ?? '-'}
+                        {changed && (
+                          <span
+                            className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
+                            title={t('numberChangedHint', {
+                              phone: recipient.phone_attempted ?? '',
+                            })}
+                          >
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            {t('triedNumber', {
+                              phone: recipient.phone_attempted ?? '',
+                            })}
                           </span>
                         )}
-                        {/* Timestamps get their own column only at lg, so
+                      </>
+                    );
+                    const errorText = recipient.error_message?.trim();
+                    return (
+                      <TableRow key={recipient.id} className="border-border">
+                        <TableCell className="text-foreground max-w-[9rem] truncate font-medium sm:max-w-xs">
+                          {recipient.contact
+                            ? contactDisplayName(recipient.contact)
+                            : 'Unknown'}
+                          <span className="text-muted-foreground mt-0.5 block text-xs font-normal whitespace-normal sm:hidden">
+                            {phoneBlock}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground hidden sm:table-cell">
+                          {phoneBlock}
+                        </TableCell>
+                        {showTagsColumn && (
+                          <TableCell className="hidden whitespace-normal md:table-cell">
+                            <TagChips tags={recipientTags(recipient)} />
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}
+                          >
+                            {tStatus(rStatus.label)}
+                          </span>
+                          {/* The error column is hidden below md, and
+                            "Failed" with no reason is not actionable. */}
+                          {errorText && (
+                            <span className="mt-1 block max-w-[14rem] text-xs break-words whitespace-normal text-red-400 md:hidden">
+                              {errorText}
+                            </span>
+                          )}
+                          {/* Timestamps get their own column only at lg, so
                             restate them here below that. Failed rows are
                             excluded: the row never reached a step worth
                             timing, and the error above is what you act
                             on — so the two never stack up together. */}
-                        {recipient.status !== 'failed' && stamps.length > 0 && (
-                          <span className="mt-1 block lg:hidden">
-                            {stamps.map(({ label, value, tint }) => (
-                              <span
-                                key={label}
-                                className={`block whitespace-nowrap text-xs ${tint}`}
-                              >
-                                <span className="opacity-60">{label}</span>{' '}
-                                {value}
+                          {recipient.status !== 'failed' &&
+                            stamps.length > 0 && (
+                              <span className="mt-1 block lg:hidden">
+                                {stamps.map(({ label, value, tint }) => (
+                                  <span
+                                    key={label}
+                                    className={`block text-xs whitespace-nowrap ${tint}`}
+                                  >
+                                    <span className="opacity-60">{label}</span>{' '}
+                                    {value}
+                                  </span>
+                                ))}
                               </span>
-                            ))}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground lg:table-cell">
-                        {attempts > 1 ? `×${attempts}` : '-'}
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground lg:table-cell">
-                        {stamps.length === 0
-                          ? '-'
-                          : stamps.map(({ label, value, tint }) => (
-                              <div
-                                key={label}
-                                className={`whitespace-nowrap text-xs ${tint}`}
-                              >
-                                {/* Dimmed by opacity, not a muted colour,
+                            )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground hidden lg:table-cell">
+                          {attempts > 1 ? `×${attempts}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground hidden lg:table-cell">
+                          {stamps.length === 0
+                            ? '-'
+                            : stamps.map(({ label, value, tint }) => (
+                                <div
+                                  key={label}
+                                  className={`text-xs whitespace-nowrap ${tint}`}
+                                >
+                                  {/* Dimmed by opacity, not a muted colour,
                                     so the label stays the step's hue. */}
-                                <span className="opacity-60">{label}</span>{' '}
-                                {value}
-                              </div>
-                            ))}
-                      </TableCell>
-                      {/* Wraps instead of truncating: a clipped WhatsApp
+                                  <span className="opacity-60">{label}</span>{' '}
+                                  {value}
+                                </div>
+                              ))}
+                        </TableCell>
+                        {/* Wraps instead of truncating: a clipped WhatsApp
                           error is unactionable, and `break-words` handles
                           the long unspaced codes Meta returns. Overrides
                           TableCell's default `whitespace-nowrap`. */}
-                      <TableCell className="hidden max-w-xs whitespace-normal break-words text-xs text-red-400 md:table-cell">
-                        {/* `|| '-'`, not `?? '-'`: an empty-string
+                        <TableCell className="hidden max-w-xs text-xs break-words whitespace-normal text-red-400 md:table-cell">
+                          {/* `|| '-'`, not `?? '-'`: an empty-string
                             error_message is as unhelpful as a null one
                             and used to render as a blank cell. */}
-                        {errorText || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {recipient.status === 'failed' && (
-                          <GatedButton
-                            canAct={canSend}
-                            gateReason="send messages"
-                            variant="outline"
-                            size="sm"
-                            disabled={
-                              broadcast.status === 'sending' || retrying !== null
-                            }
-                            onClick={() => setRetryConfirmation({ recipientId: recipient.id })}
-                            title={
-                              changed
-                                ? t('retryChangedNumber', {
-                                    phone: recipient.contact?.phone ?? '',
-                                  })
-                                : t('retryRow')
-                            }
-                            className="h-7 border-border bg-transparent text-muted-foreground hover:bg-muted disabled:opacity-40"
-                          >
-                            <RotateCw
-                              className={`h-3 w-3 ${
-                                retrying === recipient.id ? 'animate-spin' : ''
-                              }`}
-                            />
-                          </GatedButton>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                          {errorText || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {recipient.status === 'failed' && (
+                            <GatedButton
+                              canAct={canSend}
+                              gateReason="send messages"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                broadcast.status === 'sending' ||
+                                retrying !== null
+                              }
+                              onClick={() =>
+                                setRetryConfirmation({
+                                  recipientId: recipient.id,
+                                })
+                              }
+                              title={
+                                changed
+                                  ? t('retryChangedNumber', {
+                                      phone: recipient.contact?.phone ?? '',
+                                    })
+                                  : t('retryRow')
+                              }
+                              className="border-border text-muted-foreground hover:bg-muted h-7 bg-transparent disabled:opacity-40"
+                            >
+                              <RotateCw
+                                className={`h-3 w-3 ${
+                                  retrying === recipient.id
+                                    ? 'animate-spin'
+                                    : ''
+                                }`}
+                              />
+                            </GatedButton>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </div>
         )}
-        <ListPagination page={recipientPage} pageSize={50} total={filteredRecipients.length} onPageChange={setRecipientPage} />
+        <ListPagination
+          page={recipientPage}
+          pageSize={50}
+          total={filteredRecipients.length}
+          onPageChange={setRecipientPage}
+        />
       </div>
     </div>
   );

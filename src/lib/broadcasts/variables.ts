@@ -43,7 +43,7 @@ export type CustomValueIndex = Map<string, Map<string, string>>;
 export function resolveVariables(
   variables: Record<string, VariableMapping>,
   contact: Contact,
-  customValues?: Map<string, string>,
+  customValues?: Map<string, string>
 ): string[] {
   // Keys are typically "1","2",... — numeric-aware sort keeps
   // {{1}} before {{10}}.
@@ -81,7 +81,9 @@ export function resolveVariables(
  * params can still be retried (a template with no placeholders needs
  * none).
  */
-export function bodyPlaceholderKeys(bodyText: string | null | undefined): string[] {
+export function bodyPlaceholderKeys(
+  bodyText: string | null | undefined
+): string[] {
   if (!bodyText) return [];
   return extractTemplateVariables(bodyText);
 }
@@ -92,7 +94,7 @@ export function bodyPlaceholderKeys(bodyText: string | null | undefined): string
  */
 export async function fetchCustomValueIndex(
   supabase: Pick<SupabaseClient, 'from'>,
-  contactIds: string[],
+  contactIds: string[]
 ): Promise<CustomValueIndex> {
   const index: CustomValueIndex = new Map();
   if (contactIds.length === 0) return index;

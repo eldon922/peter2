@@ -12,13 +12,10 @@ import {
   type BroadcastPlan,
 } from './broadcast-core';
 import { phoneVariants } from './phone-utils';
-import {
-  DELIVER_BUDGET_MS,
-  SEND_BATCH_DELAY_MS,
-} from './broadcast-limits';
+import { DELIVER_BUDGET_MS, SEND_BATCH_DELAY_MS } from './broadcast-limits';
 
 vi.mock('@/lib/whatsapp/broadcast-limits', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@/lib/whatsapp/broadcast-limits')>(),
+  ...(await importOriginal<typeof import('@/lib/whatsapp/broadcast-limits')>()),
   DELIVER_BUDGET_MS: 90_000,
 }));
 
@@ -33,7 +30,7 @@ const SEND_BATCH_SIZE_FAST = 80;
 // computed inline in broadcast-limits.ts rather than through a
 // standalone exported function, so this mirrors the same formula.
 const DEFAULT_RECIPIENT_LIMIT = Math.floor(
-  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE),
+  DELIVER_BUDGET_MS / (SEND_BATCH_DELAY_MS / SEND_BATCH_SIZE)
 );
 
 vi.mock('@/lib/whatsapp/encryption', () => ({
@@ -154,9 +151,11 @@ function makeDb(
         );
       }
       const matched = rows.length;
-      if (rangeWindow !== null) rows = rows.slice(rangeWindow[0], rangeWindow[1] + 1);
+      if (rangeWindow !== null)
+        rows = rows.slice(rangeWindow[0], rangeWindow[1] + 1);
       if (limitN !== null) rows = rows.slice(0, limitN);
-      if (opts.serverMaxRows !== undefined) rows = rows.slice(0, opts.serverMaxRows);
+      if (opts.serverMaxRows !== undefined)
+        rows = rows.slice(0, opts.serverMaxRows);
       return rowMode === 'single'
         ? { data: rows[0] ?? null, error: null }
         : {
@@ -216,13 +215,16 @@ function makeDb(
         rowMode = 'single';
         return Promise.resolve(resolve());
       },
-      then: (onOk: (v: unknown) => unknown) => Promise.resolve(resolve()).then(onOk),
+      then: (onOk: (v: unknown) => unknown) =>
+        Promise.resolve(resolve()).then(onOk),
     };
     return chain;
   }
 
   return {
-    db: { from: (table: string) => builder(table) } as unknown as SupabaseClient,
+    db: {
+      from: (table: string) => builder(table),
+    } as unknown as SupabaseClient,
     writes,
     reads,
   };
@@ -397,7 +399,11 @@ describe('createBroadcast contact resolution', () => {
       whatsapp_config: { rows: [CONFIG_ROW] },
       message_templates: {
         rows: [
-          { ...TEMPLATE_NO_VARS, header_type: 'image', header_media_url: 'https://cdn/t.jpg' },
+          {
+            ...TEMPLATE_NO_VARS,
+            header_type: 'image',
+            header_media_url: 'https://cdn/t.jpg',
+          },
         ],
       },
       broadcasts: { rows: [{ id: 'b-1' }] },
@@ -532,7 +538,11 @@ describe('planBroadcastRetry', () => {
           // Must be left alone — retrying a delivered recipient would
           // double-message someone who already got it.
           failedRow({ id: 'rec-sent', status: 'sent', contact_id: 'c-2' }),
-          failedRow({ id: 'rec-deliv', status: 'delivered', contact_id: 'c-3' }),
+          failedRow({
+            id: 'rec-deliv',
+            status: 'delivered',
+            contact_id: 'c-3',
+          }),
           failedRow({ id: 'rec-pend', status: 'pending', contact_id: 'c-4' }),
         ],
       },
@@ -565,7 +575,10 @@ describe('planBroadcastRetry', () => {
     );
     expect(claim).toBeDefined();
     expect(claim!.filters).toContainEqual(['status', 'failed']);
-    expect(claim!.values).toMatchObject({ error_message: null, attempt_count: 2 });
+    expect(claim!.values).toMatchObject({
+      error_message: null,
+      attempt_count: 2,
+    });
   });
 
   it('claims every failed row regardless of count — no artificial ceiling', async () => {
@@ -600,7 +613,7 @@ describe('planBroadcastRetry', () => {
     expect(plan.remaining).toBe(0);
   });
 
-  it('claims past the server\'s 1,000-row page clip without losing any', async () => {
+  it("claims past the server's 1,000-row page clip without losing any", async () => {
     // Without fetchAllRows's paging, a plain `.limit()`/select is
     // clipped to the server's `max_rows` (1,000 by default) regardless
     // of how high the caller asks — every retry beyond the first 1,000
@@ -790,9 +803,7 @@ describe('planBroadcastRetry', () => {
     });
 
     // The whole point: a refusal must not consume the failures.
-    expect(
-      writes.filter((w) => w.values.status === 'pending')
-    ).toHaveLength(0);
+    expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(0);
   });
 
   it('uploads the stored source URL to Meta and sends by media id, not link', async () => {
@@ -808,7 +819,9 @@ describe('planBroadcastRetry', () => {
     });
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
-    expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    expect(plan.planned[0].messageParams).toEqual({
+      headerMediaId: 'meta-media-1',
+    });
     expect(uploadMediaFromUrl).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://cdn/x.jpg',
@@ -870,7 +883,9 @@ describe('planBroadcastRetry', () => {
       headerMediaUrl: 'https://cdn/chosen.jpg',
     });
 
-    expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+    expect(plan.planned[0].messageParams).toEqual({
+      headerMediaId: 'meta-media-1',
+    });
     expect(writes).toContainEqual(
       expect.objectContaining({
         table: 'broadcasts',
@@ -894,12 +909,15 @@ describe('planBroadcastRetry', () => {
     });
 
     await expect(
-      planBroadcastRetry(db, 'acc', 'b-1', { headerMediaUrl: 'javascript:alert(1)' })
+      planBroadcastRetry(db, 'acc', 'b-1', {
+        headerMediaUrl: 'javascript:alert(1)',
+      })
     ).rejects.toMatchObject({ code: 'bad_request', status: 400 });
   });
 
   describe('stored Meta media id expiry (30-day retention)', () => {
-    const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+    const daysAgo = (d: number) =>
+      new Date(Date.now() - d * 86_400_000).toISOString();
     const imageDb = (broadcast: Record<string, unknown>) =>
       makeDb({
         broadcasts: { rows: [sentBroadcast(broadcast)] },
@@ -917,7 +935,9 @@ describe('planBroadcastRetry', () => {
         created_at: daysAgo(5),
       });
       const plan = await planBroadcastRetry(db, 'acc', 'b-1');
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'media-1',
+      });
     });
 
     it('refuses an expired id instead of sending it, and consumes no failures', async () => {
@@ -931,7 +951,9 @@ describe('planBroadcastRetry', () => {
         status: 422,
         details: { headerType: 'image' },
       });
-      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(0);
+      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(
+        0
+      );
     });
 
     it('falls back to created_at when the upload time was never recorded', async () => {
@@ -952,7 +974,9 @@ describe('planBroadcastRetry', () => {
         created_at: null,
       });
       const plan = await planBroadcastRetry(db, 'acc', 'b-1');
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'media-1',
+      });
     });
 
     it('accepts a freshly uploaded id in place of an expired one and stamps it', async () => {
@@ -961,7 +985,9 @@ describe('planBroadcastRetry', () => {
         header_media_uploaded_at: daysAgo(40),
         created_at: daysAgo(40),
       });
-      const plan = await planBroadcastRetry(db, 'acc', 'b-1', { headerMediaId: 'fresh' });
+      const plan = await planBroadcastRetry(db, 'acc', 'b-1', {
+        headerMediaId: 'fresh',
+      });
       expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'fresh' });
       expect(writes).toContainEqual(
         expect.objectContaining({
@@ -984,7 +1010,9 @@ describe('planBroadcastRetry', () => {
       const plan = await planBroadcastRetry(db, 'acc', 'b-1', {
         headerMediaUrl: 'https://cdn/new.jpg',
       });
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'meta-media-1',
+      });
       expect(writes).toContainEqual(
         expect.objectContaining({
           table: 'broadcasts',
@@ -1008,7 +1036,9 @@ describe('planBroadcastRetry', () => {
       expect(uploadMediaFromUrl).toHaveBeenCalledWith(
         expect.objectContaining({ url: 'https://cdn/source.jpg' })
       );
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'meta-media-1',
+      });
     });
 
     it('does not re-upload while the stored id is still fresh', async () => {
@@ -1020,7 +1050,9 @@ describe('planBroadcastRetry', () => {
       });
       const plan = await planBroadcastRetry(db, 'acc', 'b-1');
       expect(uploadMediaFromUrl).not.toHaveBeenCalled();
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'media-1',
+      });
     });
 
     it('fails the retry (502) rather than falling back to a link, and consumes no failures', async () => {
@@ -1035,7 +1067,9 @@ describe('planBroadcastRetry', () => {
         code: 'media_upload_failed',
         status: 502,
       });
-      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(0);
+      expect(writes.filter((w) => w.values.status === 'pending')).toHaveLength(
+        0
+      );
     });
   });
 
@@ -1061,7 +1095,9 @@ describe('planBroadcastRetry', () => {
       },
       broadcast_recipients: { rows: [failedRow({ template_params: [] })] },
       whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text' }] },
+      message_templates: {
+        rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text' }],
+      },
     });
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
@@ -1143,7 +1179,12 @@ describe('planBroadcastSend', () => {
       broadcast_recipients: {
         rows: [
           pendingRow(),
-          pendingRow({ id: 'rec-2', contact_id: 'c-2', template_params: ['Bo', '5678'], contact: { id: 'c-2', phone: '14155550124', name: 'Bo' } }),
+          pendingRow({
+            id: 'rec-2',
+            contact_id: 'c-2',
+            template_params: ['Bo', '5678'],
+            contact: { id: 'c-2', phone: '14155550124', name: 'Bo' },
+          }),
         ],
       },
       whatsapp_config: { rows: [CONFIG_ROW] },
@@ -1193,7 +1234,7 @@ describe('planBroadcastSend', () => {
     expect(plan.planned).toHaveLength(0);
 
     const orphanWrite = writes.find(
-      (w) => w.table === 'broadcast_recipients' && w.op === 'update',
+      (w) => w.table === 'broadcast_recipients' && w.op === 'update'
     );
     expect(orphanWrite?.values).toMatchObject({
       status: 'failed',
@@ -1203,9 +1244,14 @@ describe('planBroadcastSend', () => {
 
   describe('media headers are always sent by Meta media id', () => {
     const imageTemplate = { ...TEMPLATE_ROW, header_type: 'image' };
-    const sendDb = (broadcast: Record<string, unknown>, template: Record<string, unknown> = imageTemplate) =>
+    const sendDb = (
+      broadcast: Record<string, unknown>,
+      template: Record<string, unknown> = imageTemplate
+    ) =>
       makeDb({
-        broadcasts: { rows: [sentBroadcast({ status: 'sending', ...broadcast })] },
+        broadcasts: {
+          rows: [sentBroadcast({ status: 'sending', ...broadcast })],
+        },
         broadcast_recipients: { rows: [pendingRow()] },
         whatsapp_config: { rows: [CONFIG_ROW] },
         message_templates: { rows: [template] },
@@ -1214,7 +1260,9 @@ describe('planBroadcastSend', () => {
     it('uploads the broadcast-stored URL and stores the id', async () => {
       const { db, writes } = sendDb({ header_media_url: 'https://cdn/x.jpg' });
       const plan = await planBroadcastSend(db, 'acc', 'b-1');
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'meta-media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'meta-media-1',
+      });
       expect(uploadMediaFromUrl).toHaveBeenCalledWith(
         expect.objectContaining({ url: 'https://cdn/x.jpg', kind: 'image' })
       );
@@ -1233,7 +1281,10 @@ describe('planBroadcastSend', () => {
     it("does not fall back to the template's default image; it fails the rows instead", async () => {
       const { db, writes } = sendDb(
         { header_media_url: null },
-        { ...imageTemplate, header_media_url: 'https://cdn/template-default.jpg' }
+        {
+          ...imageTemplate,
+          header_media_url: 'https://cdn/template-default.jpg',
+        }
       );
       await expect(planBroadcastSend(db, 'acc', 'b-1')).rejects.toMatchObject({
         code: 'header_media_required',
@@ -1255,7 +1306,9 @@ describe('planBroadcastSend', () => {
       });
       const plan = await planBroadcastSend(db, 'acc', 'b-1');
       expect(uploadMediaFromUrl).not.toHaveBeenCalled();
-      expect(plan.planned[0].messageParams).toEqual({ headerMediaId: 'media-1' });
+      expect(plan.planned[0].messageParams).toEqual({
+        headerMediaId: 'media-1',
+      });
     });
 
     it('fails the pending rows and closes the broadcast when the upload fails', async () => {
@@ -1296,7 +1349,9 @@ describe('planBroadcastSend', () => {
     const { db } = makeDb({
       broadcasts: { rows: [sentBroadcast({ status: 'sending' })] },
       broadcast_recipients: { rows: [pendingRow()] },
-      whatsapp_config: { rows: [{ ...CONFIG_ROW, connection_type: 'embedded_signup' }] },
+      whatsapp_config: {
+        rows: [{ ...CONFIG_ROW, connection_type: 'embedded_signup' }],
+      },
       message_templates: { rows: [{ ...TEMPLATE_ROW, header_type: 'text' }] },
     });
 
@@ -1310,7 +1365,10 @@ describe('planBroadcastStart', () => {
   // none when someone else got there first.
   const scheduledDb = (
     over: Record<string, unknown> = {},
-    template: Record<string, unknown> = { ...TEMPLATE_ROW, header_type: 'text' },
+    template: Record<string, unknown> = {
+      ...TEMPLATE_ROW,
+      header_type: 'text',
+    },
     claimed = true
   ) => {
     const row = sentBroadcast({
@@ -1379,7 +1437,10 @@ describe('planBroadcastStart', () => {
   it('also starts a draft when the caller allows it (Start now on a cancelled schedule)', async () => {
     const { db, writes } = scheduledDb();
 
-    const plan = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+    const plan = await planBroadcastStart(db, 'acc', 'b-1', [
+      'scheduled',
+      'draft',
+    ]);
 
     expect(plan.planned).toHaveLength(1);
     const claim = writes.find((w) => w.table === 'broadcasts');
@@ -1390,7 +1451,10 @@ describe('planBroadcastStart', () => {
     ['a text template', {}, { ...TEMPLATE_ROW, header_type: 'text' }],
     [
       'an image template with a stored media id',
-      { header_media_id: 'media-1', header_media_uploaded_at: new Date().toISOString() },
+      {
+        header_media_id: 'media-1',
+        header_media_uploaded_at: new Date().toISOString(),
+      },
       { ...TEMPLATE_ROW, header_type: 'image' },
     ],
   ])(
@@ -1413,7 +1477,10 @@ describe('planBroadcastStart', () => {
       );
 
       const { db } = scheduledDb(broadcast, template);
-      const started = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+      const started = await planBroadcastStart(db, 'acc', 'b-1', [
+        'scheduled',
+        'draft',
+      ]);
 
       expect(started).toEqual(old);
     }
@@ -1441,7 +1508,10 @@ describe('planBroadcastStart', () => {
   it('starts when every expected recipient is saved', async () => {
     const { db } = scheduledDb({ total_recipients: 1 });
 
-    const plan = await planBroadcastStart(db, 'acc', 'b-1', ['scheduled', 'draft']);
+    const plan = await planBroadcastStart(db, 'acc', 'b-1', [
+      'scheduled',
+      'draft',
+    ]);
 
     expect(plan.planned).toHaveLength(1);
   });
@@ -1497,7 +1567,14 @@ describe('deliverBroadcast', () => {
       phoneNumberId: 'pn-1',
       accessToken: 'tok',
       templateRow: null,
-      planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: ['Jane'] }],
+      planned: [
+        {
+          recipientRowId: 'rec-1',
+          attemptCount: 1,
+          phone: '14155550123',
+          params: ['Jane'],
+        },
+      ],
       rejected: 0,
       ...over,
     };
@@ -1514,10 +1591,21 @@ describe('deliverBroadcast', () => {
       .mockRejectedValueOnce(new Error('131030 recipient not in allowed list'))
       .mockResolvedValueOnce({ messageId: 'wamid.1' });
 
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 1 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 1 }] },
+    });
     await deliverBroadcast(
       db,
-      plan({ planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: input, params: [] }] })
+      plan({
+        planned: [
+          {
+            recipientRowId: 'rec-1',
+            attemptCount: 1,
+            phone: input,
+            params: [],
+          },
+        ],
+      })
     );
 
     const stamp = writes.find((w) => w.values.status === 'sent');
@@ -1534,10 +1622,21 @@ describe('deliverBroadcast', () => {
     );
 
     const input = '370063949836';
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 0 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 0 }] },
+    });
     await deliverBroadcast(
       db,
-      plan({ planned: [{ recipientRowId: 'rec-1', attemptCount: 1, phone: input, params: [] }] })
+      plan({
+        planned: [
+          {
+            recipientRowId: 'rec-1',
+            attemptCount: 1,
+            phone: input,
+            params: [],
+          },
+        ],
+      })
     );
 
     const variants = phoneVariants(input);
@@ -1546,7 +1645,9 @@ describe('deliverBroadcast', () => {
   });
 
   it('stores the params it sent so a second retry can replay them', async () => {
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 1 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 1 }] },
+    });
     await deliverBroadcast(db, plan());
 
     const stamp = writes.find((w) => w.values.status === 'sent');
@@ -1560,7 +1661,9 @@ describe('deliverBroadcast', () => {
     // to arrive at this same row.
     sendTemplateMessage.mockRejectedValue(new Error('130429 rate limit hit'));
 
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 0 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 0 }] },
+    });
     await deliverBroadcast(db, plan());
 
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1);
@@ -1572,7 +1675,8 @@ describe('deliverBroadcast', () => {
   const spanningTwoBatches = Array.from(
     { length: SEND_BATCH_SIZE + 1 },
     (_, i) => ({
-      recipientRowId: `rec-${i}`, attemptCount: 1,
+      recipientRowId: `rec-${i}`,
+      attemptCount: 1,
       phone: '14155550123',
       params: [] as string[],
     })
@@ -1599,9 +1703,9 @@ describe('deliverBroadcast', () => {
     }
 
     // ...and one flat pause before the next group opens.
-    expect(at[SEND_BATCH_SIZE] - at[SEND_BATCH_SIZE - 1]).toBeGreaterThanOrEqual(
-      SEND_BATCH_DELAY_MS - 20
-    );
+    expect(
+      at[SEND_BATCH_SIZE] - at[SEND_BATCH_SIZE - 1]
+    ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS - 20);
   });
 
   it('pays the batch pause on top of Meta latency, not instead of it', async () => {
@@ -1634,7 +1738,8 @@ describe('deliverBroadcast', () => {
     const spanningTwoFastBatches = Array.from(
       { length: SEND_BATCH_SIZE_FAST + 1 },
       (_, i) => ({
-        recipientRowId: `rec-${i}`, attemptCount: 1,
+        recipientRowId: `rec-${i}`,
+        attemptCount: 1,
         phone: '14155550123',
         params: [] as string[],
       })
@@ -1674,7 +1779,8 @@ describe('deliverBroadcast', () => {
     const spanningOneClampedBatch = Array.from(
       { length: SEND_BATCH_SIZE + 1 },
       (_, i) => ({
-        recipientRowId: `rec-${i}`, attemptCount: 1,
+        recipientRowId: `rec-${i}`,
+        attemptCount: 1,
         phone: '14155550123',
         params: [] as string[],
       })
@@ -1701,8 +1807,7 @@ describe('deliverBroadcast', () => {
       expect(at[i] - at[i - 1]).toBeLessThan(50);
     }
     expect(
-      at[SEND_BATCH_SIZE] -
-        at[SEND_BATCH_SIZE - 1]
+      at[SEND_BATCH_SIZE] - at[SEND_BATCH_SIZE - 1]
     ).toBeGreaterThanOrEqual(SEND_BATCH_DELAY_MS - 20);
   });
 
@@ -1711,7 +1816,9 @@ describe('deliverBroadcast', () => {
 
     // 90 recipients already sent before this retry; the trigger-owned
     // sent_count is what must decide the terminal status.
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 90 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 90 }] },
+    });
     await deliverBroadcast(db, plan({ isRetry: true }));
 
     const final = writes.find(
@@ -1723,7 +1830,9 @@ describe('deliverBroadcast', () => {
   it('marks a broadcast failed when nothing has ever sent', async () => {
     sendTemplateMessage.mockRejectedValue(new Error('boom'));
 
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 0 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 0 }] },
+    });
     await deliverBroadcast(db, plan({ isRetry: true }));
 
     const final = writes.find(
@@ -1748,7 +1857,9 @@ describe('deliverBroadcast deadline guard', () => {
       return { messageId: 'wamid.x' };
     });
 
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 1 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 1 }] },
+    });
     await deliverBroadcast(db, {
       broadcastId: 'b-1',
       templateName: 'promo',
@@ -1757,8 +1868,18 @@ describe('deliverBroadcast deadline guard', () => {
       accessToken: 'tok',
       templateRow: null,
       planned: [
-        { recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: [] },
-        { recipientRowId: 'rec-2', attemptCount: 1, phone: '14155550124', params: [] },
+        {
+          recipientRowId: 'rec-1',
+          attemptCount: 1,
+          phone: '14155550123',
+          params: [],
+        },
+        {
+          recipientRowId: 'rec-2',
+          attemptCount: 1,
+          phone: '14155550124',
+          params: [],
+        },
       ],
       rejected: 0,
     });
@@ -1838,8 +1959,18 @@ describe('deliverBroadcast stop check', () => {
       accessToken: 'tok',
       templateRow: null,
       planned: [
-        { recipientRowId: 'rec-1', attemptCount: 1, phone: '14155550123', params: [] },
-        { recipientRowId: 'rec-2', attemptCount: 1, phone: '14155550124', params: [] },
+        {
+          recipientRowId: 'rec-1',
+          attemptCount: 1,
+          phone: '14155550123',
+          params: [],
+        },
+        {
+          recipientRowId: 'rec-2',
+          attemptCount: 1,
+          phone: '14155550124',
+          params: [],
+        },
       ],
       rejected: 0,
     });
@@ -1854,7 +1985,9 @@ describe('attempt numbers in the plans', () => {
       broadcasts: { rows: [sentBroadcast({ status: 'sent' })] },
       broadcast_recipients: { rows: [failedRow({ attempt_count: 2 })] },
       whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text' }] },
+      message_templates: {
+        rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text' }],
+      },
     });
 
     const plan = await planBroadcastRetry(db, 'acc', 'b-1');
@@ -1891,8 +2024,18 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
       accessToken: 'tok',
       templateRow: null,
       planned: [
-        { recipientRowId: 'rec-1', attemptCount: 2, phone: '14155550123', params: [] },
-        { recipientRowId: 'rec-2', attemptCount: 2, phone: '14155550124', params: [] },
+        {
+          recipientRowId: 'rec-1',
+          attemptCount: 2,
+          phone: '14155550123',
+          params: [],
+        },
+        {
+          recipientRowId: 'rec-2',
+          attemptCount: 2,
+          phone: '14155550124',
+          params: [],
+        },
       ],
       rejected: 0,
       ...over,
@@ -1900,7 +2043,9 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
   }
 
   it('checks the row (still pending, same attempt) right before each send', async () => {
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 2 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 2 }] },
+    });
 
     await deliverBroadcast(db, plan());
 
@@ -1936,7 +2081,9 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
       broadcast_recipients: {
         // rec-1 is still ours; rec-2 was taken.
         onUpdate: (filters) =>
-          claimed(filters) && filters.some(([, v]) => v === 'rec-2') ? [] : [{ id: 'x' }],
+          claimed(filters) && filters.some(([, v]) => v === 'rec-2')
+            ? []
+            : [{ id: 'x' }],
       },
     });
 
@@ -1951,7 +2098,9 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
   });
 
   it('still sets the terminal status when nothing was taken from it', async () => {
-    const { db, writes } = makeDb({ broadcasts: { rows: [{ sent_count: 2 }] } });
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [{ sent_count: 2 }] },
+    });
 
     await deliverBroadcast(db, plan());
 
@@ -1962,7 +2111,8 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
     const { db, writes } = makeDb({
       broadcasts: { rows: [{ sent_count: 0 }] },
       broadcast_recipients: {
-        updateError: (filters) => (claimed(filters) ? { message: 'db down' } : null),
+        updateError: (filters) =>
+          claimed(filters) ? { message: 'db down' } : null,
       },
     });
 

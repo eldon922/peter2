@@ -13,7 +13,10 @@ export interface HeaderMedia {
 export const NO_HEADER_MEDIA: HeaderMedia = { mediaId: '', url: '' };
 
 /** What is wrong with the choice, or null when it can be sent. */
-export function headerMediaError({ mediaId, url }: HeaderMedia): 'missing' | 'invalid' | null {
+export function headerMediaError({
+  mediaId,
+  url,
+}: HeaderMedia): 'missing' | 'invalid' | null {
   if (mediaId.trim()) return null;
   const value = url.trim();
   if (!value) return 'missing';

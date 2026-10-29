@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
-import { bodyPlaceholderKeys, numberChanged, resolveVariables } from './variables';
+import {
+  bodyPlaceholderKeys,
+  numberChanged,
+  resolveVariables,
+} from './variables';
 import type { Contact } from '@/types';
 
 const contact = {
@@ -13,7 +17,10 @@ const contact = {
 
 describe('bodyPlaceholderKeys', () => {
   it('extracts keys in template order, deduplicated', () => {
-    expect(bodyPlaceholderKeys('Hi {{1}}, code {{2}}. Bye {{1}}')).toEqual(['1', '2']);
+    expect(bodyPlaceholderKeys('Hi {{1}}, code {{2}}. Bye {{1}}')).toEqual([
+      '1',
+      '2',
+    ]);
   });
 
   it('returns nothing for a template with no placeholders', () => {
@@ -96,14 +103,17 @@ describe('numberChanged', () => {
 
   it('is false for a pre-migration row with no attempted number', () => {
     expect(
-      numberChanged({ phone_attempted: null, contact: { phone: '14155550123' } })
+      numberChanged({
+        phone_attempted: null,
+        contact: { phone: '14155550123' },
+      })
     ).toBe(false);
   });
 
   it('is false — and does not throw — for a deleted contact', () => {
-    expect(numberChanged({ phone_attempted: '14155550123', contact: null })).toBe(
-      false
-    );
+    expect(
+      numberChanged({ phone_attempted: '14155550123', contact: null })
+    ).toBe(false);
     expect(numberChanged({ phone_attempted: '14155550123' })).toBe(false);
   });
 });

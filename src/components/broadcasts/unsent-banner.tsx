@@ -117,7 +117,7 @@ export function UnsentBanner({
           />
           <div>
             {isDraft ? (
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-foreground text-sm font-medium">
                 {missed
                   ? t('missedTitle', {
                       time: formatScheduledAt(broadcast.scheduled_at!),
@@ -126,14 +126,14 @@ export function UnsentBanner({
               </p>
             ) : (
               broadcast.scheduled_at && (
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-foreground text-sm font-medium">
                   {t('scheduledFor', {
                     time: formatScheduledAt(broadcast.scheduled_at),
                   })}
                 </p>
               )
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-xs">
               {missed
                 ? t('missedHint')
                 : isDraft
@@ -162,7 +162,7 @@ export function UnsentBanner({
             size="sm"
             disabled={disabled}
             onClick={() => setScheduling(true)}
-            className="border-border bg-transparent text-muted-foreground hover:bg-muted"
+            className="border-border text-muted-foreground hover:bg-muted bg-transparent"
           >
             {isDraft ? (
               <CalendarClock className="h-3.5 w-3.5" />

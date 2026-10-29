@@ -8,7 +8,9 @@ const MAX_CONVERSATIONS = 40;
 
 const cache = new Map<string, Message[]>();
 
-export function getCachedMessages(conversationId: string): Message[] | undefined {
+export function getCachedMessages(
+  conversationId: string
+): Message[] | undefined {
   const hit = cache.get(conversationId);
   if (hit) {
     // Re-insert so the most recently used sits at the back.
@@ -40,7 +42,7 @@ export function updateCachedMessage(conversationId: string, message: Message) {
   if (!existing) return;
   cache.set(
     conversationId,
-    existing.map((m) => (m.id === message.id ? { ...m, ...message } : m)),
+    existing.map((m) => (m.id === message.id ? { ...m, ...message } : m))
   );
 }
 
@@ -49,7 +51,11 @@ export function clearMessageCache() {
 }
 
 export function removeCachedMessage(messageId: string) {
-  for (const [id, messages] of cache) cache.set(id, messages.filter((message) => message.id !== messageId));
+  for (const [id, messages] of cache)
+    cache.set(
+      id,
+      messages.filter((message) => message.id !== messageId)
+    );
 }
 
 export function removeCachedConversation(conversationId: string) {

@@ -1,4 +1,4 @@
-import type { Conversation, Contact, Tag } from "@/types";
+import type { Conversation, Contact, Tag } from '@/types';
 import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 /**
@@ -8,11 +8,11 @@ import { UNTAGGED } from '@/lib/contacts/tag-filter';
  * flattens them onto `contact.tags`.
  */
 export const CONVERSATION_SELECT =
-  "*, contact:contacts(*, contact_tags(tags(*)))";
+  '*, contact:contacts(*, contact_tags(tags(*)))';
 
 /** Raw shape returned by {@link CONVERSATION_SELECT} before flattening. */
 type RawContact = Contact & { contact_tags?: { tags: Tag | null }[] };
-type RawConversation = Omit<Conversation, "contact"> & {
+type RawConversation = Omit<Conversation, 'contact'> & {
   contact?: RawContact | null;
 };
 
@@ -38,7 +38,7 @@ export function normalizeConversation(raw: RawConversation): Conversation {
 }
 
 export function normalizeConversations(
-  rows: RawConversation[],
+  rows: RawConversation[]
 ): Conversation[] {
   return rows.map(normalizeConversation);
 }
@@ -57,11 +57,15 @@ export interface ContactFilters {
  */
 export function matchesContactFilters(
   conversation: Conversation,
-  { tagIds, company }: ContactFilters,
+  { tagIds, company }: ContactFilters
 ): boolean {
   if (tagIds.length > 0) {
     const contactTagIds = conversation.contact?.tags ?? [];
-    if (!(tagIds.includes(UNTAGGED) && contactTagIds.length === 0) && !contactTagIds.some((t) => tagIds.includes(t.id))) return false;
+    if (
+      !(tagIds.includes(UNTAGGED) && contactTagIds.length === 0) &&
+      !contactTagIds.some((t) => tagIds.includes(t.id))
+    )
+      return false;
   }
 
   if (company !== null && conversation.contact?.company?.trim() !== company) {
