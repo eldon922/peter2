@@ -36,6 +36,7 @@ import { TagChips } from '@/components/broadcasts/tag-chips';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
+import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 
 interface Step4Props {
   name: string;
@@ -81,6 +82,7 @@ export function Step4ScheduleSend({
   const t = useTranslations('Broadcasts.wizard');
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [pendingSchedule, setPendingSchedule] = useState<string | null>(null);
   const [formatted, setFormatted] = useState(true);
   const { resolved, count, loading: loadingReach } = useAudience(audience);
   const reach = count ?? 0;
@@ -349,12 +351,14 @@ export function Step4ScheduleSend({
             confirmLabel={t('scheduleSend.scheduleConfirm', { count: reach })}
             onConfirm={(iso) => {
               setShowSchedule(false);
-              onSchedule(iso);
+              setPendingSchedule(iso);
+              setShowConfirm(true);
             }}
           />
 
           <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
           <DialogTrigger
+            onClick={() => setPendingSchedule(null)}
             render={
               <Button
                 disabled={!name.trim() || isProcessing || locked || loadingReach || reach === 0}
@@ -367,13 +371,14 @@ export function Step4ScheduleSend({
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-popover sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-popover-foreground">{t('scheduleSend.confirmTitle')}</DialogTitle>
+              <DialogTitle className="text-popover-foreground">{pendingSchedule ? t('scheduleSend.scheduleTitle') : t('scheduleSend.confirmTitle')}</DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {t('scheduleSend.confirmDesc')}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3 text-sm">
+              {pendingSchedule && <p className="font-medium text-popover-foreground">{formatScheduledAt(pendingSchedule)}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">{t('scheduleSend.broadcastName')}</p>
@@ -424,12 +429,13 @@ export function Step4ScheduleSend({
               <Button
                 onClick={() => {
                   setShowConfirm(false);
-                  onSend();
+                  if (pendingSchedule) onSchedule(pendingSchedule);
+                  else onSend();
                 }}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Send className="h-4 w-4" />
-                {t('scheduleSend.sendTo', { count: reach })}
+                {pendingSchedule ? t('scheduleSend.scheduleConfirm', { count: reach }) : t('scheduleSend.sendTo', { count: reach })}
               </Button>
             </DialogFooter>
           </DialogContent>
