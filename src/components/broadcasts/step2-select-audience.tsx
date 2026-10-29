@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { parseContactCsv } from '@/lib/contacts/parse-contact-csv';
 import { dedupeByPhone } from '@/lib/contacts/dedupe';
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
 import { useAudience } from '@/hooks/use-audience';
@@ -91,6 +92,7 @@ export function Step2SelectAudience({
   const {
     resolved,
     count: estimatedCount,
+    excludedCount,
     loading: loadingCount,
     failed: estimateFailed,
   } = useAudience(audience);
@@ -127,7 +129,7 @@ export function Step2SelectAudience({
       try {
         const supabase = createClient();
         const { data } = await supabase.from('tags').select('*').order('name');
-        setTags(data ?? []);
+        setTags([{ id: UNTAGGED, name: t('selectAudience.untagged'), color: '#94a3b8', user_id: '', created_at: '' }, ...(data ?? [])]);
       } finally {
         setLoadingTags(false);
       }
@@ -370,6 +372,7 @@ export function Step2SelectAudience({
       {/* Audience Summary */}
       <div className="rounded-xl border border-border bg-card/50 p-4">
         <p className="mb-2 text-sm font-medium text-foreground">{t('selectAudience.summary')}</p>
+        {!loadingCount && <p className="mb-2 text-xs text-red-600 dark:text-red-300">{t('selectAudience.excludedCount', { count: excludedCount })}</p>}
         {loadingCount ? (
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />

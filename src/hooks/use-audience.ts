@@ -46,6 +46,7 @@ export function useAudience(audience: AudienceConfig) {
   return {
     resolved: current?.resolved ?? null,
     count: resolvedCount(current?.resolved ?? null),
+    excludedCount: current?.resolved?.excludedCount ?? 0,
     loading: current === null,
     failed: current?.failed ?? false,
   };

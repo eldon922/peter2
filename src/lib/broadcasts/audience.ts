@@ -9,6 +9,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { chunkIds, fetchAllRows } from '@/lib/supabase/batching';
+import { normalizeKey } from '@/lib/contacts/dedupe';
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 export type CustomFieldOperator = 'is' | 'is_not' | 'contains';
 
@@ -40,9 +42,9 @@ export interface AudienceContact {
  * `all` is "every contact" with no exclusions, so it needs no id list.
  */
 export type ResolvedAudience =
-  | { kind: 'ids'; ids: string[] }
-  | { kind: 'all'; count: number }
-  | { kind: 'csv'; contacts: { phone: string; name?: string }[] }
+  | { kind: 'ids'; ids: string[]; excludedCount?: number }
+  | { kind: 'all'; count: number; excludedCount?: number }
+  | { kind: 'csv'; contacts: { phone: string; name?: string }[]; excludedCount?: number }
   | null;
 
 export const AUDIENCE_PAGE_SIZE = 50;
@@ -53,6 +55,17 @@ async function contactIdsForTags(
   supabase: Supabase,
   tagIds: string[],
 ): Promise<string[]> {
+  if (tagIds.includes(UNTAGGED)) {
+    const [allIds, tagged, included] = await Promise.all([
+      allContactIds(supabase),
+      fetchAllRows<{ contact_id: string }>((from, to) => supabase.from('contact_tags').select('contact_id').order('id').range(from, to)),
+      contactIdsForTags(supabase, tagIds.filter((id) => id !== UNTAGGED)),
+    ]);
+    if (tagged.error) throw new Error(tagged.error.message);
+    const taggedIds = new Set(tagged.rows.map((row) => row.contact_id));
+    return [...new Set([...included, ...allIds.filter((id) => !taggedIds.has(id))])];
+  }
+  if (tagIds.length === 0) return [];
   const { rows, error } = await fetchAllRows<{ contact_id: string }>(
     (from, to) =>
       supabase
@@ -121,17 +134,26 @@ export async function resolveAudience(
   ) {
     ids = await contactIdsForCustomField(supabase, audience.customField);
   } else if (audience.type === 'csv' && audience.csvContacts?.length) {
-    // CSV contacts are synthetic, so exclusion doesn't apply (same as send).
-    return { kind: 'csv', contacts: audience.csvContacts };
+    const excludedPhones = new Set<string>();
+    if (excludeTagIds.length) {
+      for (const chunk of chunkIds(await contactIdsForTags(supabase, excludeTagIds))) {
+        const { data, error } = await supabase.from('contacts').select('phone').in('id', chunk);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) excludedPhones.add(normalizeKey(row.phone));
+      }
+    }
+    const contacts = audience.csvContacts.filter((row) => !excludedPhones.has(normalizeKey(row.phone)));
+    return { kind: 'csv', contacts, excludedCount: audience.csvContacts.length - contacts.length };
   } else {
     return null;
   }
 
+  const beforeExclusion = ids.length;
   if (excludeTagIds.length > 0) {
     const excluded = new Set(await contactIdsForTags(supabase, excludeTagIds));
     ids = ids.filter((id) => !excluded.has(id));
   }
-  return { kind: 'ids', ids };
+  return { kind: 'ids', ids, excludedCount: beforeExclusion - ids.length };
 }
 
 export function resolvedCount(resolved: ResolvedAudience): number | null {

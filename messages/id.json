@@ -889,7 +889,9 @@
         "estimatedRecipients": "perkiraan penerima",
         "selectToEstimate": "Pilih jenis audiens untuk melihat perkiraan.",
         "noMatch": "Tidak ada kontak yang cocok dengan audiens ini. Ubah pilihan untuk melanjutkan.",
-        "estimateFailed": "Gagal menghitung audiens. Coba ubah pilihan."
+        "estimateFailed": "Gagal menghitung audiens. Coba ubah pilihan.",
+        "untagged": "Tanpa tag",
+        "excludedCount": "{count} penerima dikecualikan"
       },
       "personalize": {
         "title": "Personalisasi Variabel",

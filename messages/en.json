@@ -889,7 +889,9 @@
         "estimatedRecipients": "estimated recipients",
         "selectToEstimate": "Select an audience type to see the estimate.",
         "noMatch": "No contacts match this audience. Change the selection to continue.",
-        "estimateFailed": "Couldn't calculate the audience. Try changing the selection."
+        "estimateFailed": "Couldn't calculate the audience. Try changing the selection.",
+        "untagged": "Untagged",
+        "excludedCount": "{count} recipients excluded"
       },
       "personalize": {
         "title": "Personalize Variables",

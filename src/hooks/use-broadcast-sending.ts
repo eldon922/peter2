@@ -14,6 +14,7 @@ import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
 import { isHeaderMediaKind } from '@/lib/media-specs';
 import { uploadHeaderMedia } from '@/lib/broadcasts/upload-header-media';
 import { finishBroadcast } from '@/lib/broadcasts/finish-broadcast';
+import { resolveAudience as resolveWizardAudience } from '@/lib/broadcasts/audience';
 import type {
   AudienceConfig,
   CustomFieldFilter,
@@ -119,83 +120,15 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
   const [stage, setStage] = useState<SendingStage | null>(null);
   const [counts, setCounts] = useState<{ done: number; total: number } | null>(null);
 
-  /**
-   * Every read below goes through `fetchAllRows`. PostgREST clips each
-   * response to its `max_rows` (1,000 by default) without any error, so
-   * a plain `.select()` returned only the first 1,000 contacts — and,
-   * worse, only the first 1,000 *excluded* contacts, letting the rest
-   * through to the send. Pages are ordered by `id` so offset paging is
-   * stable.
-   */
   async function resolveAudience(audience: AudienceConfig): Promise<Contact[]> {
     const supabase = createClient();
-
-    let contacts: Contact[] = [];
-
-    if (audience.type === 'all') {
-      const { rows, error } = await fetchAllRows<Contact>((from, to) =>
-        supabase.from('contacts').select('*').order('id').range(from, to)
-      );
-      if (error) throw new Error(`Failed to fetch contacts: ${error.message}`);
-      contacts = rows;
-    } else if (
-      audience.type === 'tags' &&
-      audience.tagIds &&
-      audience.tagIds.length > 0
-    ) {
-      const tagIds = audience.tagIds;
-      const { rows: contactTags, error: tagError } = await fetchAllRows<{
-        contact_id: string;
-      }>((from, to) =>
-        supabase
-          .from('contact_tags')
-          .select('contact_id')
-          .in('tag_id', tagIds)
-          .order('id')
-          .range(from, to)
-      );
-
-      if (tagError)
-        throw new Error(`Failed to fetch contact tags: ${tagError.message}`);
-
-      if (contactTags.length > 0) {
-        const uniqueContactIds = [
-          ...new Set(contactTags.map((ct) => ct.contact_id)),
-        ];
-        contacts = await fetchContactsByIds(supabase, uniqueContactIds);
-      }
-    } else if (audience.type === 'custom_field' && audience.customField) {
-      contacts = await resolveCustomFieldAudience(supabase, audience.customField);
-    } else if (audience.type === 'csv' && audience.csvContacts) {
-      contacts = await upsertCsvContacts(supabase, audience.csvContacts);
-    }
-
-    // Apply exclude tags (works across all contact-derived audience
-    // types). CSV contacts are synthetic so exclusion doesn't apply.
-    if (audience.excludeTagIds && audience.excludeTagIds.length > 0) {
-      const excludeTagIds = audience.excludeTagIds;
-      const { rows: excludeRows, error: excludeError } = await fetchAllRows<{
-        contact_id: string;
-      }>((from, to) =>
-        supabase
-          .from('contact_tags')
-          .select('contact_id')
-          .in('tag_id', excludeTagIds)
-          .order('id')
-          .range(from, to)
-      );
-      // Abort rather than send without the exclusion: an incomplete
-      // exclude list means messaging people the user opted out.
-      if (excludeError) {
-        throw new Error(
-          `Failed to fetch excluded contacts: ${excludeError.message}`,
-        );
-      }
-      const excludedIds = new Set(excludeRows.map((r) => r.contact_id));
-      contacts = contacts.filter((c) => !excludedIds.has(c.id));
-    }
-
-    return contacts;
+    const resolved = await resolveWizardAudience(supabase, audience);
+    if (!resolved) return [];
+    if (resolved.kind === 'csv') return upsertCsvContacts(supabase, resolved.contacts);
+    if (resolved.kind === 'ids') return fetchContactsByIds(supabase, resolved.ids);
+    const { rows, error } = await fetchAllRows<Contact>((from, to) => supabase.from('contacts').select('*').order('id').range(from, to));
+    if (error) throw new Error(error.message);
+    return rows;
   }
 
   /**
@@ -276,43 +209,6 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     return phones
       .map((p) => byPhone.get(p))
       .filter((c): c is Contact => Boolean(c));
-  }
-
-  async function resolveCustomFieldAudience(
-    supabase: ReturnType<typeof createClient>,
-    filter: CustomFieldFilter,
-  ): Promise<Contact[]> {
-    const { fieldId, operator, value } = filter;
-
-    // Build the WHERE clause for the operator. PostgREST supports
-    // eq/neq/ilike via the query builder — use ilike with wildcards
-    // for "contains" so the match is case-insensitive.
-    //
-    // A function, not a variable: supabase-js builders are mutable, so
-    // each page needs a fresh one or the ranges would stack.
-    const buildQuery = () => {
-      let query = supabase
-        .from('contact_custom_values')
-        .select('contact_id')
-        .eq('custom_field_id', fieldId);
-
-      if (operator === 'is') query = query.eq('value', value);
-      else if (operator === 'is_not') query = query.neq('value', value);
-      else if (operator === 'contains')
-        query = query.ilike('value', `%${value}%`);
-      return query;
-    };
-
-    const { rows: matches, error: matchErr } = await fetchAllRows<{
-      contact_id: string;
-    }>((from, to) => buildQuery().order('id').range(from, to));
-    if (matchErr)
-      throw new Error(`Custom-field filter failed: ${matchErr.message}`);
-
-    const contactIds = [...new Set(matches.map((m) => m.contact_id))];
-    if (contactIds.length === 0) return [];
-
-    return fetchContactsByIds(supabase, contactIds);
   }
 
   async function createAndSendBroadcast(payload: BroadcastPayload): Promise<string> {
