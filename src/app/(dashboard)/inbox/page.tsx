@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useBackLayer } from "@/hooks/use-back-layer";
 import { useSessionInfo } from "@/hooks/use-session-info";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useCan } from "@/hooks/use-can";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
@@ -45,6 +46,7 @@ export default function InboxPage() {
 
 function InboxPageInner() {
   const t = useTranslations("Inbox.page");
+  const canMarkRead = useCan("send-messages");
   const router = useRouter();
   const searchParams = useSearchParams();
   /**
@@ -300,7 +302,7 @@ function InboxPageInner() {
                     last_message_text: newMsg.content_text ?? "",
                     last_message_at: newMsg.created_at,
                     unread_count:
-                      activeConversation?.id === newMsg.conversation_id
+                      canMarkRead && activeConversation?.id === newMsg.conversation_id
                         ? 0
                         : c.unread_count + 1,
                   }
@@ -326,7 +328,7 @@ function InboxPageInner() {
         );
       }
     },
-    [activeConversation, hydrateConversation]
+    [activeConversation, hydrateConversation, canMarkRead]
   );
 
   // Handle realtime conversation events
@@ -360,7 +362,7 @@ function InboxPageInner() {
           // RIGHT NOW, so any positive value would just flicker the badge
           // back on for the ~100ms it takes for the reset effect's server
           // UPDATE to round-trip. Non-active convs take the value as-is.
-          const isActive = activeConversation?.id === conv.id;
+          const isActive = canMarkRead && activeConversation?.id === conv.id;
           setConversations((prev) =>
             prev.map((c) =>
               c.id === conv.id
@@ -388,7 +390,7 @@ function InboxPageInner() {
         }
       }
     },
-    [activeConversation, hydrateConversation]
+    [activeConversation, hydrateConversation, canMarkRead]
   );
 
   // Subscribe to realtime. The `isConnected` flag below feeds the
@@ -487,7 +489,7 @@ function InboxPageInner() {
           // does — the user just deep-linked into this conv, treat that the
           // same as a click. Leaves activeConversation.unread_count alone so
           // the MessageThread reset effect still fires the server UPDATE.
-          if (match.unread_count > 0) {
+          if (canMarkRead && match.unread_count > 0) {
             setConversations((prev) =>
               prev.map((c) =>
                 c.id === match.id ? { ...c, unread_count: 0 } : c,
@@ -497,7 +499,7 @@ function InboxPageInner() {
         }
       }
     },
-    [deepLinkConvId, activeConversation?.id]
+    [deepLinkConvId, activeConversation?.id, canMarkRead]
   );
 
   const handleSelectConversation = useCallback(
@@ -521,7 +523,7 @@ function InboxPageInner() {
       // even if the realtime UPDATE is dropped.
       setConversations((prev) =>
         prev.map((c) =>
-          c.id === conv.id && c.unread_count > 0
+          canMarkRead && c.id === conv.id && c.unread_count > 0
             ? { ...c, unread_count: 0 }
             : c,
         ),
@@ -539,7 +541,7 @@ function InboxPageInner() {
       // replace() to avoid polluting browser history with every click.
       router.replace(`/inbox?c=${conv.id}`, { scroll: false });
     },
-    [activeConversation?.id, router]
+    [activeConversation?.id, router, canMarkRead]
   );
 
   // Mobile "back" — deselect the conversation so the list pane comes

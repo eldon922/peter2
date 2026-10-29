@@ -440,7 +440,7 @@ export function MessageThread({
   // Guarding on hasUnread prevents the eq-update loop: once unread_count
   // is 0 the condition is false, so no further UPDATE is issued.
   useEffect(() => {
-    if (!conversationId || !hasUnread) return;
+    if (!conversationId || !hasUnread || !canAct) return;
     const supabase = createClient();
     supabase
       .from("conversations")
@@ -449,7 +449,7 @@ export function MessageThread({
       .then(({ error }) => {
         if (error) console.error("Failed to reset unread_count:", error);
       });
-  }, [conversationId, hasUnread]);
+  }, [conversationId, hasUnread, canAct]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
