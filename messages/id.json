@@ -41,7 +41,8 @@
     "menuSettings": "Pengaturan",
     "menuSignOut": "Keluar",
     "supportHint": "Butuh bantuan? Hubungi tim dukungan TI kami",
-    "supportLabel": "Dukungan WhatsApp"
+    "supportLabel": "Dukungan WhatsApp",
+    "roleReplier": "Pembalas"
   },
   "Header": {
     "dashboard": "Dasbor",
@@ -1646,7 +1647,9 @@
       "viewer": "Pengamat",
       "viewerHint": "Hanya baca di seluruh aplikasi",
       "owner": "Pemilik",
-      "ownerHint": "Kendali penuh atas akun dan penagihan"
+      "ownerHint": "Kendali penuh atas akun dan penagihan",
+      "replier": "Pembalas",
+      "replierHint": "Balas dan beri reaksi pada chat yang ada; kontak, broadcast, dan pengaturan hanya dapat dilihat"
     },
     "whatsapp": {
       "title": "Koneksi WhatsApp",

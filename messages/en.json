@@ -41,7 +41,8 @@
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
     "supportHint": "Need help? Contact our IT support team",
-    "supportLabel": "WhatsApp support"
+    "supportLabel": "WhatsApp support",
+    "roleReplier": "Replier"
   },
   "Header": {
     "dashboard": "Dashboard",
@@ -1646,7 +1647,9 @@
       "viewer": "Viewer",
       "viewerHint": "Read-only across the app",
       "owner": "Owner",
-      "ownerHint": "Full control over account and billing"
+      "ownerHint": "Full control over account and billing",
+      "replier": "Replier",
+      "replierHint": "Reply and react in existing inbox chats; contacts, broadcasts and settings are read-only"
     },
     "whatsapp": {
       "title": "WhatsApp connection",

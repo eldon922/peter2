@@ -46,7 +46,7 @@ export default function InboxPage() {
 
 function InboxPageInner() {
   const t = useTranslations("Inbox.page");
-  const canMarkRead = useCan("send-messages");
+  const canMarkRead = useCan("reply-messages");
   const router = useRouter();
   const searchParams = useSearchParams();
   /**

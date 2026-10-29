@@ -15,11 +15,12 @@
 // changes a one-file diff.
 // ============================================================
 
-export type AccountRole = "owner" | "admin" | "agent" | "viewer";
+export type AccountRole = "owner" | "admin" | "agent" | "replier" | "viewer";
 
 /** Ordered list of every valid role, lowest privilege first. */
 export const ACCOUNT_ROLES: readonly AccountRole[] = [
   "viewer",
+  "replier",
   "agent",
   "admin",
   "owner",
@@ -32,10 +33,12 @@ export const ACCOUNT_ROLES: readonly AccountRole[] = [
 export function roleRank(role: AccountRole): number {
   switch (role) {
     case "owner":
-      return 4;
+      return 5;
     case "admin":
-      return 3;
+      return 4;
     case "agent":
+      return 3;
+    case "replier":
       return 2;
     case "viewer":
       return 1;
@@ -87,6 +90,10 @@ export function canEditSettings(role: AccountRole): boolean {
  */
 export function canSendMessages(role: AccountRole): boolean {
   return hasMinRole(role, "agent");
+}
+
+export function canReplyMessages(role: AccountRole): boolean {
+  return hasMinRole(role, 'replier');
 }
 
 /**

@@ -48,4 +48,10 @@ export const ROLE_META: Record<
     // both modes — bg-card would blend into a card surface in light mode.
     className: 'border-border bg-transparent text-muted-foreground',
   },
+  replier: {
+    icon: UserCog,
+    label: 'replier',
+    variant: 'muted',
+    className: 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300',
+  },
 };

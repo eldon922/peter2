@@ -206,7 +206,7 @@ export function MessageThread({
   const [deleting, setDeleting] = useState(false);
 
   const { user } = useAuth();
-  const canAct = useCan("send-messages");
+  const canAct = useCan("reply-messages");
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1035,7 +1035,7 @@ export function MessageThread({
           {/* Status dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger
-                disabled={!canAct}
+                disabled={!canManageContacts}
                 className={cn(
                   "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted disabled:pointer-events-none",
                   currentStatus?.color ?? "text-muted-foreground"
@@ -1062,7 +1062,7 @@ export function MessageThread({
           {/* Assign dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              disabled={!canAct}
+              disabled={!canManageContacts}
               className={cn(
                 "inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-xs hover:bg-muted disabled:pointer-events-none",
                 assignedAgentId ? "text-primary" : "text-muted-foreground"

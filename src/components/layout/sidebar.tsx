@@ -67,6 +67,11 @@ const ROLE_CHIP: Record<
     className:
       "border-border bg-card text-muted-foreground",
   },
+  replier: {
+    icon: UserCog,
+    labelKey: 'roleReplier',
+    className: 'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-300',
+  },
 };
 
 interface NavItem {

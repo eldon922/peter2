@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   try {
     // Uploading media is part of composing a send, so it needs the
     // same 'agent' role as sending a broadcast/template.
-    const { supabase, accountId, userId } = await requireRole('agent')
+    const { supabase, accountId, userId } = await requireRole('replier')
 
     const limit = checkRateLimit(`media-upload:${userId}`, RATE_LIMITS.broadcast)
     if (!limit.success) return rateLimitResponse(limit)

@@ -6,6 +6,7 @@ import {
   canEditSettings,
   canManageMembers,
   canSendMessages,
+  canReplyMessages,
   canTransferOwnership,
   canViewOnly,
   hasMinRole,
@@ -24,9 +25,9 @@ describe("roleRank", () => {
     // Keep these in lockstep with `is_account_member`'s CASE expression
     // in supabase/migrations/017_account_sharing.sql — any change here
     // means the SQL helper needs the same change.
-    expect(roleRank("owner")).toBe(4);
-    expect(roleRank("admin")).toBe(3);
-    expect(roleRank("agent")).toBe(2);
+    expect(roleRank("owner")).toBe(5);
+    expect(roleRank("admin")).toBe(4);
+    expect(roleRank("agent")).toBe(3);
     expect(roleRank("viewer")).toBe(1);
   });
 });
@@ -127,4 +128,13 @@ describe("capability predicates", () => {
     expect(canTransferOwnership("agent")).toBe(false);
     expect(canTransferOwnership("viewer")).toBe(false);
   });
+});
+
+ it('allows repliers to reply and react without granting operational or settings writes', () => {
+  expect(canReplyMessages('replier')).toBe(true);
+  expect(canReplyMessages('viewer')).toBe(false);
+  expect(canSendMessages('replier')).toBe(false);
+  expect(canEditSettings('replier')).toBe(false);
+  expect(canManageMembers('replier')).toBe(false);
+  expect(hasMinRole('replier', 'agent')).toBe(false);
 });

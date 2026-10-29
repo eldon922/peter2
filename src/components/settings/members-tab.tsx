@@ -87,7 +87,7 @@ interface Member {
 
 interface Invitation {
   id: string;
-  role: 'admin' | 'agent' | 'viewer';
+  role: 'admin' | 'agent' | 'replier' | 'viewer';
   label: string | null;
   created_at: string;
   expires_at: string;
@@ -97,6 +97,7 @@ interface Invitation {
 const EDITABLE_ROLES: { value: AccountRole }[] = [
   { value: 'admin' },
   { value: 'agent' },
+  { value: 'replier' },
   { value: 'viewer' },
 ];
 

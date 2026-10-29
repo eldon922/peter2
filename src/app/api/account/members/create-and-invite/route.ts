@@ -157,7 +157,7 @@ export async function POST(request: Request) {
     const role = body?.role;
     if (!isAccountRole(role) || role === 'owner') {
       return NextResponse.json(
-        { error: "'role' must be one of admin, agent, viewer" },
+        { error: "'role' must be one of admin, agent, replier, viewer" },
         { status: 400 }
       );
     }

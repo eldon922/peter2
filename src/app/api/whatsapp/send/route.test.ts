@@ -313,4 +313,11 @@ describe('POST /api/whatsapp/send — role enforcement', () => {
     expect(res.status).toBe(200)
     expect(sendTemplateMessage).toHaveBeenCalledTimes(1)
   })
+
+  it('prevents repliers from creating a conversation from a contact', async () => {
+    callerRole = 'replier'
+    const res = await postContactTemplate()
+    expect(res.status).toBe(403)
+    expect(sendTemplateMessage).not.toHaveBeenCalled()
+  })
 })

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
+import { canSendMessages } from '@/lib/auth/roles'
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     // still delivered a real WhatsApp message to the customer and merely
     // failed to record it (surfacing as "sent to Meta but failed to save
     // to DB"). RLS can't un-send that, so the role check belongs here.
-    const { supabase, accountId, userId } = await requireRole('agent')
+    const { supabase, accountId, userId, role } = await requireRole('replier')
 
     // Per-user rate limit. Bucket key is scoped to this route so
     // `/broadcast` has an independent budget.
@@ -59,6 +60,10 @@ export async function POST(request: Request) {
       interactive_payload,
       reply_to_message_id,
     } = body
+
+    if (!conversationIdInput && !canSendMessages(role)) {
+      return NextResponse.json({ error: 'Repliers can only reply to existing inbox conversations.' }, { status: 403 })
+    }
 
     if ((!conversationIdInput && !contact_id) || !message_type) {
       return NextResponse.json(
