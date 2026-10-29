@@ -740,23 +740,24 @@ export function TemplateManager() {
 
               <div className="space-y-2">
                 <Label className="text-muted-foreground">{t('language')}</Label>
-                <Input
-                  list="template-language-codes"
-                  placeholder="en_US"
+                <select
+                  aria-label={t('language')}
                   value={form.language}
                   onChange={(e) =>
                     setForm({ ...form, language: e.target.value })
                   }
                   disabled={editingId !== null}
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                <datalist id="template-language-codes">
+                  className="h-9 w-full rounded-md border bg-muted border-border px-3 text-sm text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {!TEMPLATE_LANGUAGES.some((lang) => lang.code === form.language) && (
+                    <option value={form.language}>{form.language}</option>
+                  )}
                   {TEMPLATE_LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
-                      {lang.label}
+                      {lang.label} ({lang.code})
                     </option>
                   ))}
-                </datalist>
+                </select>
                 <p className="text-[11px] text-muted-foreground">
                   {editingId ? (
                     t('langFixed')
