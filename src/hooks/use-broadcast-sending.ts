@@ -340,17 +340,14 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         throw new Error('Your profile is not linked to an account.');
       }
 
-      // ── Step 0b: Media header ─────────────────────────────────────
-      // Media-header templates need a Meta media id on every send. A
-      // picked file already has one; a link is uploaded now, before
-      // anything is saved, so a bad link leaves no broadcast behind.
+      // Keep scheduled media in durable storage; upload it to Meta when sending starts.
       const mediaKind = payload.template.header_type;
       let headerMediaId: string | undefined;
       let headerMediaUrl: string | undefined;
       if (isHeaderMediaKind(mediaKind)) {
         headerMediaId = payload.headerMediaId?.trim() || undefined;
-        headerMediaUrl = headerMediaId ? undefined : payload.headerMediaUrl?.trim() || undefined;
-        if (headerMediaUrl) {
+        headerMediaUrl = payload.headerMediaUrl?.trim() || undefined;
+        if (headerMediaUrl && !headerMediaId && !payload.scheduledAt) {
           setStage('uploading');
           headerMediaId = await uploadHeaderMedia(
             headerMediaUrl,

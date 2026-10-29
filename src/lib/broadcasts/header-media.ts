@@ -5,6 +5,7 @@ import { isValidHttpUrl } from '@/lib/broadcasts/variables';
  * Meta media id of an uploaded file, or a public link. Never both.
  */
 export interface HeaderMedia {
+  source?: 'upload' | 'url';
   mediaId: string;
   url: string;
 }

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { checkMediaFile, MEDIA_SPECS, type HeaderMediaKind } from '@/lib/media-specs';
 import { headerMediaError, type HeaderMedia } from '@/lib/broadcasts/header-media';
-import { uploadHeaderMedia } from '@/lib/broadcasts/upload-header-media';
+import { uploadAccountMedia } from '@/lib/storage/upload-media';
 
 interface Props {
   kind: HeaderMediaKind;
@@ -32,7 +32,7 @@ const tabClass = (active: boolean) =>
 export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit }: Props) {
   const t = useTranslations('Broadcasts.wizard.personalize');
   const [mode, setMode] = useState<'upload' | 'url'>(
-    value.url && !value.mediaId ? 'url' : 'upload'
+    value.source ?? (value.url && !value.mediaId ? 'url' : 'upload')
   );
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -48,11 +48,11 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
   function switchMode(next: 'upload' | 'url') {
     setMode(next);
     if (next === 'upload') {
-      onChange({ mediaId: value.mediaId, url: '' });
+      onChange({ mediaId: '', url: '', source: 'upload' });
     } else {
       setPreviewUrl('');
       setFileName('');
-      onChange({ mediaId: '', url: value.url || defaultUrl || '' });
+      onChange({ mediaId: '', url: value.url || defaultUrl || '', source: 'url' });
     }
   }
 
@@ -69,10 +69,10 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
 
     setUploading(true);
     try {
-      const mediaId = await uploadHeaderMedia(file, kind, t('toastUploadFailed'));
+      const { publicUrl } = await uploadAccountMedia('broadcast-media', file);
       setPreviewUrl(URL.createObjectURL(file));
       setFileName(file.name);
-      onChange({ mediaId, url: '' });
+      onChange({ mediaId: '', url: publicUrl, source: 'upload' });
       toast.success(t('toastUploadSuccess'));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('toastUploadFailed'));
@@ -123,7 +123,7 @@ export function HeaderMediaPicker({ kind, value, onChange, defaultUrl, onSubmit 
             <span className="text-xs text-muted-foreground">{t(`${kind}Hint`)}</span>
           </label>
 
-          {value.mediaId && !uploading && (
+          {(value.mediaId || (mode === 'upload' && value.url)) && !uploading && (
             <div className="mt-2 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-xs text-primary">
               <Check className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{t('uploadedReady', { name: fileName || kind })}</span>
