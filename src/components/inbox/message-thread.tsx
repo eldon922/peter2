@@ -30,11 +30,15 @@ import {
   RefreshCw,
   PanelRightOpen,
   PanelRightClose,
+  Trash2,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { clearMediaCache } from '@/lib/inbox/media-cache';
+import { clearMessageCache } from '@/lib/inbox/message-cache';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,6 +94,7 @@ interface MessageThreadProps {
     conversationId: string,
     assignedAgentId: string | null,
   ) => void;
+  onConversationDeleted?: (id: string) => void;
   /**
    * On mobile, the thread is shown full-screen with the conversation list
    * hidden. This callback lets the page deselect the active conversation
@@ -183,6 +188,7 @@ export function MessageThread({
   onUpdateMessage,
   onStatusChange,
   onAssignChange,
+  onConversationDeleted,
   onBack,
   resyncToken = 0,
   onRefresh,
@@ -196,6 +202,8 @@ export function MessageThread({
   const contact = linkedContact ?? (conversation?.contact_phone ? { phone: conversation.contact_phone, name: conversation.contact_name ?? undefined } as Contact : null);
   const canManageContacts = useCan('send-messages');
   const [savingContact, setSavingContact] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ messageId?: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { user } = useAuth();
   const canAct = useCan("send-messages");
@@ -907,6 +915,7 @@ export function MessageThread({
       {/* Header — solid card surface sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
       <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
+        {canManageContacts && <Button variant="ghost" size="icon" aria-label={t('deleteChat')} onClick={() => setDeleteTarget({})}><Trash2 className="size-4" /></Button>}
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Back-to-list button — mobile only. Hidden on lg+ where the
               conversation list is always visible next to the thread. */}
@@ -1179,6 +1188,7 @@ export function MessageThread({
                         message={msg}
                         readOnly={!canAct}
                         onReply={() => handleStartReply(msg)}
+                        onDelete={canManageContacts ? () => setDeleteTarget({ messageId: msg.id }) : undefined}
                         onReact={(emoji) => {
                           if (emoji) void postReaction(msg.id, emoji);
                         }}
@@ -1248,6 +1258,34 @@ export function MessageThread({
         onOpenChange={setTemplateModalOpen}
         onSelect={handleSendTemplate}
       />
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{deleteTarget?.messageId ? t('deleteMessage') : t('deleteChat')}</DialogTitle>
+            <DialogDescription>{t('deleteDescription')}</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>{t('cancelDelete')}</Button>
+            <Button variant="destructive" disabled={deleting} onClick={async () => {
+              if (!deleteTarget) return;
+              setDeleting(true);
+              try {
+                const messageId = deleteTarget.messageId;
+                const response = await fetch(messageId ? `/api/inbox/messages/${messageId}` : `/api/inbox/conversations/${conversation.id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('delete failed');
+                clearMediaCache();
+                clearMessageCache();
+                if (messageId) {
+                  const remaining = messages.filter((row) => row.id !== messageId);
+                  setCachedMessages(conversation.id, remaining);
+                  onMessagesLoadedRef.current(remaining);
+                  onRefresh?.();
+                } else onConversationDeleted?.(conversation.id);
+                setDeleteTarget(null);
+              } catch { toast.error(t('deleteFailed')); }
+              finally { setDeleting(false); }
+            }}>{deleting && <RefreshCw className="size-4 animate-spin" />}{t('confirmDelete')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

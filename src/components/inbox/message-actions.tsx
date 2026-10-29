@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CornerUpLeft, Copy, SmilePlus } from "lucide-react";
+import { CornerUpLeft, Copy, SmilePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ interface MessageActionsProps {
   message: Message;
   onReply: () => void;
   onReact: (emoji: string) => void;
+  onDelete?: () => void;
   /** Viewers can copy text but not react or reply. */
   readOnly?: boolean;
   children: ReactNode;
@@ -34,6 +35,7 @@ export function MessageActions({
   message,
   onReply,
   onReact,
+  onDelete,
   readOnly = false,
   children,
 }: MessageActionsProps) {
@@ -113,6 +115,7 @@ export function MessageActions({
           isAgent ? "right-3" : "left-3",
         )}
       >
+        {onDelete && !message.id.startsWith('temp-') && <button type="button" onClick={onDelete} aria-label={t('deleteMessage')} className="flex size-7 items-center justify-center rounded-full text-red-500 hover:bg-muted"><Trash2 className="size-4" /></button>}
         {!readOnly && (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger

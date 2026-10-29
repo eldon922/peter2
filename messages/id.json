@@ -180,7 +180,13 @@
       "yesterday": "Kemarin",
       "contactRemoved": "Kontak dihapus — riwayat chat tetap tersimpan. Simpan kontak untuk membalas.",
       "saveContact": "Simpan kontak",
-      "saveContactFailed": "Tidak dapat menyimpan kontak."
+      "saveContactFailed": "Tidak dapat menyimpan kontak.",
+      "deleteChat": "Hapus chat",
+      "deleteMessage": "Hapus pesan",
+      "deleteDescription": "Hapus permanen dari kotak masuk ini? Pesan di WhatsApp dan file unggahan yang disimpan terpisah tidak ikut dihapus.",
+      "cancelDelete": "Batal",
+      "confirmDelete": "Hapus",
+      "deleteFailed": "Tidak dapat menghapus. Coba lagi."
     },
     "sessionTimer": {
       "expired": "Kedaluwarsa",
@@ -248,7 +254,8 @@
       "reactWith": "Beri reaksi {emoji}",
       "nothingToCopy": "Tidak ada yang bisa disalin",
       "copied": "Disalin",
-      "copyFailed": "Gagal menyalin"
+      "copyFailed": "Gagal menyalin",
+      "deleteMessage": "Hapus pesan"
     },
     "replyQuote": {
       "photo": "[Foto]",

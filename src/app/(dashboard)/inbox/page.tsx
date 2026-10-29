@@ -713,6 +713,11 @@ function InboxPageInner() {
             onUpdateMessage={handleUpdateMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
+            onConversationDeleted={(id) => {
+              setConversations((rows) => rows.filter((row) => row.id !== id));
+              closeChat();
+              handleManualRefresh();
+            }}
             onBack={closeChat}
             resyncToken={resyncToken}
             onRefresh={handleManualRefresh}

@@ -180,7 +180,13 @@
       "yesterday": "Yesterday",
       "contactRemoved": "Contact removed — chat history is preserved. Save the contact to reply.",
       "saveContact": "Save contact",
-      "saveContactFailed": "Could not save the contact."
+      "saveContactFailed": "Could not save the contact.",
+      "deleteChat": "Delete chat",
+      "deleteMessage": "Delete message",
+      "deleteDescription": "Delete permanently from this inbox? This does not remove messages from WhatsApp or delete uploaded files stored separately.",
+      "cancelDelete": "Cancel",
+      "confirmDelete": "Delete",
+      "deleteFailed": "Could not delete. Please try again."
     },
     "sessionTimer": {
       "expired": "Expired",
@@ -248,7 +254,8 @@
       "reactWith": "React with {emoji}",
       "nothingToCopy": "Nothing to copy",
       "copied": "Copied",
-      "copyFailed": "Copy failed"
+      "copyFailed": "Copy failed",
+      "deleteMessage": "Delete message"
     },
     "replyQuote": {
       "photo": "[Photo]",

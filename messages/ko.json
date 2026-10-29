@@ -180,7 +180,13 @@
       "unnamedTeammate": "이름 없는 팀원",
       "contactRemoved": "연락처가 삭제되어도 대화 기록은 유지됩니다. 답장하려면 연락처를 저장하세요.",
       "saveContact": "연락처 저장",
-      "saveContactFailed": "연락처를 저장하지 못했습니다."
+      "saveContactFailed": "연락처를 저장하지 못했습니다.",
+      "deleteChat": "대화 삭제",
+      "deleteMessage": "메시지 삭제",
+      "deleteDescription": "이 수신함에서 영구 삭제하시겠어요? WhatsApp의 메시지와 별도로 저장된 업로드 파일은 삭제되지 않습니다.",
+      "cancelDelete": "취소",
+      "confirmDelete": "삭제",
+      "deleteFailed": "삭제하지 못했습니다. 다시 시도하세요."
     },
     "sessionTimer": {
       "expired": "만료됨",
@@ -248,7 +254,8 @@
       "reactWith": "{emoji}(으)로 반응하기",
       "nothingToCopy": "복사할 내용이 없습니다",
       "copied": "복사됨",
-      "copyFailed": "복사 실패"
+      "copyFailed": "복사 실패",
+      "deleteMessage": "메시지 삭제"
     },
     "replyQuote": {
       "photo": "[사진]",
