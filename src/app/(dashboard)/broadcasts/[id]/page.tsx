@@ -238,6 +238,7 @@ export default function BroadcastDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
+  const tActivity = useTranslations('Activity');
   const tStatus = useTranslations('Broadcasts.status');
   // Shared with the wizard's personalize step — same upload/URL
   // strings, same recommendation, so a retry prompt doesn't teach the
@@ -925,7 +926,7 @@ export default function BroadcastDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Input value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)}
               placeholder={t('searchRecipients')} aria-label={t('searchRecipients')} className="h-8 w-56" />
-            {(loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch) && <Loader2 className="size-4 animate-spin text-primary" role="status" aria-label={t('loading')} />}
+            {(loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch) && <Loader2 className="size-4 animate-spin text-primary" role="status" aria-label={tActivity('loading')} />}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={

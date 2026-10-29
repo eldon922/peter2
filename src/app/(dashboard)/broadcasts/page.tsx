@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast } from '@/types';
@@ -68,6 +68,12 @@ export default function BroadcastsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [navigating, startNavigation] = useTransition();
+  function openBroadcast(id: string) {
+    setOpeningId(id);
+    startNavigation(() => router.push(`/broadcasts/${id}`));
+  }
   const visibleBroadcasts = useMemo(() => broadcasts.filter((broadcast) =>
     `${broadcast.name} ${broadcast.template_name} ${broadcast.template_language}`.toLowerCase().includes(search.trim().toLowerCase())), [broadcasts, search]);
 
@@ -206,10 +212,11 @@ export default function BroadcastsPage() {
         <GatedButton
           canAct={canCreate}
           gateReason="create broadcasts"
-          onClick={() => router.push('/broadcasts/new')}
+          onClick={() => openBroadcast('new')}
+          disabled={navigating}
           className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          <Plus className="h-4 w-4" />
+          {navigating && openingId === 'new' ? <Loader2 className="size-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           {t('newBroadcast')}
         </GatedButton>
       </div>
@@ -225,7 +232,8 @@ export default function BroadcastsPage() {
           <GatedButton
             canAct={canCreate}
             gateReason="create broadcasts"
-            onClick={() => router.push('/broadcasts/new')}
+            onClick={() => openBroadcast('new')}
+            disabled={navigating}
             className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -261,7 +269,8 @@ export default function BroadcastsPage() {
                   <TableRow
                     key={broadcast.id}
                     className="cursor-pointer border-border hover:bg-muted/50"
-                    onClick={() => router.push(`/broadcasts/${broadcast.id}`)}
+                    onClick={() => openBroadcast(broadcast.id)}
+                    aria-busy={navigating && openingId === broadcast.id}
                   >
                     {/* Names are free text and routinely long enough to
                         set the table's width by themselves, which pushed
@@ -274,6 +283,7 @@ export default function BroadcastsPage() {
                         never engages. */}
                     <TableCell className="w-full min-w-48 max-w-0 truncate font-medium text-foreground md:w-[40%]">
                       {broadcast.name}
+                      {navigating && openingId === broadcast.id && <Loader2 className="ml-2 inline size-3 animate-spin" />}
                       <BroadcastDuration broadcast={broadcast} />
                     </TableCell>
                     {/* `max-w-0` lets this column shrink and truncate
