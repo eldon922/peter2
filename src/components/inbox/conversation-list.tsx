@@ -208,6 +208,8 @@ export function ConversationList({
   // Realtime inbound: reopen / refresh the badge immediately.
   useEffect(() => {
     if (!latestInbound) return;
+    // Retain each realtime event until the next database snapshot arrives.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLastInboundAt((prev) => {
       const next = new Map(prev ?? []);
       const seen = next.get(latestInbound.conversationId);

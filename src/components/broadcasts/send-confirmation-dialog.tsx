@@ -22,9 +22,9 @@ export function SendConfirmationDialog({ open, onOpenChange, broadcast, recipien
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setPreview(null);
-    setFailed(false);
     (async () => {
+      setPreview(null);
+      setFailed(false);
       const db = createClient();
       let query = db.from('broadcast_recipients').select('*, contact:contacts(*)', { count: 'exact' }).eq('broadcast_id', broadcast.id);
       if (recipientId) query = query.eq('id', recipientId);
