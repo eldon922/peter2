@@ -963,7 +963,7 @@ function MediaDraftPreview({
             <img
               src={draft.mediaUrl}
               alt={draft.filename}
-              className="max-h-40 rounded-lg object-cover"
+              className="h-auto w-auto max-h-64 max-w-full rounded-lg object-contain"
             />
           )}
           {draft.kind === "video" && (

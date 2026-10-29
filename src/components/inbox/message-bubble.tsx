@@ -165,7 +165,7 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
         <img
           src={src}
           alt={alt}
-          className="max-h-64 max-w-60 rounded-lg object-cover"
+          className="h-auto w-auto max-h-96 max-w-full rounded-lg object-contain"
           onError={() => setImgError(true)}
         />
       </button>

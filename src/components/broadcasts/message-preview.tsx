@@ -39,7 +39,7 @@ export function BroadcastMessagePreview({
             <img
               src={imageSrc}
               alt=""
-              className="mb-1.5 max-h-40 w-full rounded-md object-cover"
+              className="mb-1.5 h-auto w-auto max-h-80 max-w-full rounded-md object-contain"
             />
           ) : (
             <div className="mb-1.5 flex h-20 items-center justify-center rounded-md bg-black/10 text-[#667781] dark:bg-white/10 dark:text-[#E9EDEF]/60">
