@@ -18,6 +18,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Contact } from '@/types';
 import { phonesMatch } from '@/lib/whatsapp/phone-utils';
 import { chunkIds } from '@/lib/supabase/batching';
+import { extractTemplateVariables } from '@/lib/whatsapp/template-validators';
 
 /**
  * Variable mapping — each template placeholder (by key, usually "1",
@@ -82,9 +83,7 @@ export function resolveVariables(
  */
 export function bodyPlaceholderKeys(bodyText: string | null | undefined): string[] {
   if (!bodyText) return [];
-  const matches = bodyText.match(/\{\{(\d+)\}\}/g);
-  if (!matches) return [];
-  return [...new Set(matches.map((m) => m.replace(/[{}]/g, '')))];
+  return extractTemplateVariables(bodyText);
 }
 
 /**

@@ -51,6 +51,7 @@ import type {
 import { templateStatusConfig } from '@/lib/template-status';
 import {
   extractVariableIndices,
+  extractTemplateVariables,
   normalizeTemplateName,
   TEMPLATE_LIMITS,
 } from '@/lib/whatsapp/template-validators';
@@ -142,13 +143,13 @@ export function TemplateManager() {
   // re-run the extractor on every render to keep the sample-value rows
   // in sync with what the user typed.
   const bodyVarCount = useMemo(
-    () => extractVariableIndices(form.body_text).length,
+    () => extractTemplateVariables(form.body_text).length,
     [form.body_text],
   );
   const headerVarCount = useMemo(
     () =>
       form.header_format === 'text'
-        ? extractVariableIndices(form.header_content).length
+        ? extractTemplateVariables(form.header_content).length
         : 0,
     [form.header_format, form.header_content],
   );
@@ -933,8 +934,8 @@ export function TemplateManager() {
                       <Input
                         key={i}
                         id={inputId}
-                        aria-label={t('sampleAria', { var: `{{${i + 1}}}` })}
-                        placeholder={t('samplePlaceholder', { var: `{{${i + 1}}}` })}
+                        aria-label={t('sampleAria', { var: `{{${extractTemplateVariables(form.body_text)[i]}}}` })}
+                        placeholder={t('samplePlaceholder', { var: `{{${extractTemplateVariables(form.body_text)[i]}}}` })}
                         value={val}
                         onChange={(e) => {
                           const next = [...form.body_samples];

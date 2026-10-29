@@ -54,6 +54,7 @@ import { getCachedMessages, setCachedMessages } from "@/lib/inbox/message-cache"
 import { TemplatePicker } from "./template-picker";
 import { AiThreadBanner } from "./ai-thread-banner";
 import { buildReplyPreview } from "./reply-quote";
+import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
 import { toast } from "sonner";
 
 interface ReplyDraft {
@@ -62,12 +63,6 @@ interface ReplyDraft {
   preview: string;
 }
 
-function renderTemplateBody(body: string, params: string[]): string {
-  return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
-    const idx = Number(raw) - 1;
-    return params[idx] ?? `{{${raw}}}`;
-  });
-}
 
 /**
  * Label for a teammate in the assign dropdown / trigger. `full_name` is

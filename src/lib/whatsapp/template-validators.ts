@@ -96,6 +96,15 @@ export function extractVariableIndices(text: string): number[] {
   return [...set].sort((a, b) => a - b);
 }
 
+export function extractTemplateVariables(text: string): string[] {
+  return [...new Set([...text.matchAll(/\{\{([A-Za-z0-9_]+)\}\}/g)].map((match) => match[1]))]
+    .sort((a, b) => /^\d+$/.test(a) && /^\d+$/.test(b) ? Number(a) - Number(b) : a.localeCompare(b));
+}
+
+export function isNamedVariable(key: string): boolean {
+  return !/^\d+$/.test(key);
+}
+
 /**
  * Meta requires contiguous, 1-indexed variables. `{{1}} {{3}}` is
  * invalid — it must be `{{1}} {{2}}`.
@@ -121,6 +130,13 @@ export function validateBody(bodyText: string): number[] {
   }
   const indices = extractVariableIndices(bodyText);
   assertContiguous(indices, 'Body');
+  const keys = extractTemplateVariables(bodyText);
+  if (keys.some(isNamedVariable)) {
+    if (indices.length || keys.some((key) => !/^[a-z_][a-z0-9_]*$/.test(key))) {
+      throw new Error('Use lowercase named variables or positional variables, without mixing formats.');
+    }
+    return keys.map((_, index) => index + 1);
+  }
   return indices;
 }
 
@@ -131,7 +147,7 @@ export function validateFooter(footerText: string | undefined): void {
       `Footer text exceeds ${TEMPLATE_LIMITS.footerMaxLength} chars (got ${footerText.length}).`,
     );
   }
-  if (extractVariableIndices(footerText).length > 0) {
+  if (extractTemplateVariables(footerText).length > 0) {
     throw new Error('Footer text cannot contain {{N}} variables (Meta rule).');
   }
 }
@@ -159,13 +175,13 @@ export function validateHeader(
         `Header text exceeds ${TEMPLATE_LIMITS.headerTextMaxLength} chars (got ${header_content.length}).`,
       );
     }
-    const indices = extractVariableIndices(header_content);
+    const indices = extractTemplateVariables(header_content);
     if (indices.length > 1) {
       throw new Error(
         `Text header supports at most one variable — found ${indices.length} (Meta rule).`,
       );
     }
-    if (indices.length === 1 && indices[0] !== 1) {
+    if (indices.length === 1 && !isNamedVariable(indices[0]) && indices[0] !== '1') {
       throw new Error('Text header variable must be {{1}} (Meta rule).');
     }
     return { variableCount: indices.length };
@@ -352,6 +368,10 @@ export function validateTemplatePayload(payload: TemplatePayload): {
     throw new Error('Language is required.');
   }
   const bodyVars = validateBody(payload.body_text);
+  const allKeys = extractTemplateVariables(payload.body_text + (payload.header_content ?? ''));
+  if (allKeys.some(isNamedVariable) && allKeys.some((key) => !isNamedVariable(key))) {
+    throw new Error('Header and body must use the same variable format.');
+  }
   validateFooter(payload.footer_text);
   const headerResult = validateHeader(payload);
   validateButtons(payload.buttons);

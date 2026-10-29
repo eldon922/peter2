@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { extractTemplateVariables } from './template-validators'
 
 /**
  * Broadcast sends never write a `messages` row.
@@ -55,8 +56,9 @@ export function renderTemplateBody(
   params: string[],
 ): string | null {
   if (!bodyText) return null
-  return bodyText.replace(/\{\{(\d+)\}\}/g, (placeholder, index: string) => {
-    const value = params[Number(index) - 1]
+  const keys = extractTemplateVariables(bodyText)
+  return bodyText.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (placeholder, key: string) => {
+    const value = params[keys.indexOf(key)]
     return value === undefined ? placeholder : value
   })
 }

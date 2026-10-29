@@ -21,7 +21,7 @@ import {
   LayoutTemplate,
   Loader2,
 } from "lucide-react";
-import { extractVariableIndices } from "@/lib/whatsapp/template-validators";
+import { extractVariableIndices, extractTemplateVariables } from "@/lib/whatsapp/template-validators";
 import { useTranslations } from "next-intl";
 
 export interface TemplateSendValues {
@@ -37,11 +37,8 @@ interface TemplatePickerProps {
 }
 
 function renderBodyPreview(body: string, params: string[]): string {
-  return body.replace(/\{\{(\d+)\}\}/g, (_, raw) => {
-    const idx = Number(raw) - 1;
-    const value = params[idx];
-    return value && value.trim().length > 0 ? value : `{{${raw}}}`;
-  });
+  const keys = extractTemplateVariables(body);
+  return body.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (placeholder, key) => params[keys.indexOf(key)]?.trim() || placeholder);
 }
 
 interface UrlButtonSlot {
@@ -56,14 +53,14 @@ interface UrlButtonSlot {
  * send-message path doesn't 400 on missing parameters.
  */
 function collectVariableSlots(template: MessageTemplate): {
-  bodyVars: number[];
+  bodyVars: string[];
   headerVarCount: number;
   urlButtonSlots: UrlButtonSlot[];
 } {
-  const bodyVars = extractVariableIndices(template.body_text);
+  const bodyVars = extractTemplateVariables(template.body_text);
   const headerVarCount =
     template.header_type === "text" && template.header_content
-      ? extractVariableIndices(template.header_content).length
+      ? extractTemplateVariables(template.header_content).length
       : 0;
   const urlButtonSlots: UrlButtonSlot[] = [];
   (template.buttons ?? []).forEach((b, i) => {
@@ -264,7 +261,7 @@ export function TemplatePicker({
             {slots && slots.headerVarCount > 0 && (
               <div className="space-y-1">
                 <Label className="text-xs text-popover-foreground">
-                  {`Header {{1}}`}
+                  {`Header {{${extractTemplateVariables(selected?.header_content ?? '')[0] ?? '1'}}}`}
                 </Label>
                 <Input
                   value={headerText}

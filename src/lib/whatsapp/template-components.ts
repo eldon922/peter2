@@ -11,6 +11,7 @@
  */
 
 import type { TemplatePayload } from './template-validators';
+import { extractTemplateVariables, isNamedVariable } from './template-validators';
 import type { TemplateButton } from '@/types';
 
 export interface MetaComponent {
@@ -23,6 +24,8 @@ export interface MetaComponent {
     header_url?: string[];
     header_handle?: string[];
     body_text?: string[][];
+    body_text_named_params?: { param_name: string; example: string }[];
+    header_text_named_params?: { param_name: string; example: string }[];
   };
 }
 
@@ -46,7 +49,10 @@ function buildHeaderComponent(payload: TemplatePayload): MetaComponent | null {
       text: header_content,
     };
     if (headerSample && headerSample.length > 0) {
-      component.example = { header_text: headerSample };
+      const keys = extractTemplateVariables(header_content ?? '');
+      component.example = keys.some(isNamedVariable)
+        ? { header_text_named_params: keys.map((param_name, index) => ({ param_name, example: headerSample[index] })) }
+        : { header_text: headerSample };
     }
     return component;
   }
@@ -76,7 +82,10 @@ function buildBodyComponent(payload: TemplatePayload): MetaComponent {
     // Meta expects body_text as a 2D array — outer is "examples",
     // inner is the values for each variable. We submit a single
     // example row.
-    component.example = { body_text: [bodySample] };
+    const keys = extractTemplateVariables(payload.body_text);
+    component.example = keys.some(isNamedVariable)
+      ? { body_text_named_params: keys.map((param_name, index) => ({ param_name, example: bodySample[index] })) }
+      : { body_text: [bodySample] };
   }
   return component;
 }
@@ -119,6 +128,7 @@ export interface MetaTemplateSubmitPayload {
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
   language: string;
   components: MetaComponent[];
+  parameter_format?: 'NAMED';
 }
 
 const CATEGORY_TO_META: Record<
@@ -150,6 +160,7 @@ export function buildMetaTemplatePayload(
     name: payload.name,
     category: CATEGORY_TO_META[payload.category],
     language: payload.language,
+    ...(extractTemplateVariables(payload.body_text + (payload.header_content ?? '')).some(isNamedVariable) ? { parameter_format: 'NAMED' as const } : {}),
     components,
   };
 }

@@ -8,6 +8,7 @@ import {
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { META_API_BASE } from '@/lib/whatsapp/meta-api'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
+import { extractTemplateVariables } from '@/lib/whatsapp/template-validators'
 import { chunkIds } from '@/lib/supabase/batching'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
@@ -44,6 +45,8 @@ interface MetaTemplateComponent {
     header_text?: string[]
     header_handle?: string[]
     body_text?: string[][]
+    body_text_named_params?: { param_name: string; example: string }[]
+    header_text_named_params?: { param_name: string; example: string }[]
   }
 }
 
@@ -120,8 +123,10 @@ function extractSampleValues(
 ): TemplateSampleValues | null {
   // Meta returns body_text as a 2D array — one row per example set.
   // We take the first row (most templates have exactly one).
-  const bodySample = body?.example?.body_text?.[0]
-  const headerSample = header?.example?.header_text
+  const namedSamples = (component: MetaTemplateComponent | undefined, samples: { param_name: string; example: string }[] | undefined) =>
+    samples?.length ? extractTemplateVariables(component?.text ?? '').map((key) => samples.find((sample) => sample.param_name === key)?.example ?? '') : undefined
+  const bodySample = body?.example?.body_text?.[0] ?? namedSamples(body, body?.example?.body_text_named_params)
+  const headerSample = header?.example?.header_text ?? namedSamples(header, header?.example?.header_text_named_params)
   if (!bodySample?.length && !headerSample?.length) return null
   const sv: TemplateSampleValues = {}
   if (bodySample?.length) sv.body = bodySample
