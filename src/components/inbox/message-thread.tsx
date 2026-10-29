@@ -673,7 +673,7 @@ export function MessageThread({
     ) => {
       if (!conversation) return;
 
-      const renderedBody = renderTemplateBody(template.body_text, values.body);
+      const renderedBody = renderTemplateBody(template.body_text, values.body) ?? '';
       const tempId = `temp-${Date.now()}`;
 
       const optimisticMsg: Message = {
