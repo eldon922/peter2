@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Broadcast, BroadcastRecipient, RecipientStatus, Tag } from '@/types';
@@ -250,6 +250,9 @@ export default function BroadcastDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recipientSearch, setRecipientSearch] = useState('');
+  const deferredRecipientSearch = useDeferredValue(recipientSearch);
+  const [filtering, startFiltering] = useTransition();
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [statusFilter, setStatusFilter] = useState<RecipientStatus | 'all'>(
     'all',
   );
@@ -279,6 +282,7 @@ export default function BroadcastDetailPage() {
   // list page: the polling effect below re-reads it on every tick and
   // keys off `isSending` alone, so a stable identity buys nothing.
   async function refresh() {
+    setLoadingRecipients(true);
     try {
       const supabase = createClient();
 
@@ -301,6 +305,7 @@ export default function BroadcastDetailPage() {
       setError(err instanceof Error ? err.message : t('notFound'));
     } finally {
       setLoading(false);
+      setLoadingRecipients(false);
     }
   }
 
@@ -379,8 +384,8 @@ export default function BroadcastDetailPage() {
   const filteredRecipients = useMemo(
     () =>
       recipients.filter((recipient) => (statusFilter === 'all' || recipient.status === statusFilter)
-        && `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`.toLowerCase().includes(recipientSearch.trim().toLowerCase())),
-    [recipients, statusFilter, recipientSearch],
+        && `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`.toLowerCase().includes(deferredRecipientSearch.trim().toLowerCase())),
+    [recipients, statusFilter, deferredRecipientSearch],
   );
   const { page: recipientPage, setPage: setRecipientPage } = useListPage(filteredRecipients.length, 50, `${statusFilter}:${recipientSearch}`);
 
@@ -910,7 +915,7 @@ export default function BroadcastDetailPage() {
         broadcast={broadcast} recipientId={retryConfirmation?.recipientId} retry busy={retrying !== null}
         title={t('retryHover')} confirmLabel={t('retryRow')}
         onConfirm={() => { const target = retryConfirmation?.recipientId; setRetryConfirmation(null); void handleRetry(target); }} />
-      <div className="rounded-xl border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card" aria-busy={loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch}>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium text-foreground">
             {statusFilter !== 'all'
@@ -920,6 +925,7 @@ export default function BroadcastDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Input value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)}
               placeholder={t('searchRecipients')} aria-label={t('searchRecipients')} className="h-8 w-56" />
+            {(loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch) && <Loader2 className="size-4 animate-spin text-primary" role="status" aria-label={t('loading')} />}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -938,7 +944,7 @@ export default function BroadcastDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="border-border bg-popover">
                 <DropdownMenuItem
-                  onClick={() => setStatusFilter('all')}
+                  onClick={() => startFiltering(() => setStatusFilter('all'))}
                   className={
                     statusFilter === 'all' ? 'text-primary' : 'text-popover-foreground'
                   }
@@ -948,7 +954,7 @@ export default function BroadcastDetailPage() {
                 {RECIPIENT_STATUSES.map((s) => (
                   <DropdownMenuItem
                     key={s}
-                    onClick={() => setStatusFilter(s)}
+                    onClick={() => startFiltering(() => setStatusFilter(s))}
                     className={
                       statusFilter === s
                         ? 'text-primary'
