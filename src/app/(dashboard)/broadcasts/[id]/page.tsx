@@ -55,6 +55,7 @@ import { useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
 import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
+import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 
 interface StatCardProps {
   label: string;
@@ -296,30 +297,12 @@ export default function BroadcastDetailPage() {
       if (bcError) throw bcError;
       setBroadcast(bc);
 
-      // Most recently delivered first. Rows never sent (pending, and
-      // failures that never got a wamid) have no sent_at, so they sort
-      // to the end rather than being scattered through the list.
-      //
-      // `id` is a tiebreaker, not decoration. Every unsent row ties on
-      // a NULL sent_at, and created_at can't break it either — it
-      // defaults to NOW(), the *transaction* timestamp, so all 200 rows
-      // of a batch insert share one value. Unresolved ties let Postgres
-      // return rows in physical heap order, and an UPDATE writes a new
-      // row version elsewhere in the heap — which is why a retried row
-      // used to jump position for no visible reason.
       // Each recipient's tags are only needed when the broadcast was aimed
       // at tags (they're what the Tags column shows).
       const aimedAtTags =
         ((bc.audience_filter as { tagIds?: string[] } | null)?.tagIds?.length ?? 0) > 0;
-      const { data: recs, error: recsError } = await supabase
-        .from('broadcast_recipients')
-        .select(aimedAtTags ? '*, contact:contacts(*, contact_tags(tag_id))' : '*, contact:contacts(*)')
-        .eq('broadcast_id', broadcastId)
-        .order('sent_at', { ascending: false, nullsFirst: false })
-        .order('id', { ascending: true });
-
-      if (recsError) throw recsError;
-      setRecipients(recs ?? []);
+      const recs = await fetchBroadcastRecipients(supabase, broadcastId, aimedAtTags);
+      setRecipients(recs);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('notFound'));
     } finally {
