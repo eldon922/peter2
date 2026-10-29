@@ -739,7 +739,7 @@
         "sent": "Terkirim",
         "delivered": "Sampai",
         "read": "Dibaca",
-        "replied": "Dibalas",
+        "replied": "Dibalas / direaksi",
         "failed": "Gagal"
       },
       "toastFailedDelete": "Gagal menghapus: {error}",

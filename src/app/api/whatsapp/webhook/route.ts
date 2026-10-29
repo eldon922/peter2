@@ -631,18 +631,20 @@ async function handleStatusUpdate(status: {
  * Runs on a best-effort basis — failures here must not break the
  * main inbound-message flow, so errors are swallowed with a log.
  */
-async function flagBroadcastReplyIfAny(accountId: string, contactId: string) {
+async function flagBroadcastReplyIfAny(accountId: string, contactId: string, messageId?: string) {
   try {
     // Most recent outbound broadcast in this account that hasn't
     // been replied to yet. Account-scoped so a shared inbox reply
     // marks the broadcast as replied regardless of which teammate
     // sent it.
-    const { data: recs, error } = await supabaseAdmin()
+    let query = supabaseAdmin()
       .from('broadcast_recipients')
       .select('id, status, broadcast_id, broadcasts!inner(account_id)')
       .eq('contact_id', contactId)
       .eq('broadcasts.account_id', accountId)
       .in('status', ['sent', 'delivered', 'read'])
+    if (messageId) query = query.eq('whatsapp_message_id', messageId)
+    const { data: recs, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
 
@@ -653,6 +655,7 @@ async function flagBroadcastReplyIfAny(accountId: string, contactId: string) {
       .from('broadcast_recipients')
       .update({ status: 'replied', replied_at: new Date().toISOString() })
       .eq('id', row.id)
+      .in('status', ['sent', 'delivered', 'read'])
 
     if (updErr) {
       console.error('Error marking broadcast recipient replied:', updErr)
@@ -724,6 +727,9 @@ async function applyReaction(
     )
   if (upsertError) {
     console.error('[webhook] reaction upsert failed:', upsertError.message)
+  } else {
+    const { data: conversation } = await supabaseAdmin().from('conversations').select('account_id').eq('id', conversationId).maybeSingle()
+    if (conversation?.account_id) await flagBroadcastReplyIfAny(conversation.account_id, contactId, reaction.message_id)
   }
 }
 

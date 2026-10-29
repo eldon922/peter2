@@ -739,7 +739,7 @@
         "sent": "Sent",
         "delivered": "Delivered",
         "read": "Read",
-        "replied": "Replied",
+        "replied": "Replied / reacted",
         "failed": "Failed"
       },
       "toastFailedDelete": "Failed to delete: {error}",

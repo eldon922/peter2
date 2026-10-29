@@ -739,7 +739,7 @@
         "sent": "전송됨",
         "delivered": "전달됨",
         "read": "읽음",
-        "replied": "응답함",
+        "replied": "답장 / 반응",
         "failed": "실패"
       },
       "toastFailedDelete": "삭제하지 못했습니다: {error}",
