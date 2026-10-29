@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { addContactTag, deleteContactTag } from '@/lib/contacts/tag-api';
@@ -65,7 +65,8 @@ export function ContactForm({
   const [dupMatch, setDupMatch] = useState<
     { contact: ExistingContact; exact: boolean } | null
   >(null);
-  const [checkingDup, setCheckingDup] = useState(false);
+  const duplicateRequest = useRef(0);
+  const submitting = useRef(false);
 
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -92,16 +93,14 @@ export function ContactForm({
       setDupMatch(null);
       return;
     }
-    setCheckingDup(true);
-    try {
-      const existing = await findExistingContact(supabase, accountId, value);
+    const request = ++duplicateRequest.current;
+    const existing = await findExistingContact(supabase, accountId, value);
+    if (request === duplicateRequest.current) {
       setDupMatch(
         existing
           ? { contact: existing, exact: isExactMatch(existing, value) }
           : null,
       );
-    } finally {
-      setCheckingDup(false);
     }
   }
 
@@ -125,6 +124,7 @@ export function ContactForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
 
     if (!phone.trim()) {
       toast.error(t('phoneRequired'));
@@ -138,9 +138,18 @@ export function ContactForm({
       return;
     }
 
+    submitting.current = true;
     setSaving(true);
 
     try {
+      if (!isEdit && accountId) {
+        const existing = await findExistingContact(supabase, accountId, phone.trim());
+        if (existing && isExactMatch(existing, phone.trim())) {
+          setDupMatch({ contact: existing, exact: true });
+          toast.error(t('toastConflict'));
+          return;
+        }
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -217,6 +226,7 @@ export function ContactForm({
       const message = err instanceof Error ? err.message : t('toastError');
       toast.error(message);
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -257,6 +267,7 @@ export function ContactForm({
               id="cf-phone"
               value={phone}
               onChange={(e) => {
+                duplicateRequest.current++;
                 setPhone(e.target.value);
                 if (dupMatch) setDupMatch(null);
               }}
@@ -355,7 +366,7 @@ export function ContactForm({
             </Button>
             <Button
               type="submit"
-              disabled={saving || checkingDup || (!isEdit && !!dupMatch?.exact)}
+              disabled={saving || (!isEdit && !!dupMatch?.exact)}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {saving && <Loader2 className="size-4 animate-spin" />}
