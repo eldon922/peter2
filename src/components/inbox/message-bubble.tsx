@@ -54,7 +54,7 @@ function StatusIcon({ status }: { status: Message["status"] }) {
 /** Marks a message that was sent from a template (e.g. a broadcast). */
 function TemplateBadge({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
-    <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+    <span className="mb-1 inline-flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary dark:bg-rose-400/15 dark:text-rose-300">
       <LayoutTemplate className="h-3 w-3" />
       {t("template")}
     </span>
