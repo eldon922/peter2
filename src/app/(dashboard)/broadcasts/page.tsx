@@ -24,7 +24,7 @@ import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { fetchAllRows } from '@/lib/supabase/batching';
-import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
+import { BroadcastDuration, ScheduledCountdown } from '@/components/broadcasts/broadcast-timing';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -315,6 +315,7 @@ export default function BroadcastsPage() {
                           {formatScheduledAt(broadcast.scheduled_at)}
                         </span>
                       )}
+                      <ScheduledCountdown broadcast={broadcast} />
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {new Date(broadcast.created_at).toLocaleDateString()}

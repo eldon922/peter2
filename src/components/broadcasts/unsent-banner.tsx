@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
+import { ScheduledCountdown } from '@/components/broadcasts/broadcast-timing';
 import { formatScheduledAt, missedItsTime } from '@/lib/broadcasts/schedule';
 
 interface UnsentBannerProps {
@@ -187,6 +188,7 @@ export function UnsentBanner({
         </div>
       </div>
 
+      <ScheduledCountdown broadcast={broadcast} />
       <ScheduleDialog
         open={scheduling}
         onOpenChange={setScheduling}

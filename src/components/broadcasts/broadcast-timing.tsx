@@ -25,3 +25,14 @@ export function BroadcastDuration({ broadcast }: { broadcast: Broadcast }) {
     {t('duration')}: {parts.days ? t('days', { days: parts.days, time: parts.time }) : parts.time}
   </span>;
 }
+
+export function ScheduledCountdown({ broadcast }: { broadcast: Broadcast }) {
+  const t = useTranslations('Broadcasts.timing');
+  const now = useClock(broadcast.status === 'scheduled');
+  if (broadcast.status !== 'scheduled' || !broadcast.scheduled_at) return null;
+  const remaining = Date.parse(broadcast.scheduled_at) - now;
+  const parts = durationParts(remaining);
+  return <span className="block text-xs font-normal tabular-nums text-blue-600 dark:text-blue-300" suppressHydrationWarning>
+    {remaining <= 0 ? t('startingSoon') : t('startsIn', { time: parts.days ? t('days', { days: parts.days, time: parts.time }) : parts.time })}
+  </span>;
+}

@@ -995,7 +995,9 @@
     },
     "timing": {
       "duration": "Duration",
-      "days": "{days} days {time}"
+      "days": "{days} days {time}",
+      "startsIn": "Starts in {time}",
+      "startingSoon": "Scheduled time reached — waiting to start"
     }
   },
   "Automations": {

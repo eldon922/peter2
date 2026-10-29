@@ -995,7 +995,9 @@
     },
     "timing": {
       "duration": "Durasi",
-      "days": "{days} hari {time}"
+      "days": "{days} hari {time}",
+      "startsIn": "Dimulai dalam {time}",
+      "startingSoon": "Waktu terjadwal tercapai — menunggu dimulai"
     }
   },
   "Automations": {

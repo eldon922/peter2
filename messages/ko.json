@@ -995,7 +995,9 @@
     },
     "timing": {
       "duration": "소요 시간",
-      "days": "{days}일 {time}"
+      "days": "{days}일 {time}",
+      "startsIn": "{time} 후 시작",
+      "startingSoon": "예약 시간이 되어 시작을 기다리고 있습니다"
     }
   },
   "Automations": {
