@@ -386,14 +386,15 @@ export default function ContactsPage() {
         }),
       );
       if (result.error) throw result.error;
-      const assignments = await fetchAllRows<{ contact_id: string; tags: { name: string } | null }>((from, to) =>
+      const assignments = await fetchAllRows<{ contact_id: string; tags: { name: string } | { name: string }[] | null }>((from, to) =>
         supabase.from('contact_tags').select('contact_id, tags(name)').order('id').range(from, to),
       );
       if (assignments.error) throw assignments.error;
       const tags = new Map<string, string[]>();
       for (const row of assignments.rows) {
-        if (!row.tags) continue;
-        tags.set(row.contact_id, [...(tags.get(row.contact_id) ?? []), row.tags.name]);
+        const tag = Array.isArray(row.tags) ? row.tags[0] : row.tags;
+        if (!tag) continue;
+        tags.set(row.contact_id, [...(tags.get(row.contact_id) ?? []), tag.name]);
       }
       const url = URL.createObjectURL(new Blob([contactsCsv(result.rows.map((row) => row.contact), tags)], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');
