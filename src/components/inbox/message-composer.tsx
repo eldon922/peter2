@@ -1,4 +1,5 @@
 "use client";
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 import {
   useState,
@@ -552,6 +553,7 @@ export function MessageComposer({
 
   return (
     <div className="border-t border-border bg-card p-3">
+      {!readOnly && <PhoneCountryWarning />}
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote

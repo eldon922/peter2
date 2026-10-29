@@ -35,6 +35,7 @@ import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview
 import { TagChips } from '@/components/broadcasts/tag-chips';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 interface Step4Props {
   name: string;
@@ -177,6 +178,7 @@ export function Step4ScheduleSend({
 
   return (
     <div className="space-y-6">
+      <PhoneCountryWarning />
       <div>
         <h2 className="text-lg font-semibold text-foreground">{t('scheduleSend.title')}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
