@@ -223,7 +223,12 @@
       "send": "보내기",
       "quickReplyNamePrompt": "이 빠른 답장의 이름을 지정하세요:",
       "quickReplySaved": "빠른 답장으로 저장되었습니다.",
-      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다."
+      "quickReplySaveError": "빠른 답장을 저장하지 못했습니다.",
+      "formatting": "메시지 서식",
+      "bold": "굵게",
+      "italic": "기울임",
+      "strike": "취소선",
+      "code": "고정폭"
     },
     "bubble": {
       "photo": "사진",

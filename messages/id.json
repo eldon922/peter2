@@ -223,7 +223,12 @@
       "send": "Kirim",
       "quickReplyNamePrompt": "Beri nama balasan cepat ini:",
       "quickReplySaved": "Disimpan sebagai balasan cepat.",
-      "quickReplySaveError": "Tidak dapat menyimpan balasan cepat."
+      "quickReplySaveError": "Tidak dapat menyimpan balasan cepat.",
+      "formatting": "Format pesan",
+      "bold": "Tebal",
+      "italic": "Miring",
+      "strike": "Coret",
+      "code": "Monospace"
     },
     "bubble": {
       "photo": "Foto",

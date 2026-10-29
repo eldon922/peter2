@@ -23,6 +23,10 @@ import {
   Plus,
   MessageSquareDashed,
   Zap,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GatedButton } from "@/components/ui/gated-button";
@@ -57,6 +61,7 @@ import {
 import { validateInteractivePayload } from "@/lib/whatsapp/interactive";
 import type { InteractiveMessagePayload, QuickReply } from "@/types";
 import { QuickReplyPicker } from "./quick-reply-picker";
+import { FormattedText } from './formatted-text';
 
 /** Media content types an agent can send from the composer. */
 export type ComposerMediaKind = "image" | "video" | "document" | "audio";
@@ -243,7 +248,7 @@ export function MessageComposer({
 
     setSending(true);
     try {
-      onSend(trimmed, replyTo?.id);
+      await onSend(trimmed, replyTo?.id);
       setText("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
@@ -253,14 +258,33 @@ export function MessageComposer({
     }
   }, [text, sending, sessionExpired, onSend, replyTo?.id]);
 
+  const applyFormat = useCallback((marker: string) => {
+    const element = textareaRef.current;
+    if (!element || inputsDisabled) return;
+    const start = element.selectionStart;
+    const end = element.selectionEnd;
+    const selected = text.slice(start, end);
+    setText(text.slice(0, start) + marker + selected + marker + text.slice(end));
+    requestAnimationFrame(() => {
+      element.focus();
+      element.setSelectionRange(start + marker.length, end + marker.length);
+      adjustHeight();
+    });
+  }, [text, inputsDisabled, adjustHeight]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.ctrlKey || e.metaKey) && ['b', 'i'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        applyFormat(e.key.toLowerCase() === 'b' ? '*' : '_');
+        return;
+      }
       if (e.key === "Enter" && !e.shiftKey && enterSends) {
         e.preventDefault();
         handleSend();
       }
     },
-    [handleSend, enterSends]
+    [handleSend, enterSends, applyFormat]
   );
 
   const handleChange = useCallback(
@@ -555,6 +579,12 @@ export function MessageComposer({
   return (
     <div className="border-t border-border bg-card p-3">
       {!readOnly && <PhoneCountryWarning />}
+      {!draft && !recording && <div className="mb-2 flex items-center gap-1" role="toolbar" aria-label={t('formatting')}>
+        {[{ marker: '*', label: 'bold', Icon: Bold }, { marker: '_', label: 'italic', Icon: Italic }, { marker: '~', label: 'strike', Icon: Strikethrough }, { marker: '```', label: 'code', Icon: Code }].map(({ marker, label, Icon }) =>
+          <Button key={label} type="button" variant="ghost" size="icon-sm" disabled={inputsDisabled}
+            aria-label={t(label)} title={t(label)} onMouseDown={(event) => event.preventDefault()} onClick={() => applyFormat(marker)}><Icon className="size-4" /></Button>)}
+      </div>}
+      {!draft && !recording && /[*_~`]/.test(text) && <div className="mb-2 whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 text-sm"><FormattedText text={text} /></div>}
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote
