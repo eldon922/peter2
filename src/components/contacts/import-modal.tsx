@@ -1,6 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Tag as TagRecord } from '@/types';
+import { Input } from '@/components/ui/input';
+import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -10,6 +13,7 @@ import {
 } from '@/lib/contacts/dedupe';
 import {
   parseContactCsv,
+  parseTagCell,
   type ParsedContactRow,
 } from '@/lib/contacts/parse-contact-csv';
 import {
@@ -147,6 +151,24 @@ export function ImportModal({
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedContactRow[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagRecord[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [extraTags, setExtraTags] = useState('');
+  useEffect(() => {
+    if (!open || !accountId) return;
+    let cancelled = false;
+    fetchAllRows<TagRecord>((from, to) => supabase.from('tags').select('*').eq('account_id', accountId).order('name').order('id').range(from, to))
+      .then(({ rows, error }) => {
+        if (cancelled) return;
+        if (error) { toast.error(t('toastError')); return; }
+        setAvailableTags(rows);
+      });
+    return () => { cancelled = true; };
+  }, [open, accountId, supabase, t]);
+  const importRows = useMemo(() => {
+    const added = [...availableTags.filter((tag) => selectedTagIds.includes(tag.id)).map((tag) => tag.name), ...parseTagCell(extraTags)];
+    return parsedRows.map((row) => ({ ...row, tagNames: parseTagCell([...row.tagNames, ...added].join(';')) }));
+  }, [parsedRows, selectedTagIds, availableTags, extraTags]);
   /**
    * In-file duplicates dropped at parse time, carried through to the
    * result summary so they're still reported as skipped. De-duping here
@@ -184,6 +206,8 @@ export function ImportModal({
   function reset() {
     setFile(null);
     setParsedRows([]);
+    setSelectedTagIds([]);
+    setExtraTags('');
     setInFileDropped([]);
     setHasTagsColumn(false);
     setHasCompanyColumn(false);
@@ -314,7 +338,7 @@ export function ImportModal({
       if (!accountId)
         throw new Error('Your profile is not linked to an account.');
 
-      const unique = parsedRows;
+      const unique = importRows;
 
       // 1) Find which of these numbers this account already has, matched
       //    on the generated `phone_normalized` column (migration 022).
@@ -651,7 +675,7 @@ export function ImportModal({
     }
   }
 
-  const preview = parsedRows.slice(0, PREVIEW_LIMIT);
+  const preview = importRows.slice(0, PREVIEW_LIMIT);
   // Tags: OR — show when the CSV declares a column or preview rows carry
   // values, so an all-empty tags column still renders for validation.
   const previewHasTags =
@@ -768,6 +792,17 @@ export function ImportModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          {!result && (
+            <div className="mb-4 space-y-2">
+              <p className="text-sm font-medium text-popover-foreground">{t('additionalTags')}</p>
+              <TagMultiSelect tags={availableTags} value={selectedTagIds}
+                disabled={importing}
+                onToggle={(id) => setSelectedTagIds((prev) => prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id])}
+                onClear={() => setSelectedTagIds([])} />
+              <Input value={extraTags} disabled={importing || !canEditSettings} onChange={(event) => setExtraTags(event.target.value)}
+                aria-label={t('newTags')} placeholder={t('newTags')} />
+            </div>
+          )}
           {preview.length > 0 && !result && !importing && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

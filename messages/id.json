@@ -528,7 +528,9 @@
       "detailTags": "Tag: {tags}",
       "detailRenameFailed": "Gagal mengganti nama: {error}",
       "reportShowMore": "Tampilkan {count} lagi",
-      "reportSkippedTags": "Tag tidak dibuat (hanya admin yang dapat membuat tag): {names}"
+      "reportSkippedTags": "Tag tidak dibuat (hanya admin yang dapat membuat tag): {names}",
+      "additionalTags": "Tag untuk ditambahkan ke setiap kontak impor",
+      "newTags": "Tag baru, dipisahkan dengan koma"
     },
     "customFields": {
       "title": "Bidang khusus",

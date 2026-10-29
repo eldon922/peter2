@@ -528,7 +528,9 @@
       "detailTags": "Tags: {tags}",
       "detailRenameFailed": "Couldn't rename: {error}",
       "reportShowMore": "Show {count} more",
-      "reportSkippedTags": "Tags not created (only admins can create tags): {names}"
+      "reportSkippedTags": "Tags not created (only admins can create tags): {names}",
+      "additionalTags": "Tags to add to every imported contact",
+      "newTags": "New tags, separated by commas"
     },
     "customFields": {
       "title": "Custom fields",
