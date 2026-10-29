@@ -1,4 +1,5 @@
 import type { Conversation, Contact, Tag } from "@/types";
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 /**
  * Conversation select that embeds the contact plus its tags, so the Inbox
@@ -60,7 +61,7 @@ export function matchesContactFilters(
 ): boolean {
   if (tagIds.length > 0) {
     const contactTagIds = conversation.contact?.tags ?? [];
-    if (!contactTagIds.some((t) => tagIds.includes(t.id))) return false;
+    if (!(tagIds.includes(UNTAGGED) && contactTagIds.length === 0) && !contactTagIds.some((t) => tagIds.includes(t.id))) return false;
   }
 
   if (company !== null && conversation.contact?.company?.trim() !== company) {

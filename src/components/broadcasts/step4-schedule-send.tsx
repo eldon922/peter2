@@ -37,6 +37,7 @@ import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 interface Step4Props {
   name: string;
@@ -169,10 +170,12 @@ export function Step4ScheduleSend({
     <div className="space-y-1.5">
       <p className="text-foreground">{audienceLabel}</p>
       {includeTags.length > 0 && <TagChips tags={includeTags} />}
-      {excludeTags.length > 0 && (
+      {audience.tagIds?.includes(UNTAGGED) && <p>{t('selectAudience.untagged')}</p>}
+      {(excludeTags.length > 0 || audience.excludeTagIds?.includes(UNTAGGED)) && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{t('scheduleSend.excluding')}</p>
           <TagChips tags={excludeTags} danger />
+          {audience.excludeTagIds?.includes(UNTAGGED) && <p>{t('selectAudience.untagged')}</p>}
         </div>
       )}
     </div>

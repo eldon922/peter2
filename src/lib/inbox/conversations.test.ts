@@ -4,6 +4,7 @@ import {
   normalizeConversation,
 } from "./conversations";
 import type { Conversation } from "@/types";
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 function makeConversation(
   contact: Partial<Conversation["contact"]> | null,
@@ -39,6 +40,10 @@ const tag = (id: string, name = id) => ({
 });
 
 describe("matchesContactFilters", () => {
+  it('includes contacts with no tags when Untagged is selected', () => {
+    expect(matchesContactFilters(makeConversation({ tags: [] }), { tagIds: [UNTAGGED], company: null })).toBe(true);
+    expect(matchesContactFilters(makeConversation({ tags: [tag('t1')] }), { tagIds: [UNTAGGED], company: null })).toBe(false);
+  });
   it("matches everything when no filters are set", () => {
     const conv = makeConversation({ company: "Acme", tags: [tag("t1")] });
     expect(matchesContactFilters(conv, { tagIds: [], company: null })).toBe(

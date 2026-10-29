@@ -153,7 +153,8 @@
       "noConversations": "Tidak ada percakapan ditemukan",
       "noMessagesYet": "Belum ada pesan",
       "unknown": "Tidak diketahui",
-      "contactRemoved": "Dihapus"
+      "contactRemoved": "Dihapus",
+      "untagged": "Tanpa tag"
     },
     "messageThread": {
       "backToConversations": "Kembali ke percakapan",

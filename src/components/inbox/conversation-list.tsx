@@ -28,6 +28,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchAllRows } from '@/lib/supabase/batching';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -224,7 +225,7 @@ export function ConversationList({
     let cancelled = false;
     (async () => {
       const { data } = await supabase.from("tags").select("*").order("name");
-      if (!cancelled && data) setTags(data as Tag[]);
+      if (!cancelled && data) setTags([{ id: UNTAGGED, user_id: '', name: t('untagged'), color: '#94a3b8', created_at: '' }, ...data as Tag[]]);
     })();
     return () => {
       cancelled = true;
