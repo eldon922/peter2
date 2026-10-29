@@ -316,6 +316,17 @@ export default function BroadcastDetailPage() {
     refresh();
   }, [broadcastId]);
 
+  useEffect(() => {
+    const db = createClient();
+    const channel = db.channel(`broadcast-detail:${broadcastId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcasts', filter: `id=eq.${broadcastId}` }, (event) => setBroadcast(event.new as Broadcast))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcast_recipients', filter: `broadcast_id=eq.${broadcastId}` }, (event) => {
+        const next = event.new as BroadcastRecipient;
+        setRecipients((rows) => rows.map((row) => row.id === next.id ? { ...row, ...next } : row));
+      }).subscribe();
+    return () => { void db.removeChannel(channel); };
+  }, [broadcastId]);
+
   // Tag names for the "Target" line under the title.
   useEffect(() => {
     createClient()

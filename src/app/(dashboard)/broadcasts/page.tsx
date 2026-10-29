@@ -89,6 +89,18 @@ export default function BroadcastsPage() {
     fetchBroadcasts();
   }, []);
 
+  useEffect(() => {
+    const db = createClient();
+    const channel = db.channel('broadcast-list').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, (event) => {
+      if (event.eventType === 'DELETE') setBroadcasts((rows) => rows.filter((row) => row.id !== event.old.id));
+      else {
+        const next = event.new as Broadcast;
+        setBroadcasts((rows) => rows.some((row) => row.id === next.id) ? rows.map((row) => row.id === next.id ? next : row) : [next, ...rows]);
+      }
+    }).subscribe();
+    return () => { void db.removeChannel(channel); };
+  }, []);
+
   const anySending = useMemo(
     () => broadcasts.some((b) => b.status === 'sending'),
     [broadcasts],
@@ -97,7 +109,7 @@ export default function BroadcastsPage() {
   useEffect(() => {
     function startPolling() {
       if (pollTimer.current) return;
-      pollTimer.current = setInterval(fetchBroadcasts, POLL_INTERVAL_MS);
+      pollTimer.current = setInterval(fetchBroadcasts, anySending ? POLL_INTERVAL_MS : 15_000);
     }
     function stopPolling() {
       if (!pollTimer.current) return;
@@ -109,7 +121,6 @@ export default function BroadcastsPage() {
     // the user is away, and ensures a fresh fetch the moment they
     // refocus so they don't see stale data on return.
     function handleVisibilityChange() {
-      if (!anySending) return;
       if (document.visibilityState === 'hidden') {
         stopPolling();
       } else {
@@ -118,7 +129,7 @@ export default function BroadcastsPage() {
       }
     }
 
-    if (anySending && document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible') {
       startPolling();
     } else {
       stopPolling();
