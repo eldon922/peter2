@@ -17,6 +17,11 @@ import {
   SEND_BATCH_DELAY_MS,
 } from './broadcast-limits';
 
+vi.mock('@/lib/whatsapp/broadcast-limits', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/whatsapp/broadcast-limits')>(),
+  DELIVER_BUDGET_MS: 90_000,
+}));
+
 // getSendPacing's batch sizes (20 / 80 / 1000) are inlined in
 // broadcast-limits.ts rather than exported as named constants, so
 // these tests assert against the same literals.

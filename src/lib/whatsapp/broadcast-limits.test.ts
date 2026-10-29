@@ -49,14 +49,14 @@ const ROUTES_WITH_MAX_DURATION = [
 
 function readMaxDurationLiteral(relPath: string): number {
   const source = readFileSync(join(process.cwd(), relPath), 'utf8');
-  const match = source.match(/^export const maxDuration = (\d+)/m);
+  const match = source.match(/^export const maxDuration = ([\d_]+)/m);
   if (!match) {
     throw new Error(
       `${relPath} declares no literal \`export const maxDuration\`. ` +
         'Route segment config must be a literal — an imported binding is ignored by Next.',
     );
   }
-  return Number(match[1]);
+  return Number(match[1].replaceAll('_', ''));
 }
 
 describe('maxDuration mirrors ROUTE_MAX_DURATION_SECONDS', () => {
