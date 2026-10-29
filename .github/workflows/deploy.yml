@@ -48,9 +48,11 @@ jobs:
               docker rm   ${{ env.CONTAINER_NAME }} 2>/dev/null || true
 
               docker run -d \
-                --memory="3G" \
-                --memory-reservation="3G" \
-                --cpus="0.8" \
+                --memory="2.5G" \
+                --memory-reservation="2G" \
+                --memory-swap="3.5G" \
+                --cpus="1.8" \
+                --pids-limit=512 \
                 --restart=always \
                 --env-file ~/.peter2-env \
                 --network="host" \
