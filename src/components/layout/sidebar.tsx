@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import packageJson from "../../../package.json";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
@@ -113,10 +113,21 @@ import { useTranslations } from "next-intl";
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
-  const { account, accountRole} = useAuth();
+  const { account, accountId, accountRole} = useAuth();
+  const [whatsappProfile, setWhatsappProfile] = useState<{ accountId: string; name?: string | null; avatarUrl?: string | null } | null>(null);
+  useEffect(() => {
+    if (!accountId) return;
+    const controller = new AbortController();
+    fetch('/api/whatsapp/profile', { signal: controller.signal, cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((profile) => { if (profile && !controller.signal.aborted) setWhatsappProfile({ accountId, ...profile }); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [accountId]);
   const totalUnread = useTotalUnread();
-  const accountName = !(account?.ownerName) ? account?.name.split('@')[0] : account.ownerName;
-  const ownerAvatarUrl = account?.ownerAvatarUrl ?? null;
+  const identity = whatsappProfile?.accountId === accountId ? whatsappProfile : null;
+  const accountName = identity?.name || account?.ownerName || account?.name.split('@')[0];
+  const ownerAvatarUrl = identity?.avatarUrl || account?.ownerAvatarUrl || null;
   const ownerInitial = accountName ? accountName.charAt(0).toUpperCase() : "?";
   const unreadNotifications = useUnreadNotifications();
   const pendingTemplates = usePendingTemplates();
