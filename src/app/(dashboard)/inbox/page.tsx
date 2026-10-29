@@ -5,7 +5,10 @@ import {
   getCachedMessages,
   setCachedMessages,
   updateCachedMessage,
+  removeCachedMessage,
+  removeCachedConversation,
 } from "@/lib/inbox/message-cache";
+import { clearMediaCache } from '@/lib/inbox/media-cache';
 import { contactDisplayName } from "@/lib/contacts/display-name";
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -259,6 +262,12 @@ function InboxPageInner() {
   // Handle realtime message events
   const handleMessageEvent = useCallback(
     (event: { eventType: string; new: Message; old: Partial<Message> }) => {
+      if (event.eventType === 'DELETE' && event.old.id) {
+        removeCachedMessage(event.old.id);
+        clearMediaCache();
+        setMessages((rows) => rows.filter((row) => row.id !== event.old.id));
+        return;
+      }
       const newMsg = event.new;
 
       if (event.eventType === "INSERT") {
@@ -338,6 +347,17 @@ function InboxPageInner() {
       new: Conversation;
       old: Partial<Conversation>;
     }) => {
+      if (event.eventType === 'DELETE' && event.old.id) {
+        removeCachedConversation(event.old.id);
+        clearMediaCache();
+        setConversations((rows) => rows.filter((row) => row.id !== event.old.id));
+        if (activeConversation?.id === event.old.id) {
+          setActiveConversation(null);
+          setActiveContact(null);
+          setMessages([]);
+        }
+        return;
+      }
       const conv = event.new;
 
       if (event.eventType === "INSERT") {
@@ -470,6 +490,11 @@ function InboxPageInner() {
         if (current) {
           setActiveConversation(current);
           setActiveContact(current.contact ?? null);
+        } else {
+          removeCachedConversation(activeConversation.id);
+          setActiveConversation(null);
+          setActiveContact(null);
+          setMessages([]);
         }
       }
       // Resolve a pending deep-link here rather than in an effect — this

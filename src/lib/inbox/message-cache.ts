@@ -47,3 +47,11 @@ export function updateCachedMessage(conversationId: string, message: Message) {
 export function clearMessageCache() {
   cache.clear();
 }
+
+export function removeCachedMessage(messageId: string) {
+  for (const [id, messages] of cache) cache.set(id, messages.filter((message) => message.id !== messageId));
+}
+
+export function removeCachedConversation(conversationId: string) {
+  cache.delete(conversationId);
+}

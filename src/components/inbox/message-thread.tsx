@@ -39,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { clearMediaCache } from '@/lib/inbox/media-cache';
 import { clearMessageCache } from '@/lib/inbox/message-cache';
+import { fetchAllRows } from '@/lib/supabase/batching';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -301,11 +302,11 @@ export function MessageThread({
       // Already have this thread cached → show it now and refresh quietly.
       setLoading(!getCachedMessages(conversationId));
 
-      const { data, error } = await supabase
+      const { rows: data, error } = await fetchAllRows<Message>((from, to) => supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true }).order('id').range(from, to));
 
       if (cancelled) return;
 
