@@ -694,7 +694,8 @@
         "date": "Date"
       },
       "errorLoad": "Failed to load broadcasts",
-      "retry": "Retry"
+      "retry": "Retry",
+      "searchPlaceholder": "Search broadcasts by name or template…"
     },
     "status": {
       "draft": "Draft",
@@ -812,7 +813,8 @@
       "schedule": "Schedule",
       "scheduleTitle": "Schedule broadcast",
       "scheduleDesc": "Pick when to send it.",
-      "toastScheduled": "Broadcast scheduled for {time}"
+      "toastScheduled": "Broadcast scheduled for {time}",
+      "searchRecipients": "Search recipients by name or phone…"
     },
     "new": {
       "title": "New Broadcast",

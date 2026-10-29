@@ -57,6 +57,7 @@ import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
+import { Input } from '@/components/ui/input';
 
 interface StatCardProps {
   label: string;
@@ -245,6 +246,7 @@ export default function BroadcastDetailPage() {
   const [recipients, setRecipients] = useState<BroadcastRecipient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recipientSearch, setRecipientSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RecipientStatus | 'all'>(
     'all',
   );
@@ -386,10 +388,9 @@ export default function BroadcastDetailPage() {
 
   const filteredRecipients = useMemo(
     () =>
-      statusFilter === 'all'
-        ? recipients
-        : recipients.filter((r) => r.status === statusFilter),
-    [recipients, statusFilter],
+      recipients.filter((recipient) => (statusFilter === 'all' || recipient.status === statusFilter)
+        && `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`.toLowerCase().includes(recipientSearch.trim().toLowerCase())),
+    [recipients, statusFilter, recipientSearch],
   );
 
   /**
@@ -953,7 +954,9 @@ export default function BroadcastDetailPage() {
               ? t('recipientsHeader', { filtered: filteredRecipients.length, total: recipients.length })
               : t('recipientsHeaderAll', { total: recipients.length })}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)}
+              placeholder={t('searchRecipients')} aria-label={t('searchRecipients')} className="h-8 w-56" />
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={

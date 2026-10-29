@@ -694,7 +694,8 @@
         "date": "날짜"
       },
       "errorLoad": "브로드캐스트를 불러오지 못했습니다",
-      "retry": "다시 시도"
+      "retry": "다시 시도",
+      "searchPlaceholder": "이름 또는 템플릿으로 방송 검색…"
     },
     "status": {
       "draft": "초안",
@@ -812,7 +813,8 @@
       "schedule": "예약",
       "scheduleTitle": "브로드캐스트 예약",
       "scheduleDesc": "전송할 시간을 선택하세요.",
-      "toastScheduled": "브로드캐스트가 {time}에 예약되었습니다"
+      "toastScheduled": "브로드캐스트가 {time}에 예약되었습니다",
+      "searchRecipients": "이름 또는 전화번호로 수신자 검색…"
     },
     "new": {
       "title": "새 브로드캐스트",

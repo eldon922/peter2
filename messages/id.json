@@ -694,7 +694,8 @@
         "date": "Tanggal"
       },
       "errorLoad": "Gagal memuat blast",
-      "retry": "Coba lagi"
+      "retry": "Coba lagi",
+      "searchPlaceholder": "Cari broadcast berdasarkan nama atau template…"
     },
     "status": {
       "draft": "Draf",
@@ -812,7 +813,8 @@
       "schedule": "Jadwalkan",
       "scheduleTitle": "Jadwalkan blast",
       "scheduleDesc": "Pilih kapan blast dikirim.",
-      "toastScheduled": "Blast dijadwalkan pada {time}"
+      "toastScheduled": "Blast dijadwalkan pada {time}",
+      "searchRecipients": "Cari penerima berdasarkan nama atau nomor…"
     },
     "new": {
       "title": "Blast Baru",

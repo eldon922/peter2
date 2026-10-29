@@ -22,6 +22,8 @@ import {
 } from '@/lib/broadcast-status';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
+import { Input } from '@/components/ui/input';
+import { fetchAllRows } from '@/lib/supabase/batching';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -64,6 +66,9 @@ export default function BroadcastsPage() {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const visibleBroadcasts = useMemo(() => broadcasts.filter((broadcast) =>
+    `${broadcast.name} ${broadcast.template_name} ${broadcast.template_language}`.toLowerCase().includes(search.trim().toLowerCase())), [broadcasts, search]);
 
   // Used to kick off polling only while something is actively sending.
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -71,13 +76,13 @@ export default function BroadcastsPage() {
   async function fetchBroadcasts() {
     try {
       const supabase = createClient();
-      const { data, error: fetchError } = await supabase
+      const { rows: data, error: fetchError } = await fetchAllRows<Broadcast>((from, to) => supabase
         .from('broadcasts')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('id').range(from, to));
 
       if (fetchError) throw fetchError;
-      setBroadcasts(data ?? []);
+      setBroadcasts(data.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errorLoad'));
     } finally {
@@ -208,7 +213,8 @@ export default function BroadcastsPage() {
         </GatedButton>
       </div>
 
-      {broadcasts.length === 0 ? (
+      <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('searchPlaceholder')} aria-label={t('searchPlaceholder')} />
+      {visibleBroadcasts.length === 0 ? (
         <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-border bg-card">
           <Radio className="mb-3 h-10 w-10 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">{t('noBroadcastsYet')}</p>
@@ -248,7 +254,7 @@ export default function BroadcastsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {broadcasts.map((broadcast) => {
+              {visibleBroadcasts.map((broadcast) => {
                 const status = getBroadcastStatus(broadcast.status);
                 return (
                   <TableRow
