@@ -440,6 +440,8 @@ export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'fail
 export type RecipientStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed';
 
 export interface Broadcast {
+  started_at?: string | null;
+  completed_at?: string | null;
   send_run_total?: number | null;
   send_run_baseline?: number | null;
   id: string;

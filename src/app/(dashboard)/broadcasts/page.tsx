@@ -24,6 +24,7 @@ import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { fetchAllRows } from '@/lib/supabase/batching';
+import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -273,6 +274,7 @@ export default function BroadcastsPage() {
                         never engages. */}
                     <TableCell className="w-full min-w-48 max-w-0 truncate font-medium text-foreground md:w-[40%]">
                       {broadcast.name}
+                      <BroadcastDuration broadcast={broadcast} />
                     </TableCell>
                     {/* `max-w-0` lets this column shrink and truncate
                         instead of claiming its full text width. */}

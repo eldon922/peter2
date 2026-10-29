@@ -992,6 +992,10 @@
       "applyFormatting": "Terapkan format",
       "formattingInfoLabel": "Tentang terapkan format",
       "formattingInfo": "Format yang Anda tulis di pesan (seperti *tebal* atau _miring_) selalu berlaku. Sakelar ini hanya mengubah tampilan pratinjau. Sakelar ini tidak mengubah pesan yang dikirim."
+    },
+    "timing": {
+      "duration": "Durasi",
+      "days": "{days} hari {time}"
     }
   },
   "Automations": {

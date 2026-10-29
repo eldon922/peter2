@@ -60,6 +60,7 @@ import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmatio
 import { Input } from '@/components/ui/input';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
+import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
 
 interface StatCardProps {
   label: string;
@@ -904,6 +905,7 @@ export default function BroadcastDetailPage() {
       <FunnelChart steps={funnelSteps} sent={broadcast.sent_count} />
 
       {/* Recipients Table */}
+      <BroadcastDuration broadcast={broadcast} />
       <SendConfirmationDialog open={retryConfirmation !== null} onOpenChange={(open) => { if (!open) setRetryConfirmation(null); }}
         broadcast={broadcast} recipientId={retryConfirmation?.recipientId} retry busy={retrying !== null}
         title={t('retryHover')} confirmLabel={t('retryRow')}

@@ -992,6 +992,10 @@
       "applyFormatting": "Apply formatting",
       "formattingInfoLabel": "About apply formatting",
       "formattingInfo": "Formatting you write in the message (like *bold* or _italic_) always takes effect. This switch only changes how the preview looks. It does not change the message that gets sent."
+    },
+    "timing": {
+      "duration": "Duration",
+      "days": "{days} days {time}"
     }
   },
   "Automations": {
