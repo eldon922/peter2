@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchAllRows } from '@/lib/supabase/batching';
+import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -293,6 +294,7 @@ export function ConversationList({
       return bt - at;
     });
   }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  const { page, setPage } = useListPage(filtered.length, 25, JSON.stringify([filter, search, selectedTagIds, selectedCompany]));
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -511,7 +513,7 @@ export function ConversationList({
           </div>
         ) : (
           <div className="flex flex-col">
-            {filtered.map((conv) => (
+            {filtered.slice(page * 25, (page + 1) * 25).map((conv) => (
               <ConversationItem
                 key={conv.id}
                 conversation={conv}
@@ -531,6 +533,7 @@ export function ConversationList({
           </div>
         )}
       </ScrollArea>
+      <ListPagination page={page} pageSize={25} total={filtered.length} onPageChange={setPage} busy={loading} />
     </div>
   );
 }

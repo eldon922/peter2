@@ -1973,5 +1973,10 @@
   "PhoneFormat": {
     "warning": "Check country codes before sending. Local numbers starting with 0 are automatically changed to +{code} (DEFAULT_COUNTRY_CODE) when sending messages or broadcasts. Use full international numbers for other countries.",
     "fallback": "Use full international phone numbers. Local numbers starting with 0 use the configured DEFAULT_COUNTRY_CODE when messages or broadcasts are sent."
+  },
+  "Pagination": {
+    "range": "{from}–{to} of {total}",
+    "previous": "Previous page",
+    "next": "Next page"
   }
 }

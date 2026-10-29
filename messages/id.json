@@ -1973,5 +1973,10 @@
   "PhoneFormat": {
     "warning": "Periksa kode negara sebelum mengirim. Nomor lokal yang diawali 0 otomatis diubah menjadi +{code} (DEFAULT_COUNTRY_CODE) saat mengirim pesan atau broadcast. Gunakan nomor internasional lengkap untuk negara lain.",
     "fallback": "Gunakan nomor telepon internasional lengkap. Nomor lokal yang diawali 0 memakai DEFAULT_COUNTRY_CODE saat pesan atau broadcast dikirim."
+  },
+  "Pagination": {
+    "range": "{from}–{to} dari {total}",
+    "previous": "Halaman sebelumnya",
+    "next": "Halaman berikutnya"
   }
 }

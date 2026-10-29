@@ -58,6 +58,7 @@ import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
 import { Input } from '@/components/ui/input';
+import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 
 interface StatCardProps {
   label: string;
@@ -392,6 +393,7 @@ export default function BroadcastDetailPage() {
         && `${recipient.contact?.name ?? ''} ${recipient.contact?.profile_name ?? ''} ${recipient.contact?.phone ?? ''} ${recipient.phone_attempted ?? ''}`.toLowerCase().includes(recipientSearch.trim().toLowerCase())),
     [recipients, statusFilter, recipientSearch],
   );
+  const { page: recipientPage, setPage: setRecipientPage } = useListPage(filteredRecipients.length, 50, `${statusFilter}:${recipientSearch}`);
 
   /**
    * Retry every failed recipient, or just one when `recipientId` is
@@ -1052,7 +1054,7 @@ export default function BroadcastDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecipients.map((recipient) => {
+                {filteredRecipients.slice(recipientPage * 50, (recipientPage + 1) * 50).map((recipient) => {
                   const rStatus = getRecipientStatus(recipient.status);
                   // The contact was edited since this row was dialled,
                   // so what's displayed is NOT what was messaged. Shown
@@ -1219,6 +1221,7 @@ export default function BroadcastDetailPage() {
             </Table>
           </div>
         )}
+        <ListPagination page={recipientPage} pageSize={50} total={filteredRecipients.length} onPageChange={setRecipientPage} />
       </div>
     </div>
   );
