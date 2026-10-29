@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { parseContactCsv } from '@/lib/contacts/parse-contact-csv';
+import { dedupeByPhone } from '@/lib/contacts/dedupe';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
 import { useAudience } from '@/hooks/use-audience';
@@ -40,6 +42,10 @@ export function Step2SelectAudience({
   onBack,
 }: Step2Props) {
   const t = useTranslations('Broadcasts.wizard');
+  const importT = useTranslations('Contacts.importModal');
+  const csvRequest = useRef(0);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [csvError, setCsvError] = useState('');
 
   const OPERATOR_OPTIONS = useMemo<{ value: CustomFieldOperator; label: string }[]>(() => [
     { value: 'is', label: t('selectAudience.operatorIs') },
@@ -301,6 +307,42 @@ export function Step2SelectAudience({
               />
             </div>
           )}
+        </div>
+      )}
+
+      {audience.type === 'csv' && (
+        <div className="space-y-2 rounded-xl border border-border bg-card/50 p-4" aria-busy={csvLoading}>
+          <label htmlFor="broadcast-csv" className="block text-sm font-medium text-foreground">
+            {t('selectAudience.method.csv')}
+          </label>
+          <input
+            id="broadcast-csv"
+            type="file"
+            accept=".csv,text/csv"
+            className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-2 file:text-foreground"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              const request = ++csvRequest.current;
+              setCsvError('');
+              onUpdate({ ...audience, csvContacts: [] });
+              if (!file) return;
+              setCsvLoading(true);
+              try {
+                const { rows } = parseContactCsv(await file.text());
+                const { unique } = dedupeByPhone(rows);
+                if (request !== csvRequest.current) return;
+                if (unique.length === 0) setCsvError(importT('toastNoValidRows'));
+                onUpdate({ ...audience, csvContacts: unique.map(({ phone, name }) => ({ phone, name })) });
+              } catch {
+                if (request === csvRequest.current) setCsvError(importT('toastNoValidRows'));
+              } finally {
+                if (request === csvRequest.current) setCsvLoading(false);
+              }
+            }}
+          />
+          <p className="text-xs text-muted-foreground">{importT('uploadHint')}</p>
+          {csvLoading && <Loader2 className="size-4 animate-spin" />}
+          {csvError && <p role="alert" className="text-xs text-red-500">{csvError}</p>}
         </div>
       )}
 
