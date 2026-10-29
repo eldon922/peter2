@@ -33,7 +33,7 @@
  * MUST be mirrored in each route file as a literal, not an import:
  * export const maxDuration = [ROUTE_MAX_DURATION_SECONDS]; // in each route file
  */
-export const ROUTE_MAX_DURATION_SECONDS = 1800;
+export const ROUTE_MAX_DURATION_SECONDS = 43_200;
 
 /**
  * Tail of the duration budget reserved for DB writes rather than sends.

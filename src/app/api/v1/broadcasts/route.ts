@@ -46,7 +46,7 @@ import { requireApiKey } from '@/lib/auth/api-context';
 // — DELIVER_BUDGET_MS is derived from it. It cannot be imported: Next
 // statically analyzes route segment config and ignores non-literal
 // values. broadcast-limits.test.ts enforces the mirror.
-export const maxDuration = 1800;
+export const maxDuration = 43_200;
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
 import {
   claimIdempotencyKey,

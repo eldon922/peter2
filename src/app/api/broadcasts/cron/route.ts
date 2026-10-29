@@ -36,7 +36,7 @@ import {
 // MUST equal ROUTE_MAX_DURATION_SECONDS in lib/whatsapp/broadcast-limits
 // (literal required — see the note there). Enforced by
 // broadcast-limits.test.ts.
-export const maxDuration = 1800;
+export const maxDuration = 43_200;
 
 // More than this at once just wait for the next tick.
 const MAX_PER_RUN = 10;
