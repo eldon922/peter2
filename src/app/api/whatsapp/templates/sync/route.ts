@@ -9,6 +9,7 @@ import { decrypt } from '@/lib/whatsapp/encryption'
 import { META_API_BASE } from '@/lib/whatsapp/meta-api'
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
 import { extractTemplateVariables } from '@/lib/whatsapp/template-validators'
+import { templateSyncChanged } from '@/lib/whatsapp/template-sync'
 import { chunkIds } from '@/lib/supabase/batching'
 import type { TemplateButton, TemplateSampleValues } from '@/types'
 
@@ -208,6 +209,7 @@ export async function POST() {
 
     let inserted = 0
     let updated = 0
+    let unchanged = 0
     const errors: { name: string; language: string; message: string }[] = []
 
     for (const t of metaTemplates) {
@@ -252,7 +254,7 @@ export async function POST() {
 
       const { data: existing, error: lookupErr } = await supabase
         .from('message_templates')
-        .select('id')
+        .select('*')
         .eq('account_id', accountId)
         .eq('name', t.name)
         .eq('language', t.language)
@@ -268,6 +270,10 @@ export async function POST() {
       }
 
       if (existing?.id) {
+        if (!templateSyncChanged(existing, row)) {
+          unchanged++
+          continue
+        }
         const { error: updErr } = await supabase
           .from('message_templates')
           .update(row)
@@ -331,6 +337,7 @@ export async function POST() {
       total: metaTemplates.length,
       inserted,
       updated,
+      unchanged,
       deleted,
       errors,
       truncated,

@@ -1623,7 +1623,8 @@
       "showLabel": "Show deleted template",
       "dialogViewTitle": "Deleted Template",
       "dialogViewDesc": "This template was deleted on Meta, so it can't be edited or used. This is the last version that was synced.",
-      "close": "Close"
+      "close": "Close",
+      "toastSyncUnchanged": "Templates are already up to date. No changes."
     },
     "roles": {
       "admin": "Admin",

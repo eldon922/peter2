@@ -313,7 +313,7 @@ export function TemplateManager() {
         throw new Error(data?.error || `Sync failed (HTTP ${res.status})`);
       }
       toast.success(
-        t('toastSyncCount', { total: data.total }) +
+        (!data.inserted && !data.updated && !data.deleted && !data.errors?.length ? t('toastSyncUnchanged') : t('toastSyncCount', { total: data.total })) +
           (data.inserted || data.updated
             ? t('toastSyncDetails', { inserted: data.inserted, updated: data.updated })
             : ''),

@@ -1623,7 +1623,8 @@
       "showLabel": "Lihat template yang dihapus",
       "dialogViewTitle": "Template yang Dihapus",
       "dialogViewDesc": "Template ini dihapus di Meta sehingga tidak dapat diedit atau digunakan. Ini adalah versi terakhir yang disinkronkan.",
-      "close": "Tutup"
+      "close": "Tutup",
+      "toastSyncUnchanged": "Template sudah terbaru. Tidak ada perubahan."
     },
     "roles": {
       "admin": "Admin",
