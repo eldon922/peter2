@@ -25,8 +25,8 @@ describe('bodyPlaceholderKeys', () => {
     expect(bodyPlaceholderKeys(undefined)).toEqual([]);
   });
 
-  it('ignores non-numeric braces', () => {
-    expect(bodyPlaceholderKeys('Hi {{name}} and {{1}}')).toEqual(['1']);
+  it('recognizes named and positional keys', () => {
+    expect(bodyPlaceholderKeys('Hi {{name}} and {{1}}')).toEqual(['1', 'name']);
   });
 });
 
