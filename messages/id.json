@@ -39,7 +39,9 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profil",
     "menuSettings": "Pengaturan",
-    "menuSignOut": "Keluar"
+    "menuSignOut": "Keluar",
+    "supportHint": "Butuh bantuan? Hubungi tim dukungan TI kami",
+    "supportLabel": "Dukungan WhatsApp"
   },
   "Header": {
     "dashboard": "Dasbor",
@@ -1702,7 +1704,6 @@
       "step4_4": "Masukkan <strong>Token Verifikasi</strong> yang sama seperti yang Anda atur di sini",
       "step4_5": "Berlangganan bidang webhook \"messages\"",
       "metaDocs": "Dokumentasi Meta WhatsApp API",
-
       "embeddedSignup": {
         "title": "Hubungkan dengan Facebook",
         "description": "Onboarding lewat pop-up, tanpa menyalin kredensial satu per satu. Bisa dipakai untuk nomor yang sudah Anda gunakan di aplikasi WhatsApp Business.",
