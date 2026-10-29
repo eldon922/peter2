@@ -35,6 +35,7 @@ function Section({
 
   function detail(row: ReportRow): string {
     const parts: string[] = [];
+    if (row.existingTags?.length) parts.push(t('detailExistingTags', { tags: row.existingTags.join(', ') }));
     if (row.reason) parts.push(t(`reason.${row.reason}`));
     if (row.rename) {
       parts.push(

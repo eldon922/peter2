@@ -530,7 +530,8 @@
       "reportShowMore": "Tampilkan {count} lagi",
       "reportSkippedTags": "Tag tidak dibuat (hanya admin yang dapat membuat tag): {names}",
       "additionalTags": "Tag untuk ditambahkan ke setiap kontak impor",
-      "newTags": "Tag baru, dipisahkan dengan koma"
+      "newTags": "Tag baru, dipisahkan dengan koma",
+      "detailExistingTags": "Tag yang sudah ada: {tags}"
     },
     "customFields": {
       "title": "Bidang khusus",

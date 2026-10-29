@@ -13,6 +13,7 @@ export interface ReportRow {
   rename?: { from: string | null; to: string };
   /** Updated rows: tags the file carried for this contact. */
   tags?: string[];
+  existingTags?: string[];
   /** Skipped rows: why. */
   reason?: SkipReason;
   /** Failed rows: the error. */

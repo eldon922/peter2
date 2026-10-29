@@ -530,7 +530,8 @@
       "reportShowMore": "Show {count} more",
       "reportSkippedTags": "Tags not created (only admins can create tags): {names}",
       "additionalTags": "Tags to add to every imported contact",
-      "newTags": "New tags, separated by commas"
+      "newTags": "New tags, separated by commas",
+      "detailExistingTags": "Existing tags: {tags}"
     },
     "customFields": {
       "title": "Custom fields",

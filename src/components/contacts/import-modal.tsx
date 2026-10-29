@@ -399,6 +399,17 @@ export function ImportModal({
         unique,
         existingByPhone
       );
+      const existingTagsById = new Map<string, string[]>();
+      for (const ids of chunkIds(toMerge.map((row) => row.id))) {
+        const result = await fetchAllRows<{ contact_id: string; tag_id: string }>((from, to) =>
+          supabase.from('contact_tags').select('contact_id, tag_id').in('contact_id', ids).order('id').range(from, to),
+        );
+        if (result.error) throw result.error;
+        for (const row of result.rows) {
+          const tag = availableTags.find((tag) => tag.id === row.tag_id);
+          if (tag) existingTagsById.set(row.contact_id, [...(existingTagsById.get(row.contact_id) ?? []), tag.name]);
+        }
+      }
       report.skipped.push(
         ...duplicateRows.map((row) => ({
           ...toRow(row),
@@ -609,6 +620,7 @@ export function ImportModal({
         }
         report.updated.push({
           ...toRow(m.row),
+          existingTags: existingTagsById.get(m.id),
           rename: renamed
             ? { from: m.previousName, to: m.rename as string }
             : undefined,

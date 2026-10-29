@@ -530,7 +530,8 @@
       "reportShowMore": "{count}개 더 보기",
       "reportSkippedTags": "생성되지 않은 태그(관리자만 태그를 만들 수 있음): {names}",
       "additionalTags": "가져오는 모든 연락처에 추가할 태그",
-      "newTags": "새 태그를 쉼표로 구분하세요"
+      "newTags": "새 태그를 쉼표로 구분하세요",
+      "detailExistingTags": "기존 태그: {tags}"
     },
     "customFields": {
       "title": "커스텀 필드",
