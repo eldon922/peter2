@@ -59,6 +59,7 @@ import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
+import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
 
 interface StatCardProps {
   label: string;
@@ -259,19 +260,6 @@ export default function BroadcastDetailPage() {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryConfirmation, setRetryConfirmation] = useState<{ recipientId?: string } | null>(null);
   /**
-   * Set right after the server accepts a retry, so the progress bar
-   * below can track just *that* retry's slice rather than the whole
-   * broadcast. `baseline` is sent_count + failed_count at the moment
-   * the retry was accepted; `total` is how many rows it claimed. As
-   * polling advances those counts, (current - baseline) / total is
-   * this retry's own 0–100, distinct from the wizard's initial-send
-   * case below where there is no baseline to subtract.
-   */
-  const [retryTarget, setRetryTarget] = useState<{
-    total: number;
-    baseline: number;
-  } | null>(null);
-  /**
    * Set when the server refused a retry because it can't tell which
    * media this broadcast sent. Holds the pending retry's scope so
    * answering the prompt resumes exactly what was clicked.
@@ -445,15 +433,6 @@ export default function BroadcastDetailPage() {
 
       setMediaPrompt(null);
 
-      if (data.retrying > 0) {
-        // Snapshot before `refresh()` below moves the counts — this is
-        // the "before" the progress bar measures forward from.
-        setRetryTarget({
-          total: data.retrying,
-          baseline: broadcast.sent_count + broadcast.failed_count,
-        });
-      }
-
       if (data.retrying === 0) {
         toast.info(t('noFailedToRetry'));
       } else if (data.remaining > 0) {
@@ -601,27 +580,7 @@ export default function BroadcastDetailPage() {
         : t('targetAll');
   const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
 
-  // Same 0–100 shape as the wizard's Step4ScheduleSend "Processing"
-  // overlay, driven by polling instead of a client-tracked counter
-  // since the fan-out itself now always runs server-side (both a
-  // start and a retry — see use-broadcast-sending.ts and
-  // /api/broadcasts/[id]/start).
-  //
-  // `retryTarget` set: scope to just that retry's claimed rows, so the
-  // bar moves visibly even when it's a handful of rows against a
-  // broadcast of thousands.
-  // `retryTarget` unset but still 'sending': this is either a fresh
-  // send just kicked off by the wizard (no retry was ever clicked on
-  // this page) or a page load that landed mid-send from elsewhere —
-  // either way, fall back to overall completion.
-  const completedCount = broadcast.sent_count + broadcast.failed_count;
-  const progressTotal = retryTarget ? retryTarget.total : broadcast.total_recipients;
-  const progressDone = Math.min(
-    progressTotal,
-    Math.max(0, retryTarget ? completedCount - retryTarget.baseline : completedCount),
-  );
-  const sendProgress =
-    progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
+  const { total: progressTotal, done: progressDone, percent: sendProgress } = broadcastRunProgress(broadcast);
 
   // `onColor` is the text colour drawn on top of each fill. The primary
   // bar uses the theme's paired token; the three raw Tailwind fills are
