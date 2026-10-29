@@ -344,7 +344,8 @@
       "toastDeleted": "Kontak dihapus",
       "toastBulkFailedDelete": "Gagal menghapus kontak",
       "toastBulkDeleted": "{count} kontak dihapus",
-      "fieldsAndTagsBtn": "Kolom & tag"
+      "fieldsAndTagsBtn": "Kolom & tag",
+      "excludeTags": "Kecualikan tag"
     },
     "form": {
       "addTitle": "Tambah Kontak",

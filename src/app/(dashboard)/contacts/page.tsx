@@ -61,7 +61,7 @@ import { ImportModal } from '@/components/contacts/import-modal';
 import { FieldsAndTagsDialog } from '@/components/contacts/fields-and-tags-dialog';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
-import { TagPickerList } from '@/components/ui/tag-multi-select';
+import { TagMultiSelect, TagPickerList } from '@/components/ui/tag-multi-select';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { useTranslations } from 'next-intl';
 
@@ -151,6 +151,7 @@ export default function ContactsPage() {
   const [totalCount, setTotalCount] = useState(0);
   // Tag filter — contacts shown must have ANY of these tags (OR).
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [excludedTagIds, setExcludedTagIds] = useState<string[]>([]);
   // Sort is resolved server-side on both the plain query and the
   // tag-filter RPC, so it orders the whole result set rather than
   // shuffling whichever 25 rows the default ordering happened to pick.
@@ -202,9 +203,10 @@ export default function ContactsPage() {
       // Drop any filter selections whose tag no longer exists (e.g. a tag
       // deleted elsewhere) so it can't linger invisibly in the query.
       setSelectedTagIds((prev) => {
-        const pruned = prev.filter((id) => map[id]);
+        const pruned = prev.filter((id) => id === UNTAGGED || map[id]);
         return pruned.length === prev.length ? prev : pruned;
       });
+      setExcludedTagIds((prev) => prev.filter((id) => id === UNTAGGED || map[id]));
     }
   }, [supabase]);
 
@@ -223,13 +225,16 @@ export default function ContactsPage() {
     let contactRows: Contact[];
     let count: number;
 
-    if (selectedTagIds.length > 0) {
+    if (selectedTagIds.length > 0 || excludedTagIds.length > 0) {
       // Tag filter active — resolve it server-side (join + distinct +
       // windowed total count + pagination) so a tag covering many
       // contacts can't silently truncate the result or overflow an IN
       // clause. See migration 025_filter_contacts_by_tags.
       const { data, error } = await supabase.rpc('filter_contacts_by_tags', {
-        p_tag_ids: selectedTagIds,
+        p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
+        p_include_untagged: selectedTagIds.includes(UNTAGGED),
+        p_exclude_tag_ids: excludedTagIds.filter((id) => id !== UNTAGGED),
+        p_exclude_untagged: excludedTagIds.includes(UNTAGGED),
         p_search: term || null,
         p_limit: PAGE_SIZE,
         p_offset: from,
@@ -308,6 +313,7 @@ export default function ContactsPage() {
     page,
     search,
     selectedTagIds,
+    excludedTagIds,
     sortColumn,
     sortDirection,
     tagsMap,
@@ -506,7 +512,7 @@ export default function ContactsPage() {
   const allTags = Object.values(tagsMap).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
-  const hasActiveFilters = search.trim().length > 0 || selectedTagIds.length > 0;
+  const hasActiveFilters = search.trim().length > 0 || selectedTagIds.length > 0 || excludedTagIds.length > 0;
 
   // What the user must type to confirm delete-by-tag: the tag's name, or
   // the "Untagged" label for the no-tag choice.
@@ -668,26 +674,33 @@ export default function ContactsPage() {
                   </button>
                 )}
               </div>
-              {allTags.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-muted-foreground text-center">
-                  {t('noTagsYet')}
-                </p>
-              ) : (
                 <TagPickerList
-                  tags={allTags}
+                  tags={[untaggedOption, ...allTags]}
                   value={selectedTagIds}
                   onToggle={toggleTagFilter}
                 />
-              )}
             </PopoverContent>
           </Popover>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('excludeTags')}</span>
+          <TagMultiSelect
+            tags={[untaggedOption, ...allTags]}
+            value={excludedTagIds}
+            variant="danger"
+            onToggle={(id) => {
+              setExcludedTagIds((prev) => prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]);
+              setPage(0);
+            }}
+            onClear={() => { setExcludedTagIds([]); setPage(0); }}
+          />
         </div>
 
         {/* Active tag-filter chips */}
         {selectedTagIds.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {selectedTagIds.map((id) => {
-              const tag = tagsMap[id];
+              const tag = id === UNTAGGED ? untaggedOption : tagsMap[id];
               if (!tag) return null;
               return (
                 <span

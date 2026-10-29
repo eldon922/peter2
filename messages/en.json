@@ -344,7 +344,8 @@
       "toastDeleted": "Contact deleted",
       "toastBulkFailedDelete": "Failed to delete contacts",
       "toastBulkDeleted": "{count} contacts deleted",
-      "fieldsAndTagsBtn": "Fields & tags"
+      "fieldsAndTagsBtn": "Fields & tags",
+      "excludeTags": "Exclude tags"
     },
     "form": {
       "addTitle": "Add Contact",
