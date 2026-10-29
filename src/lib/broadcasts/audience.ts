@@ -142,7 +142,18 @@ export async function resolveAudience(
         for (const row of data ?? []) excludedPhones.add(normalizeKey(row.phone));
       }
     }
-    const contacts = audience.csvContacts.filter((row) => !excludedPhones.has(normalizeKey(row.phone)));
+    let contacts = audience.csvContacts.filter((row) => !excludedPhones.has(normalizeKey(row.phone)));
+    if (excludeTagIds.includes(UNTAGGED)) {
+      const tagged = await fetchAllRows<{ contact_id: string }>((from, to) => supabase.from('contact_tags').select('contact_id').order('id').range(from, to));
+      if (tagged.error) throw new Error(tagged.error.message);
+      const taggedPhones = new Set<string>();
+      for (const chunk of chunkIds([...new Set(tagged.rows.map((row) => row.contact_id))])) {
+        const { data, error } = await supabase.from('contacts').select('phone').in('id', chunk);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) taggedPhones.add(normalizeKey(row.phone));
+      }
+      contacts = contacts.filter((row) => taggedPhones.has(normalizeKey(row.phone)));
+    }
     return { kind: 'csv', contacts, excludedCount: audience.csvContacts.length - contacts.length };
   } else {
     return null;
