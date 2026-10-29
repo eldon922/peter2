@@ -1173,6 +1173,7 @@ async function processMessage(
     content_type: contentType,
     content_text: contentText,
     media_url: mediaUrl,
+    media_filename: message.document?.filename ?? null,
     message_id: message.id,
     status: 'delivered',
     created_at: new Date(parseInt(message.timestamp) * 1000).toISOString(),

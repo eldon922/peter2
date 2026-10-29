@@ -531,6 +531,7 @@ export function MessageThread({
         content_type: payload.kind,
         content_text: contentText,
         media_url: payload.mediaUrl,
+        media_filename: payload.filename,
         status: "sending",
         created_at: new Date().toISOString(),
         reply_to_message_id: payload.replyToId,

@@ -460,6 +460,7 @@ export async function sendMessageToConversation(
       content_type: messageType,
       content_text: interactiveBody ?? contentText ?? null,
       media_url: mediaUrl || null,
+      media_filename: filename || null,
       template_name: templateName || null,
       interactive_payload:
         messageType === 'interactive' ? interactivePayload : null,

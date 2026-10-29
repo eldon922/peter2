@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { ReplyQuote } from "./reply-quote";
 import { FormattedText } from "./formatted-text";
 import { ImageViewer } from "./image-viewer";
+import { MediaDownload } from './media-download';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getMediaObjectUrl, peekMediaObjectUrl } from "@/lib/inbox/media-cache";
 import { MessageReactions } from "./message-reactions";
@@ -114,7 +115,7 @@ function MediaUnavailable({ label, t }: { label: string, t: ReturnType<typeof us
   );
 }
 
-function MediaImage({ url, alt }: { url: string; alt: string }) {
+function MediaImage({ url, alt, filename }: { url: string; alt: string; filename?: string | null }) {
   // Proxy URLs need the session, so they go through the shared media cache.
   const isProxy = url.startsWith("/api/whatsapp/media/");
   const [loaded, setLoaded] = useState<{ url: string; src: string | null } | null>(null);
@@ -169,7 +170,7 @@ function MediaImage({ url, alt }: { url: string; alt: string }) {
           onError={() => setImgError(true)}
         />
       </button>
-      <ImageViewer src={src} alt={alt} open={viewerOpen} onOpenChange={setViewerOpen} />
+      <ImageViewer src={src} alt={alt} filename={filename} open={viewerOpen} onOpenChange={setViewerOpen} />
     </>
   );
 }
@@ -228,7 +229,7 @@ function MessageContent({
         <div>
           {message.template_name && <TemplateBadge t={t} />}
           {message.media_url ? (
-            <MediaImage url={message.media_url} alt="Shared image" />
+            <MediaImage url={message.media_url} alt="Shared image" filename={message.media_filename} />
           ) : (
             <MediaUnavailable label={t("photo")} t={t} />
           )}
@@ -277,20 +278,15 @@ function MessageContent({
     case "document": {
       // A template's body is its caption, not the file name.
       const fromTemplate = Boolean(message.template_name);
-      const fileLabel = fromTemplate ? t("document") : message.content_text || t("document");
+      const fileLabel = message.media_filename || (fromTemplate ? t("document") : message.content_text || t("document"));
       return (
         <div>
           {fromTemplate && <TemplateBadge t={t} />}
           {message.media_url ? (
-            <a
-              href={message.media_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm hover:bg-muted"
-            >
+            <MediaDownload url={message.media_url} filename={message.media_filename || fileLabel}>
               <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
               <span className="truncate">{fileLabel}</span>
-            </a>
+            </MediaDownload>
           ) : (
             <MediaUnavailable label={fileLabel} t={t} />
           )}
@@ -466,6 +462,9 @@ export function MessageBubble({
             ) : undefined
           }
         />
+        {message.media_url && ['image', 'video', 'audio'].includes(message.content_type) && (
+          <MediaDownload url={message.media_url} filename={message.media_filename} />
+        )}
         {inlineMeta ? (
           <span className="absolute bottom-2 right-3">{renderMeta(true)}</span>
         ) : (

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { mediaDownloadName } from '@/lib/inbox/download-media';
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -29,12 +30,13 @@ interface Props {
   /** Image to show (an object URL or a public URL). */
   src: string;
   alt: string;
+  filename?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 /** Full-size image with "open in new tab" and "download". */
-export function ImageViewer({ src, alt, open, onOpenChange }: Props) {
+export function ImageViewer({ src, alt, filename, open, onOpenChange }: Props) {
   const t = useTranslations("Inbox.bubble");
 
   async function download() {
@@ -44,7 +46,7 @@ export function ImageViewer({ src, alt, open, onOpenChange }: Props) {
       if (!res.ok) throw new Error("download failed");
       const blob = await res.blob();
       const ext = EXTENSION_BY_TYPE[blob.type] ?? "jpg";
-      saveBlob(blob, `image-${Date.now()}.${ext}`);
+      saveBlob(blob, mediaDownloadName(filename, src, blob.type || `image/${ext}`));
     } catch {
       toast.error(t("downloadFailed"));
     }

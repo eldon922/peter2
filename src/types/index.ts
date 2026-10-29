@@ -228,6 +228,7 @@ export type ContentType =
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface Message {
+  media_filename?: string | null;
   id: string;
   conversation_id: string;
   sender_type: SenderType;
