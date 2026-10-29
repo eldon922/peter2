@@ -151,7 +151,8 @@
       "clearAll": "Hapus semua",
       "noConversations": "Tidak ada percakapan ditemukan",
       "noMessagesYet": "Belum ada pesan",
-      "unknown": "Tidak diketahui"
+      "unknown": "Tidak diketahui",
+      "contactRemoved": "Dihapus"
     },
     "messageThread": {
       "backToConversations": "Kembali ke percakapan",
@@ -176,7 +177,10 @@
       "selectConversation": "Pilih percakapan",
       "selectConversationHint": "Pilih percakapan di sebelah kiri untuk mulai mengirim pesan",
       "today": "Hari ini",
-      "yesterday": "Kemarin"
+      "yesterday": "Kemarin",
+      "contactRemoved": "Kontak dihapus — riwayat chat tetap tersimpan. Simpan kontak untuk membalas.",
+      "saveContact": "Simpan kontak",
+      "saveContactFailed": "Tidak dapat menyimpan kontak."
     },
     "sessionTimer": {
       "expired": "Kedaluwarsa",

@@ -169,7 +169,10 @@ export type ConversationStatus = 'open' | 'pending' | 'closed';
 export interface Conversation {
   id: string;
   user_id: string;
-  contact_id: string;
+  contact_id: string | null;
+  contact_phone?: string | null;
+  contact_name?: string | null;
+  contact_removed_at?: string | null;
   status: ConversationStatus;
   assigned_agent_id?: string;
   last_message_text?: string;

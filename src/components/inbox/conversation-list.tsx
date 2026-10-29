@@ -273,8 +273,8 @@ export function ConversationList({
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((c) => {
-        const name = c.contact?.name?.toLowerCase() ?? "";
-        const phone = c.contact?.phone?.toLowerCase() ?? "";
+        const name = (c.contact?.name || c.contact_name || '').toLowerCase();
+        const phone = (c.contact?.phone || c.contact_phone || '').toLowerCase();
         const lastMsg = c.last_message_text?.toLowerCase() ?? "";
         return name.includes(q) || phone.includes(q) || lastMsg.includes(q);
       });
@@ -561,7 +561,7 @@ function ConversationItem({
   t,
 }: ConversationItemProps) {
   const contact = conversation.contact;
-  const displayName = contact ? contactDisplayName(contact) : t("unknown");
+  const displayName = contact ? contactDisplayName(contact) : conversation.contact_name || conversation.contact_phone || t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
 
   const handleClick = useCallback(() => {
@@ -629,6 +629,7 @@ function ConversationItem({
           <span className="truncate text-sm font-medium text-foreground">
             {displayName}
           </span>
+          {conversation.contact_removed_at && <span className="text-[10px] text-amber-600 dark:text-amber-300">{t('contactRemoved')}</span>}
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">

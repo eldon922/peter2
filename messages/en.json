@@ -151,7 +151,8 @@
       "clearAll": "Clear all",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "contactRemoved": "Removed"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -176,7 +177,10 @@
       "selectConversation": "Select a conversation",
       "selectConversationHint": "Choose a conversation from the left to start messaging",
       "today": "Today",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "contactRemoved": "Contact removed — chat history is preserved. Save the contact to reply.",
+      "saveContact": "Save contact",
+      "saveContactFailed": "Could not save the contact."
     },
     "sessionTimer": {
       "expired": "Expired",

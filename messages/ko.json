@@ -151,7 +151,8 @@
       "clearAll": "모두 지우기",
       "noConversations": "대화를 찾을 수 없습니다",
       "noMessagesYet": "아직 메시지가 없습니다",
-      "unknown": "알 수 없음"
+      "unknown": "알 수 없음",
+      "contactRemoved": "삭제됨"
     },
     "messageThread": {
       "backToConversations": "대화 목록으로 돌아가기",
@@ -176,7 +177,10 @@
       "selectConversationHint": "왼쪽에서 대화를 선택해 메시지를 시작하세요",
       "today": "오늘",
       "yesterday": "어제",
-      "unnamedTeammate": "이름 없는 팀원"
+      "unnamedTeammate": "이름 없는 팀원",
+      "contactRemoved": "연락처가 삭제되어도 대화 기록은 유지됩니다. 답장하려면 연락처를 저장하세요.",
+      "saveContact": "연락처 저장",
+      "saveContactFailed": "연락처를 저장하지 못했습니다."
     },
     "sessionTimer": {
       "expired": "만료됨",

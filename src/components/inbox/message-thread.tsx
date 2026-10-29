@@ -34,6 +34,7 @@ import {
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -175,7 +176,7 @@ const DOODLE_BG_CLASSES =
 
 export function MessageThread({
   conversation,
-  contact,
+  contact: linkedContact,
   messages,
   onMessagesLoaded,
   onNewMessage,
@@ -192,6 +193,9 @@ export function MessageThread({
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
   const tQuote = useTranslations("Inbox.replyQuote");
+  const contact = linkedContact ?? (conversation?.contact_phone ? { phone: conversation.contact_phone, name: conversation.contact_name ?? undefined } as Contact : null);
+  const canManageContacts = useCan('send-messages');
+  const [savingContact, setSavingContact] = useState(false);
 
   const { user } = useAuth();
   const canAct = useCan("send-messages");
@@ -1213,6 +1217,20 @@ export function MessageThread({
       />
 
       {/* Composer */}
+      {conversation.contact_removed_at ? (
+        <div className="flex items-center justify-between gap-3 border-t border-border bg-card p-3">
+          <p className="text-xs text-amber-700 dark:text-amber-300">{t('contactRemoved')}</p>
+          <Button disabled={!canManageContacts || savingContact} onClick={async () => {
+            setSavingContact(true);
+            try {
+              const { error } = await createClient().rpc('save_conversation_contact', { p_conversation_id: conversation.id });
+              if (error) throw error;
+              onRefresh?.();
+            } catch { toast.error(t('saveContactFailed')); }
+            finally { setSavingContact(false); }
+          }}>{savingContact && <RefreshCw className="size-4 animate-spin" />}{t('saveContact')}</Button>
+        </div>
+      ) :
       <MessageComposer
         conversationId={conversation.id}
         sessionExpired={sessionInfo.expired}
@@ -1223,6 +1241,7 @@ export function MessageThread({
         replyTo={replyTo}
         onClearReply={() => setReplyTo(null)}
       />
+      }
 
       <TemplatePicker
         open={templateModalOpen}

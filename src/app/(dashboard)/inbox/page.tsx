@@ -369,6 +369,7 @@ function InboxPageInner() {
                 ? {
                     ...c,
                     ...conv,
+                    contact: conv.contact_id === null ? undefined : c.contact,
                     unread_count: isActive ? 0 : conv.unread_count,
                   }
                 : c,
@@ -385,8 +386,9 @@ function InboxPageInner() {
         // Update active conversation if it changed
         if (activeConversation && conv.id === activeConversation.id) {
           setActiveConversation((prev) =>
-            prev ? { ...prev, ...conv } : prev
+            prev ? { ...prev, ...conv, contact: conv.contact_id === null ? undefined : prev.contact } : prev
           );
+          if (conv.contact_id === null) setActiveContact(null);
         }
       }
     },
@@ -463,6 +465,13 @@ function InboxPageInner() {
   const handleConversationsLoaded = useCallback(
     (loaded: Conversation[]) => {
       setConversations(loaded);
+      if (activeConversation?.id) {
+        const current = loaded.find((row) => row.id === activeConversation.id);
+        if (current) {
+          setActiveConversation(current);
+          setActiveContact(current.contact ?? null);
+        }
+      }
       // Resolve a pending deep-link here rather than in an effect — this
       // is an event handler, so the setState calls below are allowed by
       // react-hooks/set-state-in-effect. Runs once per ?c=<id> URL value
