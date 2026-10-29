@@ -1116,6 +1116,7 @@ export default function ContactsPage() {
             <div className="rounded-lg border border-border bg-muted/30">
               <TagPickerList
                 tags={[untaggedOption, ...allTags]}
+                selectionMode="single"
                 value={deleteByTagId ? [deleteByTagId] : []}
                 onToggle={toggleDeleteByTag}
               />

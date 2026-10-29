@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -14,11 +14,13 @@ interface TagPickerListProps {
   tags: Tag[];
   value: string[];
   onToggle: (tagId: string) => void;
+  selectionMode?: "multiple" | "single";
 }
 
 /** Search box + checkbox list. Reused wherever a tag has to be picked. */
-export function TagPickerList({ tags, value, onToggle }: TagPickerListProps) {
+export function TagPickerList({ tags, value, onToggle, selectionMode = "multiple" }: TagPickerListProps) {
   const t = useTranslations("TagPicker");
+  const groupName = useId();
   const [query, setQuery] = useState("");
 
   const visible = useMemo(() => {
@@ -50,11 +52,21 @@ export function TagPickerList({ tags, value, onToggle }: TagPickerListProps) {
               key={tag.id}
               className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50"
             >
-              <Checkbox
+              {selectionMode === "single" ? (
+                <input
+                  type="radio"
+                  name={groupName}
+                  value={tag.id}
+                  checked={value.includes(tag.id)}
+                  onChange={() => onToggle(tag.id)}
+                  aria-label={tag.name}
+                  className="size-4 accent-primary"
+                />
+              ) : <Checkbox
                 checked={value.includes(tag.id)}
                 onCheckedChange={() => onToggle(tag.id)}
                 aria-label={tag.name}
-              />
+              />}
               <span
                 className="size-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: tag.color }}
