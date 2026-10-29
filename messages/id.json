@@ -1992,5 +1992,8 @@
     "range": "{from}–{to} dari {total}",
     "previous": "Halaman sebelumnya",
     "next": "Halaman berikutnya"
+  },
+  "Activity": {
+    "loading": "Memuat…"
   }
 }

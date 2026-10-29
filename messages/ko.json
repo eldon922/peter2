@@ -1992,5 +1992,8 @@
     "range": "{total}개 중 {from}–{to}",
     "previous": "이전 페이지",
     "next": "다음 페이지"
+  },
+  "Activity": {
+    "loading": "불러오는 중…"
   }
 }

@@ -1992,5 +1992,8 @@
     "range": "{from}–{to} of {total}",
     "previous": "Previous page",
     "next": "Next page"
+  },
+  "Activity": {
+    "loading": "Loading…"
   }
 }
