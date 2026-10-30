@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -74,7 +74,7 @@ const PAGE_SIZE = 25;
 
 // Pseudo tag id for the "Untagged" choice in the delete-by-tag dialog.
 // Real tag ids are UUIDs, so this can never collide with one.
-const UNTAGGED = '__untagged__';
+import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 interface ContactWithTags extends Contact {
   tags?: Tag[];
@@ -214,6 +214,19 @@ export default function ContactsPage() {
     }
   }, [supabase]);
 
+  const contactFilterArgs = useMemo(
+    () => ({
+      p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
+      p_include_untagged: selectedTagIds.includes(UNTAGGED),
+      p_exclude_tag_ids: excludedTagIds.filter((id) => id !== UNTAGGED),
+      p_exclude_untagged: excludedTagIds.includes(UNTAGGED),
+      p_search: search.trim() || null,
+      p_sort_column: sortColumn,
+      p_sort_dir: sortDirection,
+    }),
+    [selectedTagIds, excludedTagIds, search, sortColumn, sortDirection]
+  );
+
   const fetchContacts = useCallback(async () => {
     const seq = ++fetchSeq.current;
     setLoading(true);
@@ -235,15 +248,9 @@ export default function ContactsPage() {
       // contacts can't silently truncate the result or overflow an IN
       // clause. See migration 025_filter_contacts_by_tags.
       const { data, error } = await supabase.rpc('filter_contacts_by_tags', {
-        p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
-        p_include_untagged: selectedTagIds.includes(UNTAGGED),
-        p_exclude_tag_ids: excludedTagIds.filter((id) => id !== UNTAGGED),
-        p_exclude_untagged: excludedTagIds.includes(UNTAGGED),
-        p_search: term || null,
+        ...contactFilterArgs,
         p_limit: PAGE_SIZE,
         p_offset: from,
-        p_sort_column: sortColumn,
-        p_sort_dir: sortDirection,
       });
       if (seq !== fetchSeq.current) return; // superseded by a newer fetch
       if (error) {
@@ -318,6 +325,7 @@ export default function ContactsPage() {
     setContacts(enriched);
     setLoading(false);
   }, [
+    contactFilterArgs,
     supabase,
     page,
     search,
@@ -383,13 +391,7 @@ export default function ContactsPage() {
         total_count: number;
       }>((from, to) =>
         supabase.rpc('filter_contacts_by_tags', {
-          p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
-          p_include_untagged: selectedTagIds.includes(UNTAGGED),
-          p_exclude_tag_ids: excludedTagIds.filter((id) => id !== UNTAGGED),
-          p_exclude_untagged: excludedTagIds.includes(UNTAGGED),
-          p_search: search.trim() || null,
-          p_sort_column: sortColumn,
-          p_sort_dir: sortDirection,
+          ...contactFilterArgs,
           p_limit: to - from + 1,
           p_offset: from,
         })
