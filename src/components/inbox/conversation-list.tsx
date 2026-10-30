@@ -4,14 +4,10 @@ import { contactDisplayName } from '@/lib/contacts/display-name';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
-  CONVERSATION_SELECT,
   matchesContactFilters,
   normalizeConversations,
 } from '@/lib/inbox/conversations';
-import {
-  sessionWindow,
-  SESSION_WINDOW_HOURS,
-} from '@/lib/inbox/session-window';
+import { sessionWindow } from '@/lib/inbox/session-window';
 import { cn } from '@/lib/utils';
 import type { Conversation, ConversationStatus, Tag } from '@/types';
 import { Search, ChevronDown, X, Clock } from 'lucide-react';
@@ -26,7 +22,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { fetchAllRows } from '@/lib/supabase/batching';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
@@ -104,6 +99,16 @@ export function ConversationList({
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
+  const filterKey = JSON.stringify([
+    filter,
+    search,
+    selectedTagIds,
+    selectedCompany,
+  ]);
+  const { page, setPage } = useListPage(total, 25, filterKey);
+  const loadedPage = useRef('');
 
   // Keep the latest callback in a ref so the fetch effect below can
   // have a stable, empty-dep identity. Previously the fetch useCallback
@@ -125,89 +130,52 @@ export function ConversationList({
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
-
+    const pageKey = `${filterKey}:${page}`;
     (async () => {
-      const { rows: data, error } = await fetchAllRows<Conversation>(
-        (from, to) =>
-          supabase
-            .from('conversations')
-            .select(CONVERSATION_SELECT)
-            .order('id')
-            .range(from, to)
-      );
-
+      setLoading(loadedPage.current !== pageKey);
+      const { data, error } = await supabase.rpc('inbox_conversation_page', {
+        p_status: filter,
+        p_search: search,
+        p_tag_ids: selectedTagIds.filter((id) => id !== UNTAGGED),
+        p_include_untagged: selectedTagIds.includes(UNTAGGED),
+        p_company: selectedCompany,
+        p_limit: 25,
+        p_offset: page * 25,
+      });
       if (cancelled) return;
-
       if (error) {
-        // Supabase errors have non-enumerable properties — log fields explicitly
-        console.error('Failed to fetch conversations:', {
-          message: error.message,
-        });
+        console.error('Failed to fetch conversations:', error.message);
         setLoading(false);
         return;
       }
-
-      const rows = normalizeConversations(data ?? []);
-      onConversationsLoadedRef.current(rows);
-      setLoading(false);
-
-      // Second pass for the session-window badges. The 24h clock runs
-      // from the customer's last inbound message, which `conversations`
-      // does not carry — `last_message_at` moves on outbound sends too,
-      // so it would show a fresh window on a thread that had actually
-      // closed. Aggregated in the database (migration 045): one row per
-      // conversation with an inbound message inside the window. A
-      // conversation absent from the result has no open window.
-      //
-      // Deliberately NOT a `messages ... IN (all conversation ids)`
-      // query: that id list goes in the URL and blows the length limit
-      // on a large inbox, and PostgREST truncates at 1000 rows. Both
-      // failed silently and left an empty map → every row "Expired".
-      const { data: inbound, error: inboundError } = await supabase.rpc(
-        'conversations_last_inbound',
-        { p_window_hours: SESSION_WINDOW_HOURS }
+      const rows = data.rows as (Conversation & {
+        last_inbound_at?: string | null;
+      })[];
+      onConversationsLoadedRef.current(normalizeConversations(rows));
+      setTotal(Number(data.total));
+      setCompanies(data.companies);
+      setLastInboundAt(
+        new Map(
+          rows.flatMap((row) =>
+            row.last_inbound_at ? [[row.id, row.last_inbound_at]] : []
+          )
+        )
       );
-      if (cancelled) return;
-
-      if (inboundError) {
-        // Leave the map as-is (null on first load → no badge) rather
-        // than claiming every window is closed.
-        console.error('Failed to fetch last inbound times:', {
-          message: inboundError.message,
-          details: inboundError.details,
-          hint: inboundError.hint,
-          code: inboundError.code,
-        });
-        return;
-      }
-
-      const fetched = new Map<string, string>();
-      for (const m of (inbound ?? []) as {
-        conversation_id: string;
-        last_inbound_at: string;
-      }[]) {
-        fetched.set(m.conversation_id, m.last_inbound_at);
-      }
-      // Merge rather than replace: a realtime inbound may have landed
-      // while this request was in flight and be newer than the result.
-      setLastInboundAt((prev) => {
-        if (!prev) return fetched;
-        const merged = new Map(fetched);
-        for (const [id, at] of prev) {
-          const seen = merged.get(id);
-          if (!seen || Date.parse(at) > Date.parse(seen)) merged.set(id, at);
-        }
-        return merged;
-      });
+      loadedPage.current = pageKey;
+      setLoading(false);
     })();
-
     return () => {
       cancelled = true;
     };
-    // `resyncToken` is included so the parent can force a refetch when
-    // the realtime channel reconnects or the tab regains focus — catches
-    // up on any events sent while the WS was disconnected or throttled.
-  }, [resyncToken]);
+  }, [
+    resyncToken,
+    filterKey,
+    page,
+    filter,
+    search,
+    selectedTagIds,
+    selectedCompany,
+  ]);
 
   // Realtime inbound: reopen / refresh the badge immediately.
   useEffect(() => {
@@ -248,18 +216,6 @@ export function ConversationList({
     };
   }, []);
 
-  // Company options are derived from the loaded conversations — there's no
-  // separate companies table, and only companies with a live conversation
-  // are worth offering as an inbox filter.
-  const companies = useMemo(() => {
-    const set = new Set<string>();
-    for (const c of conversations) {
-      const co = c.contact?.company?.trim();
-      if (co) set.add(co);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [conversations]);
-
   const tagsById = useMemo(() => {
     const m = new Map<string, Tag>();
     for (const t of tags) m.set(t.id, t);
@@ -286,7 +242,7 @@ export function ConversationList({
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       result = result.filter((c) => {
         const name = (c.contact?.name || c.contact_name || '').toLowerCase();
         const phone = (c.contact?.phone || c.contact_phone || '').toLowerCase();
@@ -311,11 +267,6 @@ export function ConversationList({
       return bt - at;
     });
   }, [conversations, filter, search, selectedTagIds, selectedCompany]);
-  const { page, setPage } = useListPage(
-    filtered.length,
-    25,
-    JSON.stringify([filter, search, selectedTagIds, selectedCompany])
-  );
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -545,7 +496,7 @@ export function ConversationList({
           </div>
         ) : (
           <div className="flex flex-col">
-            {filtered.slice(page * 25, (page + 1) * 25).map((conv) => (
+            {filtered.slice(0, 25).map((conv) => (
               <ConversationItem
                 key={conv.id}
                 conversation={conv}
@@ -568,7 +519,7 @@ export function ConversationList({
       <ListPagination
         page={page}
         pageSize={25}
-        total={filtered.length}
+        total={total}
         onPageChange={setPage}
         busy={loading}
       />

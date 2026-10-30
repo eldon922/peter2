@@ -497,60 +497,52 @@ function InboxPageInner() {
   const handleConversationsLoaded = useCallback(
     (loaded: Conversation[]) => {
       setConversations(loaded);
-      if (activeConversation?.id) {
-        const current = loaded.find((row) => row.id === activeConversation.id);
-        if (current) {
-          setActiveConversation(current);
-          setActiveContact(current.contact ?? null);
-        } else {
-          removeCachedConversation(activeConversation.id);
-          setActiveConversation(null);
-          setActiveContact(null);
-          setMessages([]);
-        }
-      }
-      // Resolve a pending deep-link here rather than in an effect — this
-      // is an event handler, so the setState calls below are allowed by
-      // react-hooks/set-state-in-effect. Runs once per ?c=<id> URL value
-      // via the ref, so realtime refreshes of the list can't snap the
-      // user back to the deep-linked thread after they've navigated.
-      if (
-        deepLinkConvId &&
-        autoSelectedForDeepLinkRef.current !== deepLinkConvId &&
-        loaded.length > 0
-      ) {
-        autoSelectedForDeepLinkRef.current = deepLinkConvId;
-        // If the deep-linked conversation is already the active one
-        // (e.g. because the user clicked it in the list and we
-        // router.replace()'d the URL, which made the ConversationList
-        // refetch and land us back here), do NOT re-apply it. Doing so
-        // would setMessages([]) on a thread whose messages have
-        // already been loaded by MessageThread — and because
-        // conversationId didn't change, MessageThread wouldn't
-        // refetch. The thread would read "No messages yet" until a
-        // full page reload rehydrated state from scratch.
-        if (activeConversation?.id === deepLinkConvId) return;
-        const match = loaded.find((c) => c.id === deepLinkConvId);
-        if (match) {
-          setActiveConversation(match);
-          setActiveContact(match.contact ?? null);
-          setMessages(getCachedMessages(match.id) ?? []);
-          // Mirror the optimistic unread reset that handleSelectConversation
-          // does — the user just deep-linked into this conv, treat that the
-          // same as a click. Leaves activeConversation.unread_count alone so
-          // the MessageThread reset effect still fires the server UPDATE.
-          if (canMarkRead && match.unread_count > 0) {
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === match.id ? { ...c, unread_count: 0 } : c
-              )
-            );
-          }
-        }
+      const current = loaded.find((row) => row.id === activeConversation?.id);
+      if (current) {
+        setActiveConversation(current);
+        setActiveContact(current.contact ?? null);
       }
     },
-    [deepLinkConvId, activeConversation?.id, canMarkRead]
+    [activeConversation?.id]
   );
+
+  // The selected chat may be outside the current list page or filters.
+  useEffect(() => {
+    if (!deepLinkConvId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await createClient()
+        .from('conversations')
+        .select(CONVERSATION_SELECT)
+        .eq('id', deepLinkConvId)
+        .maybeSingle();
+      if (cancelled || error) return;
+      if (!data) {
+        removeCachedConversation(deepLinkConvId);
+        setActiveConversation(null);
+        setActiveContact(null);
+        setMessages([]);
+        return;
+      }
+      const current = normalizeConversation(data);
+      setActiveConversation(current);
+      setActiveContact(current.contact ?? null);
+      if (autoSelectedForDeepLinkRef.current !== deepLinkConvId) {
+        autoSelectedForDeepLinkRef.current = deepLinkConvId;
+        setMessages(getCachedMessages(current.id) ?? []);
+      }
+      if (canMarkRead && current.unread_count > 0) {
+        setConversations((rows) =>
+          rows.map((row) =>
+            row.id === current.id ? { ...row, unread_count: 0 } : row
+          )
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkConvId, resyncToken, canMarkRead]);
 
   const handleSelectConversation = useCallback(
     (conv: Conversation) => {
