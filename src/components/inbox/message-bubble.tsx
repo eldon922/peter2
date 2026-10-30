@@ -25,7 +25,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { getMediaObjectUrl, peekMediaObjectUrl } from '@/lib/inbox/media-cache';
+import {
+  getMediaObjectUrl,
+  peekMediaObjectUrl,
+  releaseMediaObjectUrl,
+} from '@/lib/inbox/media-cache';
 import { MessageReactions } from './message-reactions';
 import { InteractivePreview } from '@/components/interactive/interactive-preview';
 import { useTranslations } from 'next-intl';
@@ -156,6 +160,7 @@ function MediaImage({
       .catch(() => !cancelled && setLoaded({ url, src: null }));
     return () => {
       cancelled = true;
+      releaseMediaObjectUrl(url);
     };
   }, [url, isProxy]);
 

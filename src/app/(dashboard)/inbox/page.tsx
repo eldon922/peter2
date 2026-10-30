@@ -8,7 +8,6 @@ import {
   removeCachedMessage,
   removeCachedConversation,
 } from '@/lib/inbox/message-cache';
-import { clearMediaCache } from '@/lib/inbox/media-cache';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -269,7 +268,6 @@ function InboxPageInner() {
     (event: { eventType: string; new: Message; old: Partial<Message> }) => {
       if (event.eventType === 'DELETE' && event.old.id) {
         removeCachedMessage(event.old.id);
-        clearMediaCache();
         setMessages((rows) => rows.filter((row) => row.id !== event.old.id));
         return;
       }
@@ -356,7 +354,6 @@ function InboxPageInner() {
     }) => {
       if (event.eventType === 'DELETE' && event.old.id) {
         removeCachedConversation(event.old.id);
-        clearMediaCache();
         setConversations((rows) =>
           rows.filter((row) => row.id !== event.old.id)
         );

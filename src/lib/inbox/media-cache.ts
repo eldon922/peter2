@@ -13,6 +13,8 @@ const MAX_ENTRIES = 300;
 
 const objectUrls = new Map<string, Promise<string>>();
 const resolved = new Map<string, string>();
+const users = new Map<string, number>();
+const removed = new Set<string>();
 
 function cacheStorage(): CacheStorage | null {
   return typeof caches === 'undefined' ? null : caches;
@@ -30,7 +32,9 @@ async function remember(cache: Cache, url: string, response: Response) {
 async function load(url: string): Promise<string> {
   let blob: Blob | null = null;
   const storage = cacheStorage();
-  const cache = storage ? await storage.open(CACHE_NAME).catch(() => null) : null;
+  const cache = storage
+    ? await storage.open(CACHE_NAME).catch(() => null)
+    : null;
 
   const hit = await cache?.match(url).catch(() => undefined);
   if (hit) blob = await hit.blob();
@@ -38,23 +42,60 @@ async function load(url: string): Promise<string> {
   if (!blob) {
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to load media');
-    if (cache) void remember(cache, url, res.clone()).catch(() => {});
+    if (cache) await remember(cache, url, res.clone()).catch(() => {});
     blob = await res.blob();
   }
   return URL.createObjectURL(blob);
 }
 
-/** Object URL for an auth-protected media URL, fetched at most once. */
+/** Acquire an object URL; release it when the image unmounts. */
 export function getMediaObjectUrl(url: string): Promise<string> {
+  users.set(url, (users.get(url) ?? 0) + 1);
   let pending = objectUrls.get(url);
   if (!pending) {
     pending = load(url);
     objectUrls.set(url, pending);
-    pending.then((u) => resolved.set(url, u)).catch(() => {});
+    pending
+      .then((u) => {
+        if (objectUrls.get(url) === pending) resolved.set(url, u);
+      })
+      .catch(() => {});
     // Don't cache failures — a retry on next mount should refetch.
     pending.catch(() => objectUrls.delete(url));
   }
   return pending;
+}
+
+function revoke(url: string) {
+  objectUrls
+    .get(url)
+    ?.then((src) => URL.revokeObjectURL(src))
+    .catch(() => {});
+  objectUrls.delete(url);
+  resolved.delete(url);
+  users.delete(url);
+  removed.delete(url);
+}
+
+export function releaseMediaObjectUrl(url: string) {
+  const remaining = Math.max(0, (users.get(url) ?? 0) - 1);
+  users.set(url, remaining);
+  if (!remaining && removed.has(url)) revoke(url);
+}
+
+export function removeCachedMedia(url: string | null | undefined) {
+  if (!url) return;
+  const pending = objectUrls.get(url);
+  removed.add(url);
+  // The same image may still be displayed by another message.
+  if (!users.get(url)) revoke(url);
+  void Promise.resolve(pending)
+    .catch(() => {})
+    .then(async () => {
+      const cache = await cacheStorage()?.open(CACHE_NAME);
+      await cache?.delete(url);
+    })
+    .catch(() => {});
 }
 
 /** The object URL if it's already loaded, so a remount can skip the spinner. */
@@ -63,10 +104,6 @@ export function peekMediaObjectUrl(url: string): string | undefined {
 }
 
 export function clearMediaCache() {
-  for (const pending of objectUrls.values()) {
-    pending.then((u) => URL.revokeObjectURL(u)).catch(() => {});
-  }
-  objectUrls.clear();
-  resolved.clear();
+  for (const url of objectUrls.keys()) revoke(url);
   void cacheStorage()?.delete(CACHE_NAME);
 }

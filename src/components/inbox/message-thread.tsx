@@ -44,8 +44,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { clearMediaCache } from '@/lib/inbox/media-cache';
-import { clearMessageCache } from '@/lib/inbox/message-cache';
+import {
+  removeCachedMessage,
+  removeCachedConversation,
+} from '@/lib/inbox/message-cache';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import {
   DropdownMenu,
@@ -1368,16 +1370,18 @@ export function MessageThread({
                     { method: 'DELETE' }
                   );
                   if (!response.ok) throw new Error('delete failed');
-                  clearMediaCache();
-                  clearMessageCache();
                   if (messageId) {
+                    removeCachedMessage(messageId);
                     const remaining = messages.filter(
                       (row) => row.id !== messageId
                     );
                     setCachedMessages(conversation.id, remaining);
                     onMessagesLoadedRef.current(remaining);
                     onRefresh?.();
-                  } else onConversationDeleted?.(conversation.id);
+                  } else {
+                    removeCachedConversation(conversation.id);
+                    onConversationDeleted?.(conversation.id);
+                  }
                   setDeleteTarget(null);
                 } catch {
                   toast.error(t('deleteFailed'));

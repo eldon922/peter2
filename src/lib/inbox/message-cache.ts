@@ -3,6 +3,7 @@
 // Cleared on sign-out.
 
 import type { Message } from '@/types';
+import { removeCachedMedia } from './media-cache';
 
 const MAX_CONVERSATIONS = 40;
 
@@ -51,13 +52,19 @@ export function clearMessageCache() {
 }
 
 export function removeCachedMessage(messageId: string) {
-  for (const [id, messages] of cache)
+  for (const [id, messages] of cache) {
+    const deleted = messages.find((message) => message.id === messageId);
+    if (!deleted) continue;
+    removeCachedMedia(deleted.media_url);
     cache.set(
       id,
       messages.filter((message) => message.id !== messageId)
     );
+  }
 }
 
 export function removeCachedConversation(conversationId: string) {
+  for (const message of cache.get(conversationId) ?? [])
+    removeCachedMedia(message.media_url);
   cache.delete(conversationId);
 }
