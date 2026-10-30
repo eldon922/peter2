@@ -524,14 +524,16 @@
         "tags": "Menyiapkan tag…",
         "adding": "Menambahkan kontak baru…",
         "updating": "Memperbarui kontak yang ada…",
-        "linking": "Menetapkan tag…"
+        "linking": "Menetapkan tag…",
+        "fields": "Menyimpan kolom kustom…"
       },
       "section": {
         "imported": "Ditambahkan ({count})",
         "updated": "Diperbarui ({count})",
         "skipped": "Dilewati ({count})",
         "tagFailed": "Tag tidak tersimpan ({count})",
-        "failed": "Gagal ({count})"
+        "failed": "Gagal ({count})",
+        "customFieldFailed": "Kolom kustom tidak tersimpan ({count})"
       },
       "reason": {
         "file_duplicate": "Nomor yang sama muncul lebih awal di file",
@@ -549,7 +551,11 @@
       "reportSkippedTags": "Tag tidak dibuat (hanya admin yang dapat membuat tag): {names}",
       "additionalTags": "Tag untuk ditambahkan ke setiap kontak impor",
       "newTags": "Tag baru, dipisahkan dengan koma",
-      "detailExistingTags": "Tag yang sudah ada: {tags}"
+      "detailExistingTags": "Tag yang sudah ada: {tags}",
+      "customFieldsHint": "Gunakan nama kolom kustom yang sudah ada sebagai header kolom CSV. Nilai yang diisi memperbarui kolom tersebut; sel kosong mempertahankan nilai tersimpan. Kolom yang tidak dikenal diabaikan.",
+      "readingFile": "Membaca CSV dan mencocokkan kolom kustom…",
+      "customFieldsWarning": "Kolom kustom untuk {count} kontak tidak dapat disimpan. Lihat laporan di bawah.",
+      "detailCustomFields": "Kolom kustom: {fields}"
     },
     "customFields": {
       "title": "Bidang khusus",

@@ -14,6 +14,7 @@ export interface ReportRow {
   /** Updated rows: tags the file carried for this contact. */
   tags?: string[];
   existingTags?: string[];
+  customFields?: string[];
   /** Skipped rows: why. */
   reason?: SkipReason;
   /** Failed rows: the error. */
@@ -27,6 +28,7 @@ export interface ImportReport {
   failed: ReportRow[];
   /** Contacts that were saved but whose tags could not be. */
   tagFailed: ReportRow[];
+  customFieldFailed: ReportRow[];
   /** Tag names from the file that couldn't be created (not an admin). */
   skippedTags: string[];
 }
@@ -38,6 +40,7 @@ export function emptyReport(): ImportReport {
     skipped: [],
     failed: [],
     tagFailed: [],
+    customFieldFailed: [],
     skippedTags: [],
   };
 }

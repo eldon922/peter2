@@ -128,3 +128,12 @@ describe('planContactImport', () => {
     expect(plan.duplicates).toBe(1);
   });
 });
+
+it('updates an existing contact when only custom values are supplied', () => {
+  const imported: ParsedContactRow = { phone: '15551234567', tagNames: [], customValues: { field: 'Gold' } };
+  const plan = planContactImport([imported], new Map([['15551234567', { id: 'existing', name: 'Jane' }]]));
+  expect(plan.toMerge).toHaveLength(1);
+  expect(plan.toMerge[0].id).toBe('existing');
+  expect(plan.toMerge[0].rename).toBeNull();
+  expect(plan.duplicates).toBe(0);
+});

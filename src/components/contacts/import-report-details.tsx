@@ -9,7 +9,13 @@ import type { ImportReport, ReportRow } from '@/lib/contacts/import-report';
 
 const PAGE = 50;
 
-type SectionKey = 'imported' | 'updated' | 'skipped' | 'failed' | 'tagFailed';
+type SectionKey =
+  | 'imported'
+  | 'updated'
+  | 'skipped'
+  | 'failed'
+  | 'tagFailed'
+  | 'customFieldFailed';
 
 const TONE: Record<SectionKey, string> = {
   imported: 'text-primary',
@@ -17,6 +23,7 @@ const TONE: Record<SectionKey, string> = {
   skipped: 'text-amber-400',
   failed: 'text-red-400',
   tagFailed: 'text-red-400',
+  customFieldFailed: 'text-red-400',
 };
 
 function Section({
@@ -31,6 +38,7 @@ function Section({
   const [open, setOpen] = useState(
     sectionKey === 'failed' ||
       sectionKey === 'tagFailed' ||
+      sectionKey === 'customFieldFailed' ||
       sectionKey === 'skipped'
   );
   const [shown, setShown] = useState(PAGE);
@@ -53,6 +61,10 @@ function Section({
     }
     if (row.tags?.length)
       parts.push(t('detailTags', { tags: row.tags.join(', ') }));
+    if (row.customFields?.length)
+      parts.push(
+        t('detailCustomFields', { fields: row.customFields.join(', ') })
+      );
     if (row.error) parts.push(row.error);
     return parts.join(' · ');
   }
@@ -123,6 +135,7 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
       </p>
       <Section sectionKey="failed" rows={report.failed} />
       <Section sectionKey="tagFailed" rows={report.tagFailed} />
+      <Section sectionKey="customFieldFailed" rows={report.customFieldFailed} />
       <Section sectionKey="skipped" rows={report.skipped} />
       <Section sectionKey="updated" rows={report.updated} />
       <Section sectionKey="imported" rows={report.imported} />

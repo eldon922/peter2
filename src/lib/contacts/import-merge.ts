@@ -78,7 +78,11 @@ export function planContactImport(
     const rename =
       incoming && incoming !== (match.name ?? '').trim() ? incoming : null;
 
-    if (!rename && row.tagNames.length === 0) {
+    if (
+      !rename &&
+      row.tagNames.length === 0 &&
+      !Object.values(row.customValues ?? {}).some((value) => value.trim())
+    ) {
       duplicateRows.push(row);
       continue;
     }

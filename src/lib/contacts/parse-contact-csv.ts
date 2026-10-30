@@ -1,3 +1,5 @@
+import type { CustomField } from '@/types';
+
 /**
  * CSV parsing for the contacts import modal. Shared + unit-tested so
  * tag-column handling stays aligned with phone/name/email/company.
@@ -10,6 +12,7 @@ export interface ParsedContactRow {
   company?: string;
   /** Tag names from the optional `tags` column (comma/semicolon separated). */
   tagNames: string[];
+  customValues?: Record<string, string>;
 }
 
 /** Split a CSV cell into unique tag names (case-insensitive de-dupe). */
@@ -37,9 +40,13 @@ export interface ParseContactCsvResult {
   hasTagsColumn: boolean;
   /** True when the CSV header includes a `company` column. */
   hasCompanyColumn: boolean;
+  customFieldIds?: string[];
 }
 
-export function parseContactCsv(text: string): ParseContactCsvResult {
+export function parseContactCsv(
+  text: string,
+  customFields: Pick<CustomField, 'id' | 'field_name'>[] = []
+): ParseContactCsvResult {
   const records = parseCsv(text);
   const empty = { rows: [], hasTagsColumn: false, hasCompanyColumn: false };
   if (records.length < 2) return empty;
@@ -52,6 +59,14 @@ export function parseContactCsv(text: string): ParseContactCsvResult {
   const emailIdx = headers.indexOf('email');
   const companyIdx = headers.indexOf('company');
   const tagsIdx = headers.indexOf('tags');
+  const builtInHeaders = new Set(['phone', 'name', 'email', 'company', 'tags']);
+  const customColumns = customFields.flatMap((field) => {
+    const name = field.field_name.trim().toLowerCase();
+    const index = headers.indexOf(name);
+    return index >= 0 && !builtInHeaders.has(name)
+      ? [{ id: field.id, index }]
+      : [];
+  });
 
   const cell = (values: string[], idx: number) =>
     idx >= 0 ? values[idx]?.trim() || undefined : undefined;
@@ -63,8 +78,15 @@ export function parseContactCsv(text: string): ParseContactCsvResult {
     const phone = cell(values, phoneIdx);
     if (!phone) continue;
 
+    const customValues = Object.fromEntries(
+      customColumns.flatMap(({ id, index }) => {
+        const value = cell(values, index);
+        return value ? [[id, value]] : [];
+      })
+    );
     rows.push({
       phone,
+      ...(Object.keys(customValues).length ? { customValues } : {}),
       name: cell(values, nameIdx),
       email: cell(values, emailIdx),
       company: cell(values, companyIdx),
@@ -76,6 +98,9 @@ export function parseContactCsv(text: string): ParseContactCsvResult {
     rows,
     hasTagsColumn: tagsIdx >= 0,
     hasCompanyColumn: companyIdx >= 0,
+    ...(customColumns.length
+      ? { customFieldIds: customColumns.map((column) => column.id) }
+      : {}),
   };
 }
 

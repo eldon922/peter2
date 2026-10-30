@@ -524,14 +524,16 @@
         "tags": "Preparing tags…",
         "adding": "Adding new contacts…",
         "updating": "Updating existing contacts…",
-        "linking": "Assigning tags…"
+        "linking": "Assigning tags…",
+        "fields": "Saving custom fields…"
       },
       "section": {
         "imported": "Added ({count})",
         "updated": "Updated ({count})",
         "skipped": "Skipped ({count})",
         "tagFailed": "Tags not saved ({count})",
-        "failed": "Failed ({count})"
+        "failed": "Failed ({count})",
+        "customFieldFailed": "Custom fields not saved ({count})"
       },
       "reason": {
         "file_duplicate": "Same number appears earlier in the file",
@@ -549,7 +551,11 @@
       "reportSkippedTags": "Tags not created (only admins can create tags): {names}",
       "additionalTags": "Tags to add to every imported contact",
       "newTags": "New tags, separated by commas",
-      "detailExistingTags": "Existing tags: {tags}"
+      "detailExistingTags": "Existing tags: {tags}",
+      "customFieldsHint": "Use existing custom field names as CSV column headers. Non-empty values update those fields; blank cells keep saved values. Unrecognized columns are ignored.",
+      "readingFile": "Reading CSV and matching custom fields…",
+      "customFieldsWarning": "Custom fields could not be saved for {count} contact(s). See the report below.",
+      "detailCustomFields": "Custom fields: {fields}"
     },
     "customFields": {
       "title": "Custom fields",

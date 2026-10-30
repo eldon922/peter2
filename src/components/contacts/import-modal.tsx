@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Tag as TagRecord } from '@/types';
+import type { Tag as TagRecord, CustomField } from '@/types';
 import { Input } from '@/components/ui/input';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { createClient } from '@/lib/supabase/client';
@@ -21,6 +21,7 @@ import {
   resolveImportTagIds,
   type ContactTagAssignment,
 } from '@/lib/contacts/resolve-import-tags';
+import { saveImportedCustomValues } from '@/lib/contacts/import-custom-values';
 import { planContactImport } from '@/lib/contacts/import-merge';
 import {
   emptyReport,
@@ -147,6 +148,10 @@ export function ImportModal({
   const supabase = createClient();
   const { accountId, canEditSettings } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileRequest = useRef(0);
+  const [parsingFile, setParsingFile] = useState(false);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [csvCustomFieldIds, setCsvCustomFieldIds] = useState<string[]>([]);
 
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -222,12 +227,15 @@ export function ImportModal({
    *  while it's still working. `total` is absent for steps that are a
    *  single request. */
   const [progress, setProgress] = useState<{
-    stage: 'checking' | 'tags' | 'adding' | 'updating' | 'linking';
+    stage: 'checking' | 'tags' | 'adding' | 'updating' | 'linking' | 'fields';
     done: number;
     total?: number;
   } | null>(null);
 
   function reset() {
+    fileRequest.current++;
+    setParsingFile(false);
+    setCsvCustomFieldIds([]);
     setFile(null);
     setParsedRows([]);
     setSelectedTagIds([]);
@@ -246,47 +254,74 @@ export function ImportModal({
   }
 
   async function loadFile(selected: File) {
+    if (importing || !accountId) return;
+    const request = ++fileRequest.current;
     setFile(selected);
     setResult(null);
+    setParsedRows([]);
+    setCsvCustomFieldIds([]);
+    setParsingFile(true);
+    try {
+      const [text, fields] = await Promise.all([
+        selected.text(),
+        fetchAllRows<CustomField>((from, to) =>
+          supabase
+            .from('custom_fields')
+            .select('*')
+            .eq('account_id', accountId)
+            .order('id')
+            .range(from, to)
+        ),
+      ]);
+      if (request !== fileRequest.current) return;
+      if (fields.error) throw fields.error;
+      const {
+        rows,
+        hasTagsColumn: csvHasTags,
+        hasCompanyColumn: csvHasCompany,
+        customFieldIds = [],
+      } = parseContactCsv(text, fields.rows);
+      setCustomFields(fields.rows);
+      setCsvCustomFieldIds(customFieldIds);
 
-    const text = await selected.text();
-    const {
-      rows,
-      hasTagsColumn: csvHasTags,
-      hasCompanyColumn: csvHasCompany,
-    } = parseContactCsv(text);
-
-    if (rows.length === 0) {
-      toast.error(t('toastNoValidRows'));
-      setParsedRows([]);
-      setInFileDropped([]);
-      setHasTagsColumn(false);
-      setHasCompanyColumn(false);
-      return;
-    }
-
-    // Collapse repeats of the same number now, so everything downstream —
-    // preview, counts, insert — works from one list.
-    // A repeated number still contributes its tags (and any blank fields).
-    const { unique, dropped } = dedupeByPhone(rows, (kept, repeat) => {
-      const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
-      for (const name of repeat.tagNames) {
-        if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
+      if (rows.length === 0) {
+        toast.error(t('toastNoValidRows'));
+        setParsedRows([]);
+        setInFileDropped([]);
+        setHasTagsColumn(false);
+        setHasCompanyColumn(false);
+        return;
       }
-      kept.name ??= repeat.name;
-      kept.email ??= repeat.email;
-      kept.company ??= repeat.company;
-    });
-    setParsedRows(unique);
-    setInFileDropped(
-      dropped.map(({ row, reason }) => ({
-        phone: row.phone,
-        name: row.name,
-        reason: reason === 'no_phone' ? 'no_phone' : 'file_duplicate',
-      }))
-    );
-    setHasTagsColumn(csvHasTags);
-    setHasCompanyColumn(csvHasCompany);
+
+      // Collapse repeats of the same number now, so everything downstream —
+      // preview, counts, insert — works from one list.
+      // A repeated number still contributes its tags (and any blank fields).
+      const { unique, dropped } = dedupeByPhone(rows, (kept, repeat) => {
+        const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
+        for (const name of repeat.tagNames) {
+          if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
+        }
+        kept.name ??= repeat.name;
+        kept.email ??= repeat.email;
+        kept.company ??= repeat.company;
+        if (repeat.customValues)
+          kept.customValues = { ...repeat.customValues, ...kept.customValues };
+      });
+      setParsedRows(unique);
+      setInFileDropped(
+        dropped.map(({ row, reason }) => ({
+          phone: row.phone,
+          name: row.name,
+          reason: reason === 'no_phone' ? 'no_phone' : 'file_duplicate',
+        }))
+      );
+      setHasTagsColumn(csvHasTags);
+      setHasCompanyColumn(csvHasCompany);
+    } catch {
+      if (request === fileRequest.current) toast.error(t('toastError'));
+    } finally {
+      if (request === fileRequest.current) setParsingFile(false);
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -303,7 +338,7 @@ export function ImportModal({
   }
 
   async function handleImport() {
-    if (parsedRows.length === 0) return;
+    if (parsedRows.length === 0 || parsingFile || importing) return;
     setImporting(true);
     setProgress({ stage: 'checking', done: 0, total: parsedRows.length });
 
@@ -459,8 +494,9 @@ export function ImportModal({
 
       const tagAssignments: ContactTagAssignment[] = [];
       const rowByContactId = new Map<string, ParsedContactRow>();
-      const queueTags = (contactId: string, row: ParsedContactRow) => {
-        tagAssignments.push({ contactId, tagNames: row.tagNames });
+      const queueValues = (contactId: string, row: ParsedContactRow) => {
+        if (row.tagNames.length)
+          tagAssignments.push({ contactId, tagNames: row.tagNames });
         rowByContactId.set(contactId, row);
       };
 
@@ -492,11 +528,14 @@ export function ImportModal({
           company: row.company || null,
         }));
 
-        let data: { id: string }[] | null = null;
+        let data: { id: string; phone_normalized: string }[] | null = null;
         let error: { message: string } | null = null;
         try {
           ({ data, error } = await withRetry(() =>
-            supabase.from('contacts').insert(rows).select('id')
+            supabase
+              .from('contacts')
+              .insert(rows)
+              .select('id, phone_normalized')
           ));
         } catch (err) {
           error = err instanceof Error ? err : new Error(String(err));
@@ -520,9 +559,7 @@ export function ImportModal({
 
             if (!singleErr && singleData) {
               report.imported.push(toRow(source));
-              if (source.tagNames.length > 0) {
-                queueTags(singleData.id, source);
-              }
+              queueValues(singleData.id, source);
             } else if (isUniqueViolation(singleErr)) {
               report.skipped.push({
                 ...toRow(source),
@@ -536,15 +573,17 @@ export function ImportModal({
             }
           }
         } else {
-          const inserted = data ?? [];
-          report.imported.push(...chunk.slice(0, inserted.length).map(toRow));
-          // inserted[j] ↔ chunk[j] only holds because a single INSERT
-          // preserves RETURNING order. If this path is ever split into
-          // parallel inserts, zip by phone or returned id instead.
-          for (let j = 0; j < inserted.length; j++) {
-            const source = chunk[j];
-            if (!source || source.tagNames.length === 0) continue;
-            queueTags(inserted[j].id, source);
+          const sourceByPhone = new Map(
+            chunk.map((row) => [normalizeKey(row.phone), row])
+          );
+          for (const inserted of data ?? []) {
+            const source = sourceByPhone.get(inserted.phone_normalized);
+            if (!source)
+              throw new Error(
+                'Could not match an imported contact to its CSV row'
+              );
+            report.imported.push(toRow(source));
+            queueValues(inserted.id, source);
           }
         }
 
@@ -596,9 +635,7 @@ export function ImportModal({
       }
 
       for (const m of toMerge) {
-        if (m.row.tagNames.length > 0) {
-          queueTags(m.id, m.row);
-        }
+        queueValues(m.id, m.row);
       }
       // Merge rows that only needed tags (no rename) never went through
       // the rename loop above, so progress hasn't counted them yet.
@@ -627,6 +664,37 @@ export function ImportModal({
         );
       }
 
+      setProgress({ stage: 'fields', done: 0 });
+      const custom = await saveImportedCustomValues(
+        supabase,
+        Array.from(rowByContactId, ([contactId, row]) => ({
+          contactId,
+          values: row.customValues ?? {},
+        }))
+      );
+      const namesByFieldId = new Map(
+        customFields.map((field) => [field.id, field.field_name])
+      );
+      const customFieldNames = (contactId: string) =>
+        (custom.saved.get(contactId) ?? [])
+          .map((id) => namesByFieldId.get(id))
+          .filter((name): name is string => Boolean(name));
+      for (const [contactId, error] of custom.failed) {
+        report.customFieldFailed.push({
+          ...toRow(rowByContactId.get(contactId)!),
+          error,
+        });
+      }
+      if (custom.failed.size)
+        toast.warning(t('customFieldsWarning', { count: custom.failed.size }));
+      const importedByPhone = new Map(
+        report.imported.map((row) => [normalizeKey(row.phone), row])
+      );
+      for (const [contactId, row] of rowByContactId) {
+        const imported = importedByPhone.get(normalizeKey(row.phone));
+        if (imported) imported.customFields = customFieldNames(contactId);
+      }
+
       // Counted once per row touched, whether it was renamed, re-tagged
       // or both — the summary reports rows, not writes. A row whose only
       // contribution was a rename that failed is reported as failed, not
@@ -637,8 +705,12 @@ export function ImportModal({
         const renameFailed = renameFailures.has(m.id);
         const renamed = m.rename !== null && !renameFailed;
         const tagged = assigned.contactIds.has(m.id);
-        if (!renamed && !tagged) {
-          const reported = renameFailed || assigned.failed.has(m.id);
+        const fieldsSaved = custom.saved.has(m.id);
+        if (!renamed && !tagged && !fieldsSaved) {
+          const reported =
+            renameFailed ||
+            assigned.failed.has(m.id) ||
+            custom.failed.has(m.id);
           if (!reported) {
             report.skipped.push({ ...toRow(m.row), reason: 'nothing_new' });
           }
@@ -647,6 +719,7 @@ export function ImportModal({
         report.updated.push({
           ...toRow(m.row),
           existingTags: existingTagsById.get(m.id),
+          customFields: customFieldNames(m.id),
           rename: renamed
             ? { from: m.previousName, to: m.rename as string }
             : undefined,
@@ -701,7 +774,8 @@ export function ImportModal({
           report.updated.length +
           report.skipped.length +
           report.failed.length +
-          report.tagFailed.length >
+          report.tagFailed.length +
+          report.customFieldFailed.length >
         0
       ) {
         report.skippedTags = skippedNames;
@@ -714,6 +788,9 @@ export function ImportModal({
   }
 
   const preview = importRows.slice(0, PREVIEW_LIMIT);
+  const previewCustomFields = customFields.filter((field) =>
+    csvCustomFieldIds.includes(field.id)
+  );
   // Tags: OR — show when the CSV declares a column or preview rows carry
   // values, so an all-empty tags column still renders for validation.
   const previewHasTags =
@@ -764,6 +841,9 @@ export function ImportModal({
             <p className="text-muted-foreground text-xs leading-relaxed">
               {t('mergeHint')}
             </p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {t('customFieldsHint')}
+            </p>
           </DialogHeader>
 
           <div
@@ -805,7 +885,9 @@ export function ImportModal({
                   {truncateFilename(file.name)}
                 </p>
                 <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                  {t('rowsReady', { count: parsedRows.length })}
+                  {parsingFile
+                    ? t('readingFile')
+                    : t('rowsReady', { count: parsedRows.length })}
                 </span>
               </>
             ) : (
@@ -912,6 +994,14 @@ export function ImportModal({
                             {t('columns.tags')}
                           </th>
                         )}
+                        {previewCustomFields.map((field) => (
+                          <th
+                            key={field.id}
+                            className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap"
+                          >
+                            {field.field_name}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-border/70 divide-y">
@@ -955,6 +1045,16 @@ export function ImportModal({
                               />
                             </td>
                           )}
+                          {previewCustomFields.map((field) => (
+                            <td
+                              key={field.id}
+                              className="text-muted-foreground px-3 py-2"
+                            >
+                              <PreviewCell
+                                value={row.customValues?.[field.id] || '—'}
+                              />
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
@@ -1047,6 +1147,13 @@ export function ImportModal({
                     })}
                   </div>
                 )}
+                {result.report.customFieldFailed.length > 0 && (
+                  <p className="text-sm text-red-400">
+                    {t('customFieldsWarning', {
+                      count: result.report.customFieldFailed.length,
+                    })}
+                  </p>
+                )}
                 {result.report.failed.length > 0 && (
                   <div className="flex items-center gap-1.5 text-sm text-red-400">
                     <XCircle className="size-4 shrink-0" />
@@ -1071,7 +1178,7 @@ export function ImportModal({
           {!result && (
             <Button
               type="button"
-              disabled={parsedRows.length === 0 || importing}
+              disabled={parsedRows.length === 0 || parsingFile || importing}
               onClick={handleImport}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
