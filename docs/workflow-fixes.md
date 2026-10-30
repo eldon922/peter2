@@ -1,6 +1,6 @@
 # Contacts, inbox and broadcast fixes
 
-Apply migrations **053–062 in order** before deploying this version. The Replier enum addition (058) must commit before its permissions migration (059). The new broadcast attachment picker also needs the `broadcast-media` bucket created by 062.
+Apply migrations **053–065 in order** before deploying this version. The Replier enum addition (058) must commit before its permissions migration (059). The broadcast attachment picker needs the `broadcast-media` bucket created by 062. Migration 063 stores recipient header values; 064–065 provide the paginated list queries used by this version.
 
 ## Contact and chat deletion
 
@@ -8,7 +8,7 @@ Previously, deleting a contact cascaded through its conversations and message re
 
 Deleting a contact now preserves its chat and messages. The inbox shows a removed-contact marker with its saved name and phone number. An agent can save the contact again to reconnect the history, or explicitly delete the chat.
 
-Delete message and Delete chat permanently remove their inbox records and dependent reactions. They clear this browser's message and media caches; connected inboxes also handle the deletion events. They do not unsend messages on WhatsApp or erase separately stored uploaded files. Historical chats already removed by the old contact cascade cannot be reconstructed by this migration.
+Delete message and Delete chat permanently remove their inbox records and dependent reactions. They remove the deleted items from this browser's message and media caches; unrelated image previews remain usable. Connected inboxes also handle the deletion events. They do not unsend messages on WhatsApp or erase separately stored uploaded files. Historical chats already removed by the old contact cascade cannot be reconstructed by this migration.
 
 ## Scheduled audiences
 
@@ -28,21 +28,33 @@ Replier can send replies, attachments, templates and reactions in existing inbox
 
 Retry progress uses a saved run total and baseline, so the denominator stays correct after refresh. Durations use recorded start and completion times; old broadcasts without those timestamps cannot show a reliable duration. Scheduled countdowns show a waiting state once the chosen time arrives, until the scheduler starts the send.
 
-Inbox conversations show 25 rows per page and broadcast recipients show 50. Search and filters apply to the complete loaded dataset, and exports include every matching row. Shared buttons show feedback for pending asynchronous handlers; navigation and recipient filters show their own pending state.
+Inbox conversations fetch 25 rows per page and broadcast recipients fetch 50. Search, filters and counts run in the database across the full dataset. Opening an off-page conversation or changing list pages preserves the selected thread. Recipient exports fetch the full list only when requested; contact exports include every matching row. Shared buttons show feedback for pending asynchronous handlers; navigation and recipient filters show their own pending state.
 
 ## Verification
 
-The regression suite covers named template parameters, unchanged sync results, CSV export, filename handling, audience exclusions, roles and retry progress. `supabase/ci/verify-workflow-fixes.sql` checks filters, chat retention/restoration, deletion, real role policies and persisted retry progress inside a transaction that rolls back its fixtures. Run it against a disposable database after applying the migrations.
+The regression suite covers named template parameters, unchanged sync results, CSV export, filename handling, audience exclusions, roles and retry progress. `supabase/ci/verify-workflow-fixes.sql` checks filters, chat retention/restoration, deletion, real role policies and persisted retry progress inside a transaction that rolls back its fixtures. `supabase/ci/verify-list-pagination.sql` checks database paging and account isolation. Run both against a disposable database after applying the migrations.
 
 Validated for this change:
 
-- 1,063 tests passed across 106 test files.
+- 1,068 tests passed across 107 test files.
 - Type checking and the production build passed.
-- ESLint reported zero errors and 49 warnings.
-- Six Chromium component checks passed: first-click contact submission during blur validation, CSV audience input, single-choice tag radios, pending button state, template language selection, and the final scheduling confirmation.
-- All new migrations (053–062) applied successfully to a disposable PostgreSQL database. The SQL behavior checks passed with real authenticated role policies. The unchanged cron migration (051) was excluded from that local replay because the image does not provide its cron/network extensions.
+- ESLint reported zero errors and 48 warnings.
+- Six original Chromium component checks passed: first-click contact submission during blur validation, CSV audience input, single-choice tag radios, pending button state, template language selection, and the final scheduling confirmation.
+- Eight additional Chromium checks passed: pending-send draft preservation, unchanged-refresh scroll position, targeted media eviction, shared templates after no-op sync, required header input/preview, inbox paging/search, recipient paging/search/full export, and off-page chat deep links.
+- All new migrations (053–065) applied successfully to a disposable PostgreSQL database. Both SQL check scripts passed with real authenticated role policies, including page boundaries, filter counts, stored headers and cross-account isolation. The unchanged cron migration (051) was excluded from that local replay because the image does not provide its cron/network extensions.
 
 Browser checks used mocked authentication and service responses. No real WhatsApp messages were sent, and the hosted database was not migrated or deployed during this work.
+
+## Review follow-up
+
+- [ac32f05](https://github.com/eldon922/peter2/commit/ac32f05): clear the submitted draft before sending so completion cannot erase the next draft.
+- [3ae301c](https://github.com/eldon922/peter2/commit/3ae301c): read templates by account so unchanged shared templates remain visible to teammates.
+- [4c3efa4](https://github.com/eldon922/peter2/commit/4c3efa4): evict only deleted media and keep shared image URLs alive while still displayed.
+- [4a91afb](https://github.com/eldon922/peter2/commit/4a91afb): collect and preview header variables, then save each recipient's resolved value for scheduling and retry. Legacy retries without a saved header fail before claiming recipients.
+- [85bd8f0](https://github.com/eldon922/peter2/commit/85bd8f0): preserve the reader's position during refreshes and incoming messages when scrolled up.
+- [74b57e2](https://github.com/eldon922/peter2/commit/74b57e2): replace full-list polling with database pagination and keep full exports and off-page chat selection working.
+
+The cleanup commits reuse pending duplicate-phone lookups, share image-download helpers, derive import tag colors from the existing catalog, and share contact filter arguments between the table and export.
 
 ## Request checklist
 
@@ -78,7 +90,7 @@ Each linked commit includes its solution in the commit description. Follow-up co
 | Loading feedback                        | Shared asynchronous buttons retain a busy state and reject repeat clicks; sidebar navigation, broadcast entries and recipient filtering show pending feedback.    | [c0419fd](https://github.com/eldon922/peter2/commit/c0419fd) |
 | Inbox message formatting                | Added formatting controls, keyboard shortcuts and a live preview for chat drafts.                                                                                 | [7e85373](https://github.com/eldon922/peter2/commit/7e85373) |
 | Existing tags in import results         | Updated-contact results display existing tags separately.                                                                                                         | [6646b12](https://github.com/eldon922/peter2/commit/6646b12) |
-| Inbox and recipient pagination          | Display 25 inbox conversations or 50 recipients per page; search and export still use all matching loaded rows.                                                   | [845add6](https://github.com/eldon922/peter2/commit/845add6) |
+| Inbox and recipient pagination          | Fetch 25 inbox conversations or 50 recipients per page; search/filter counts use the full database, and exports remain complete.                                                   | [845add6](https://github.com/eldon922/peter2/commit/845add6) |
 | Excluded audience counts                | Preview actual excluded recipient counts with the same resolution used when sending, including untagged CSV entries.                                              | [c277cf7](https://github.com/eldon922/peter2/commit/c277cf7) |
 | Viewer unread/read-receipt behavior     | Viewing as Viewer preserves unread markers; opening a chat does not send a Meta read receipt.                                                                     | [2bdf32d](https://github.com/eldon922/peter2/commit/2bdf32d) |
 | Explain contact deletion and files      | Documented the former record cascade, separate file storage and the new history-preserving behavior above.                                                        | [703e159](https://github.com/eldon922/peter2/commit/703e159) |
