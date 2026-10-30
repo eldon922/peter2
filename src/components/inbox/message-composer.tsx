@@ -113,7 +113,7 @@ interface MediaDraft {
 interface MessageComposerProps {
   conversationId: string;
   sessionExpired: boolean;
-  onSend: (text: string, replyToId?: string) => void;
+  onSend: (text: string, replyToId?: string) => Promise<void>;
   onSendMedia: (payload: SendMediaPayload) => void;
   onSendInteractive: (
     payload: InteractiveMessagePayload,
@@ -244,12 +244,10 @@ export function MessageComposer({
     if (!trimmed || sending || sessionExpired) return;
 
     setSending(true);
+    setText('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     try {
       await onSend(trimmed, replyTo?.id);
-      setText('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
     } finally {
       setSending(false);
     }
