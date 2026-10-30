@@ -200,8 +200,12 @@ export function ImportModal({
   const [inFileDropped, setInFileDropped] = useState<ReportRow[]>([]);
   const [hasTagsColumn, setHasTagsColumn] = useState(false);
   const [hasCompanyColumn, setHasCompanyColumn] = useState(false);
-  const [tagColorByKey, setTagColorByKey] = useState<Map<string, string>>(
-    new Map()
+  const tagColorByKey = useMemo(
+    () =>
+      new Map(
+        availableTags.map((tag) => [tag.name.trim().toLowerCase(), tag.color])
+      ),
+    [availableTags]
   );
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{
@@ -231,7 +235,6 @@ export function ImportModal({
     setInFileDropped([]);
     setHasTagsColumn(false);
     setHasCompanyColumn(false);
-    setTagColorByKey(new Map());
     setResult(null);
     setProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -259,7 +262,6 @@ export function ImportModal({
       setInFileDropped([]);
       setHasTagsColumn(false);
       setHasCompanyColumn(false);
-      setTagColorByKey(new Map());
       return;
     }
 
@@ -285,29 +287,6 @@ export function ImportModal({
     );
     setHasTagsColumn(csvHasTags);
     setHasCompanyColumn(csvHasCompany);
-
-    if (csvHasTags && accountId) {
-      const { rows: tags } = await fetchAllRows<{
-        name: string;
-        color: string;
-      }>((from, to) =>
-        supabase
-          .from('tags')
-          .select('name, color')
-          .eq('account_id', accountId)
-          .order('id')
-          .range(from, to)
-      );
-
-      const colors = new Map<string, string>();
-      for (const tag of tags) {
-        const key = tag.name.trim().toLowerCase();
-        if (!colors.has(key)) colors.set(key, tag.color);
-      }
-      setTagColorByKey(colors);
-    } else {
-      setTagColorByKey(new Map());
-    }
   }
 
   function handleDrop(e: React.DragEvent) {
