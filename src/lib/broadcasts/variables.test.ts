@@ -4,6 +4,8 @@ import {
   bodyPlaceholderKeys,
   numberChanged,
   resolveVariables,
+  resolveHeaderVariable,
+  HEADER_VARIABLE_KEY,
 } from './variables';
 import type { Contact } from '@/types';
 
@@ -116,4 +118,14 @@ describe('numberChanged', () => {
     ).toBe(false);
     expect(numberChanged({ phone_attempted: '14155550123' })).toBe(false);
   });
+});
+
+it('keeps header personalization separate from body parameters with the same name', () => {
+  const mappings = {
+    name: { type: 'static' as const, value: 'Body name' },
+    [HEADER_VARIABLE_KEY]: { type: 'field' as const, value: 'name' },
+  };
+  expect(resolveVariables(mappings, contact)).toEqual(['Body name']);
+  expect(resolveHeaderVariable(mappings, contact)).toBe('Jane');
+  expect(resolveHeaderVariable({}, contact)).toBeUndefined();
 });

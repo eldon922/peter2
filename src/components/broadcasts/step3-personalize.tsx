@@ -12,23 +12,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, CheckCheck, Eye, ImageIcon, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { ArrowLeft, ArrowRight, Eye, ImageIcon, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { bodyPlaceholderKeys } from '@/lib/broadcasts/variables';
-import { headerMediaError, type HeaderMedia } from '@/lib/broadcasts/header-media';
+import {
+  bodyPlaceholderKeys,
+  HEADER_VARIABLE_KEY,
+  resolveVariables,
+  resolveHeaderVariable,
+  type VariableMapping,
+} from '@/lib/broadcasts/variables';
+import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
+import { BroadcastMessagePreview } from './message-preview';
+import {
+  headerMediaError,
+  type HeaderMedia,
+} from '@/lib/broadcasts/header-media';
 import { isHeaderMediaKind } from '@/lib/media-specs';
 import { contactDisplayName } from '@/lib/contacts/display-name';
-import { FormattedText } from '@/components/inbox/formatted-text';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { HeaderMediaPicker } from '@/components/broadcasts/header-media-picker';
 
 type VariableType = 'static' | 'field' | 'custom_field';
-
-interface VariableMapping {
-  type: VariableType;
-  value: string;
-}
 
 interface Step3Props {
   template: MessageTemplate;
@@ -120,19 +124,27 @@ export function Step3Personalize({
     };
   }, []);
 
-  // Extraction is shared with the retry planner (which needs to know
-  // whether a template has any placeholders at all before deciding a
-  // broadcast with no stored params is retryable). Re-wrapped to
-  // "{{N}}" and sorted exactly as before — this component keys its
-  // form rows and preview substitution off the braced form.
   const placeholders = useMemo(
-    () => bodyPlaceholderKeys(template.body_text).map((key) => `{{${key}}}`).sort(),
-    [template.body_text],
+    () => [
+      ...(template.header_type === 'text'
+        ? bodyPlaceholderKeys(template.header_content).map((key) => ({
+            key: HEADER_VARIABLE_KEY,
+            label: `${t('personalize.headerVariable')} {{${key}}}`,
+          }))
+        : []),
+      ...bodyPlaceholderKeys(template.body_text).map((key) => ({
+        key,
+        label: `{{${key}}}`,
+      })),
+    ],
+    [template.body_text, template.header_type, template.header_content, t]
   );
 
   // A template with an IMAGE/VIDEO/DOCUMENT header needs that media on
   // every send — Meta rejects the broadcast without it.
-  const mediaHeaderType = isHeaderMediaKind(template.header_type) ? template.header_type : null;
+  const mediaHeaderType = isHeaderMediaKind(template.header_type)
+    ? template.header_type
+    : null;
   const mediaError = mediaHeaderType ? headerMediaError(headerMedia) : null;
 
   /**
@@ -143,65 +155,52 @@ export function Step3Personalize({
    */
   const unmappedKeys = useMemo(() => {
     const missing: string[] = [];
-    for (const placeholder of placeholders) {
-      const key = placeholder.replace(/^\{\{|\}\}$/g, '');
+    for (const { key, label } of placeholders) {
       const mapping = variables[key];
       if (!mapping || !mapping.value?.trim()) {
-        missing.push(placeholder);
+        missing.push(label);
       }
     }
     return missing;
   }, [placeholders, variables]);
 
   function updateVariable(key: string, patch: Partial<VariableMapping>) {
-    const current = variables[key] ?? { type: 'static' as VariableType, value: '' };
+    const current = variables[key] ?? {
+      type: 'static' as VariableType,
+      value: '',
+    };
     onUpdate({
       ...variables,
       [key]: { ...current, ...patch },
     });
   }
 
-  /**
-   * Substitute placeholders using the first real contact where
-   * possible. Placeholders keyed by "{{N}}" map to variable key "N".
-   */
-  const previewText = useMemo(() => {
-    const contact = firstContact ?? SAMPLE_CONTACT;
-    const customValues = firstContact
-      ? firstContactCustomValues
-      : new Map<string, string>();
-
-    let text = template.body_text;
-    for (const placeholder of placeholders) {
-      const key = placeholder.replace(/^\{\{|\}\}$/g, '');
-      const mapping = variables[key];
-      let replacement = placeholder;
-
-      if (mapping) {
-        if (mapping.type === 'static' && mapping.value) {
-          replacement = mapping.value;
-        } else if (mapping.type === 'field' && mapping.value) {
-          const fieldMap: Record<string, string | undefined> = {
-            name: contact.name,
-            phone: contact.phone,
-            email: contact.email,
-            company: contact.company,
-          };
-          replacement = fieldMap[mapping.value] ?? placeholder;
-        } else if (mapping.type === 'custom_field' && mapping.value) {
-          replacement = customValues.get(mapping.value) || placeholder;
-        }
-      }
-      text = text.replaceAll(placeholder, replacement);
-    }
-    return text;
-  }, [
-    template.body_text,
+  const previewContact = firstContact ?? SAMPLE_CONTACT;
+  const previewVariables = Object.fromEntries(
+    placeholders.map(({ key }) => [
+      key,
+      variables[key]?.value
+        ? variables[key]
+        : {
+            type: 'static' as const,
+            value: key === HEADER_VARIABLE_KEY ? '' : `{{${key}}}`,
+          },
+    ])
+  );
+  const previewText =
+    renderTemplateBody(
+      template.body_text,
+      resolveVariables(
+        previewVariables,
+        previewContact,
+        firstContactCustomValues
+      )
+    ) ?? '';
+  const previewHeader = resolveHeaderVariable(
     variables,
-    placeholders,
-    firstContact,
-    firstContactCustomValues,
-  ]);
+    previewContact,
+    firstContactCustomValues
+  );
 
   const previewLabel = firstContact
     ? contactDisplayName(firstContact)
@@ -210,18 +209,22 @@ export function Step3Personalize({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">{t('personalize.title')}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="text-foreground text-lg font-semibold">
+          {t('personalize.title')}
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">
           {t('personalize.subtitle')}
         </p>
       </div>
 
       {mediaHeaderType && (
-        <div className="rounded-xl border border-border bg-card/50 p-4">
+        <div className="border-border bg-card/50 rounded-xl border p-4">
           <div className="mb-3 flex items-center gap-2">
-            <ImageIcon className="h-4 w-4 text-primary" />
-            <p className="text-sm font-medium text-foreground">{t('personalize.headerImage')}</p>
-            <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium uppercase text-primary">
+            <ImageIcon className="text-primary h-4 w-4" />
+            <p className="text-foreground text-sm font-medium">
+              {t('personalize.headerImage')}
+            </p>
+            <span className="bg-primary/10 text-primary inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium uppercase">
               {mediaHeaderType}
             </span>
           </div>
@@ -236,31 +239,30 @@ export function Step3Personalize({
       )}
 
       {placeholders.length === 0 && !mediaHeaderType ? (
-        <div className="rounded-xl border border-border bg-card/50 p-6 text-center">
-          <p className="text-sm text-muted-foreground">
+        <div className="border-border bg-card/50 rounded-xl border p-6 text-center">
+          <p className="text-muted-foreground text-sm">
             {t('personalize.noPreview')}
           </p>
         </div>
       ) : placeholders.length === 0 ? null : (
         <div className="space-y-4">
-          {placeholders.map((placeholder) => {
-            const key = placeholder.replace(/^\{\{|\}\}$/g, '');
+          {placeholders.map(({ key, label }) => {
             const mapping = variables[key] ?? { type: 'static', value: '' };
 
             return (
               <div
-                key={placeholder}
-                className="rounded-xl border border-border bg-card/50 p-4"
+                key={key}
+                className="border-border bg-card/50 rounded-xl border p-4"
               >
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-mono font-medium text-primary">
-                    {placeholder}
+                  <span className="bg-primary/10 text-primary inline-flex items-center rounded-md px-2 py-0.5 font-mono text-xs font-medium">
+                    {label}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
                       {t('personalize.type')}
                     </label>
                     <Select
@@ -272,12 +274,16 @@ export function Step3Personalize({
                         })
                       }
                     >
-                      <SelectTrigger className="w-full border-border bg-muted text-foreground">
+                      <SelectTrigger className="border-border bg-muted text-foreground w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="border-border bg-popover">
-                        <SelectItem value="static">{t('personalize.typeStatic')}</SelectItem>
-                        <SelectItem value="field">{t('personalize.typeContact')}</SelectItem>
+                        <SelectItem value="static">
+                          {t('personalize.typeStatic')}
+                        </SelectItem>
+                        <SelectItem value="field">
+                          {t('personalize.typeContact')}
+                        </SelectItem>
                         <SelectItem value="custom_field">
                           {t('personalize.typeCustom')}
                         </SelectItem>
@@ -286,8 +292,10 @@ export function Step3Personalize({
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                      {mapping.type === 'static' ? t('personalize.staticValue') : t('personalize.contactField')}
+                    <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+                      {mapping.type === 'static'
+                        ? t('personalize.staticValue')
+                        : t('personalize.contactField')}
                     </label>
                     {mapping.type === 'static' ? (
                       <Input
@@ -305,8 +313,10 @@ export function Step3Personalize({
                           updateVariable(key, { value: val || '' })
                         }
                       >
-                        <SelectTrigger className="w-full border-border bg-muted text-foreground">
-                          <SelectValue placeholder={t('personalize.selectContactField')} />
+                        <SelectTrigger className="border-border bg-muted text-foreground w-full">
+                          <SelectValue
+                            placeholder={t('personalize.selectContactField')}
+                          />
                         </SelectTrigger>
                         <SelectContent className="border-border bg-popover">
                           {contactFields.map((field) => (
@@ -323,7 +333,7 @@ export function Step3Personalize({
                           updateVariable(key, { value: val || '' })
                         }
                       >
-                        <SelectTrigger className="w-full border-border bg-muted text-foreground">
+                        <SelectTrigger className="border-border bg-muted text-foreground w-full">
                           <SelectValue
                             placeholder={
                               loadingFields
@@ -353,38 +363,36 @@ export function Step3Personalize({
 
       {/* Live Preview — rendered as a WhatsApp-style bubble so the user
           sees approximately what the recipient will see. */}
-      <div className="rounded-xl border border-border bg-card/50 p-4">
+      <div className="border-border bg-card/50 rounded-xl border p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4 text-primary" />
-            <p className="text-sm font-medium text-foreground">{t('personalize.preview')}</p>
-            <span className="text-xs text-muted-foreground">({previewLabel})</span>
+            <Eye className="text-primary h-4 w-4" />
+            <p className="text-foreground text-sm font-medium">
+              {t('personalize.preview')}
+            </p>
+            <span className="text-muted-foreground text-xs">
+              ({previewLabel})
+            </span>
             {loadingPreview && (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
             )}
           </div>
-          <FormattingToggle checked={formatted} onCheckedChange={setFormatted} />
+          <FormattingToggle
+            checked={formatted}
+            onCheckedChange={setFormatted}
+          />
         </div>
-        {/* WhatsApp's own surface colours rather than app tokens: the
-            point of this panel is to show what the recipient sees, and
-            the previous primary-tinted bubble on a near-black panel
-            matched neither of WhatsApp's themes. Hard-coded hexes are
-            deliberate — these track WhatsApp, not our palette.
-              light  chat #EFEAE2 · outgoing bubble #D9FDD3 · text #111B21
-              dark   chat #0B141A · outgoing bubble #005C4B · text #E9EDEF */}
-        <div className="rounded-lg bg-[#EFEAE2] p-3 dark:bg-[#0B141A]">
-          <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-sm bg-[#D9FDD3] px-3 py-2 shadow-sm dark:bg-[#005C4B]">
-            <p className="whitespace-pre-wrap break-words text-sm text-[#111B21] dark:text-[#E9EDEF]">
-              {formatted ? <FormattedText text={previewText} /> : previewText}
-            </p>
-            <div className="mt-1 flex items-center justify-end gap-1">
-              <span className="text-[10px] text-[#667781] dark:text-[#E9EDEF]/60">
-                {format(new Date(), 'HH:mm')}
-              </span>
-              <CheckCheck className="h-3 w-3 text-[#53BDEB]" />
-            </div>
-          </div>
-        </div>
+        <BroadcastMessagePreview
+          template={template}
+          bodyText={previewText}
+          headerText={previewHeader}
+          formatted={formatted}
+          mediaUrl={
+            headerMedia.mediaId
+              ? `/api/whatsapp/media/${headerMedia.mediaId}`
+              : headerMedia.url
+          }
+        />
       </div>
 
       {unmappedKeys.length > 0 && (
@@ -397,7 +405,7 @@ export function Step3Personalize({
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-border pt-4">
+      <div className="border-border flex items-center justify-between border-t pt-4">
         <Button
           variant="outline"
           onClick={onBack}

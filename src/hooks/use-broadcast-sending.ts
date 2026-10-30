@@ -8,6 +8,7 @@ import { Contact, MessageTemplate } from '@/types';
 import {
   fetchCustomValueIndex,
   resolveVariables,
+  resolveHeaderVariable,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { normalizeKey } from '@/lib/contacts/dedupe';
@@ -356,6 +357,12 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         contact_id: contact.id,
         status: 'pending' as const,
         template_params: paramsByContact.get(contact.id) ?? [],
+        template_header_text:
+          resolveHeaderVariable(
+            payload.variables,
+            contact,
+            customValueIndex.get(contact.id)
+          ) ?? null,
       }));
 
       setStage('saving');

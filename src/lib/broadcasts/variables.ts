@@ -33,6 +33,9 @@ export type VariableMapping =
   | { type: 'custom_field'; value: string };
 
 /** contactId → (customFieldId → value). */
+// A colon cannot occur in a Meta placeholder name.
+export const HEADER_VARIABLE_KEY = 'header:text';
+
 export type CustomValueIndex = Map<string, Map<string, string>>;
 
 /**
@@ -47,30 +50,48 @@ export function resolveVariables(
 ): string[] {
   // Keys are typically "1","2",... — numeric-aware sort keeps
   // {{1}} before {{10}}.
-  const keys = Object.keys(variables).sort((a, b) => {
-    const an = Number(a);
-    const bn = Number(b);
-    if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-    return a.localeCompare(b);
-  });
+  const keys = Object.keys(variables)
+    .filter((key) => key !== HEADER_VARIABLE_KEY)
+    .sort((a, b) => {
+      const an = Number(a);
+      const bn = Number(b);
+      if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+      return a.localeCompare(b);
+    });
 
-  return keys.map((key) => {
-    const v = variables[key];
-    if (v.type === 'static') return v.value;
+  return keys.map((key) =>
+    resolveVariable(variables[key], contact, customValues)
+  );
+}
 
-    if (v.type === 'field') {
-      const fieldMap: Record<string, string | undefined> = {
-        name: contact.name,
-        phone: contact.phone,
-        email: contact.email,
-        company: contact.company,
-      };
-      return fieldMap[v.value] ?? '';
-    }
+export function resolveHeaderVariable(
+  variables: Record<string, VariableMapping>,
+  contact: Contact,
+  customValues?: Map<string, string>
+): string | undefined {
+  const mapping = variables[HEADER_VARIABLE_KEY];
+  return mapping ? resolveVariable(mapping, contact, customValues) : undefined;
+}
 
-    // custom_field
-    return customValues?.get(v.value) ?? '';
-  });
+function resolveVariable(
+  v: VariableMapping,
+  contact: Contact,
+  customValues?: Map<string, string>
+): string {
+  if (v.type === 'static') return v.value;
+
+  if (v.type === 'field') {
+    const fieldMap: Record<string, string | undefined> = {
+      name: contact.name,
+      phone: contact.phone,
+      email: contact.email,
+      company: contact.company,
+    };
+    return fieldMap[v.value] ?? '';
+  }
+
+  // custom_field
+  return customValues?.get(v.value) ?? '';
 }
 
 /**

@@ -895,6 +895,7 @@
         "excludedCount": "{count} recipients excluded"
       },
       "personalize": {
+        "headerVariable": "Header",
         "title": "Personalize Variables",
         "subtitle": "Map your template variables to contact fields or provide static values.",
         "headerImage": "Header Image",

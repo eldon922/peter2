@@ -536,6 +536,7 @@ interface FailedRecipientRow {
   contact_id: string | null;
   attempt_count: number | null;
   template_params: unknown;
+  template_header_text?: string | null;
   contact: Contact | null;
 }
 
@@ -619,7 +620,7 @@ export async function planBroadcastRetry(
     let query = db
       .from('broadcast_recipients')
       .select(
-        'id, contact_id, attempt_count, template_params, contact:contacts(*)',
+        'id, contact_id, attempt_count, template_params, template_header_text, contact:contacts(*)',
         { count: 'exact' }
       )
       .eq('broadcast_id', broadcastId)
@@ -687,6 +688,12 @@ export async function planBroadcastRetry(
       `Template "${broadcast.template_name}" (${templateLanguage}) is no longer in this account, so the original message cannot be rebuilt. Run "Sync from Meta" in Settings, then retry.`,
       422
     );
+  }
+
+  if (templateRow.header_type === 'text' && bodyPlaceholderKeys(templateRow.header_content).length > 0 &&
+      sendable.some((row) => !row.template_header_text?.trim())) {
+    throw new BroadcastError('params_unrecoverable',
+      'The original header value is unavailable. Create a new broadcast with a header value.', 422);
   }
 
   // Media headers need a media id on every send; see resolveHeaderMediaId.
@@ -766,7 +773,12 @@ export async function planBroadcastRetry(
       attemptCount,
       phone: contact.phone as string,
       params,
-      ...(messageParams ? { messageParams } : {}),
+      ...((messageParams || row.template_header_text != null) ? {
+        messageParams: {
+          ...messageParams,
+          ...(row.template_header_text != null ? { headerText: row.template_header_text } : {}),
+        },
+      } : {}),
     });
   }
 
@@ -800,6 +812,7 @@ interface PendingRecipientRow {
   contact_id: string | null;
   attempt_count: number | null;
   template_params: unknown;
+  template_header_text?: string | null;
   contact: Contact | null;
 }
 
@@ -858,7 +871,7 @@ export async function planBroadcastSend(
   >((from, to) =>
     db
       .from('broadcast_recipients')
-      .select('id, contact_id, attempt_count, template_params, contact:contacts(*)')
+      .select('id, contact_id, attempt_count, template_params, template_header_text, contact:contacts(*)')
       .eq('broadcast_id', broadcastId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
@@ -940,7 +953,12 @@ export async function planBroadcastSend(
     attemptCount: row.attempt_count ?? 1,
     phone: row.contact!.phone as string,
     params: Array.isArray(row.template_params) ? (row.template_params as string[]) : [],
-    ...(messageParams ? { messageParams } : {}),
+    ...((messageParams || row.template_header_text != null) ? {
+        messageParams: {
+          ...messageParams,
+          ...(row.template_header_text != null ? { headerText: row.template_header_text } : {}),
+        },
+      } : {}),
   }));
 
   return {

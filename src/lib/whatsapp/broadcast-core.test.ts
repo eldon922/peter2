@@ -2130,3 +2130,32 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
     );
   });
 });
+
+describe('broadcast text header snapshots', () => {
+  it.each(['start', 'retry'] as const)('replays the saved named header on %s after the contact is renamed', async (action) => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' })] },
+      broadcast_recipients: { rows: [(action === 'start' ? pendingRow : failedRow)({
+        template_params: [],
+        template_header_text: 'Original name',
+        contact: { id: 'c-1', phone: '14155550123', name: 'Changed name' },
+      })] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text', header_content: 'Hello {{name}}' }] },
+    });
+    const plan = await (action === 'start' ? planBroadcastSend : planBroadcastRetry)(db, 'acc', 'b-1');
+    expect(plan.planned[0].params).toEqual([]);
+    expect(plan.planned[0].messageParams?.headerText).toBe('Original name');
+  });
+
+  it('refuses a retry with a missing header value before claiming any rows', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [sentBroadcast()] },
+      broadcast_recipients: { rows: [failedRow({ template_params: [] })] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text', header_content: 'Hello {{name}}' }] },
+    });
+    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({ code: 'params_unrecoverable' });
+    expect(writes.filter((write) => write.values.status === 'pending')).toHaveLength(0);
+  });
+});

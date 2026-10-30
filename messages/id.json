@@ -895,6 +895,7 @@
         "excludedCount": "{count} penerima dikecualikan"
       },
       "personalize": {
+        "headerVariable": "Header",
         "title": "Personalisasi Variabel",
         "subtitle": "Petakan variabel template Anda ke bidang kontak atau isi nilai statis.",
         "headerImage": "Gambar Header",

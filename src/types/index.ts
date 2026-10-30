@@ -526,6 +526,7 @@ export interface BroadcastRecipient {
    * `broadcasts.template_variables`, or refuses if that is absent too.
    */
   template_params?: string[] | null;
+  template_header_text?: string | null;
   created_at: string;
   contact?: Contact;
 }

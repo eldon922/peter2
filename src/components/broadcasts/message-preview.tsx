@@ -2,12 +2,14 @@ import { CheckCheck, FileIcon, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { FormattedText } from '@/components/inbox/formatted-text';
+import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
 import type { MessageTemplate } from '@/types';
 
 interface Props {
   template: MessageTemplate;
   /** Body with variables already substituted. */
   bodyText: string;
+  headerText?: string;
   /** Media header link, when one was set for this broadcast. */
   mediaUrl?: string;
   /** Render WhatsApp formatting (*bold*, _italic_…) in the body. Default on. */
@@ -18,6 +20,7 @@ interface Props {
 export function BroadcastMessagePreview({
   template,
   bodyText,
+  headerText,
   mediaUrl,
   formatted = true,
 }: Props) {
@@ -30,7 +33,9 @@ export function BroadcastMessagePreview({
       <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-sm bg-[#D9FDD3] px-3 py-2 shadow-sm dark:bg-[#005C4B]">
         {headerType === 'text' && template.header_content && (
           <p className="mb-1 text-sm font-semibold break-words text-[#111B21] dark:text-[#E9EDEF]">
-            {template.header_content}
+            {headerText === undefined
+              ? template.header_content
+              : renderTemplateBody(template.header_content, [headerText])}
           </p>
         )}
         {headerType &&
