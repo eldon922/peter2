@@ -1,6 +1,6 @@
 # Contacts, inbox and broadcast fixes
 
-Apply migrations **053–065 in order** before deploying this version. The Replier enum addition (058) must commit before its permissions migration (059). The broadcast attachment picker needs the `broadcast-media` bucket created by 062. Migration 063 stores recipient header values; 064–065 provide the paginated list queries used by this version.
+Apply migrations **053–066 in order** before deploying this version. The Replier enum addition (058) must commit before its permissions migration (059). The broadcast attachment picker needs the `broadcast-media` bucket created by 062. Migration 063 stores recipient header values; 064–065 provide the paginated list queries used by this version. Migration 066 stores each recipient's dynamic button values.
 
 ## Contact and chat deletion
 
@@ -20,6 +20,23 @@ Picked attachments are retained in account-scoped `broadcast-media` storage. Sch
 
 Older scheduled broadcasts that contain only an expiring Meta ID and no source URL still require a replacement upload. Incoming photos do not include original filenames in Meta's webhook; downloads use an attachment filename when no original name is available.
 
+## Dynamic button variables
+
+Broadcast personalization includes an input for each dynamic URL button. Each button keeps its original template index and can use a static value, contact field or custom field. The wizard requires every button mapping, displays the resolved URLs, and saves each recipient's resolved values for scheduled starts and retries. Older failed broadcasts without saved button values must be recreated. See [4dcea0c](https://github.com/eldon922/peter2/commit/4dcea0c).
+
+## Importing custom fields
+
+CSV headers can match existing custom field names, ignoring capitalization and surrounding spaces. For example, if **Membership level** and **Order code** exist:
+
+```csv
+phone,name,Membership level,Order code
++628123456789,Dewi,Gold,order-123
+```
+
+The preview shows the matched fields. Non-empty cells update new and existing contacts; blank cells preserve saved values. Unknown columns are ignored. The result report identifies saved fields and any failures. See [9720e3e](https://github.com/eldon922/peter2/commit/9720e3e).
+
+Personalization selectors display field names while keeping field IDs internally, including when reopening the form. See [324554a](https://github.com/eldon922/peter2/commit/324554a).
+
 ## Roles and read state
 
 Replier can send replies, attachments, templates and reactions in existing inbox conversations. Contacts, broadcasts, settings, assignment, conversation status and deletion remain read-only for that role. Viewer can inspect chats without clearing their unread indicators. Opening a chat does not send a Meta read receipt in this application.
@@ -36,12 +53,13 @@ The regression suite covers named template parameters, unchanged sync results, C
 
 Validated for this change:
 
-- 1,068 tests passed across 107 test files.
+- 1,078 tests passed across 108 test files.
 - Type checking and the production build passed.
 - ESLint reported zero errors and 48 warnings.
 - Six original Chromium component checks passed: first-click contact submission during blur validation, CSV audience input, single-choice tag radios, pending button state, template language selection, and the final scheduling confirmation.
 - Eight additional Chromium checks passed: pending-send draft preservation, unchanged-refresh scroll position, targeted media eviction, shared templates after no-op sync, required header input/preview, inbox paging/search, recipient paging/search/full export, and off-page chat deep links.
-- All new migrations (053–065) applied successfully to a disposable PostgreSQL database. Both SQL check scripts passed with real authenticated role policies, including page boundaries, filter counts, stored headers and cross-account isolation. The unchanged cron migration (051) was excluded from that local replay because the image does not provide its cron/network extensions.
+- Four follow-up Chromium checks passed: custom-field labels after reopening, multiple dynamic button inputs and resolved URLs, custom-field import for new/existing contacts with blank and duplicate handling, and reporting field-save failures.
+- All new migrations (053–066) applied successfully to a disposable PostgreSQL database. Both SQL check scripts passed with real authenticated role policies, including page boundaries, filter counts, stored header/button values and cross-account isolation. The unchanged cron migration (051) was excluded from that local replay because the image does not provide its cron/network extensions.
 
 Browser checks used mocked authentication and service responses. No real WhatsApp messages were sent, and the hosted database was not migrated or deployed during this work.
 
