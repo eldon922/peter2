@@ -895,6 +895,7 @@
         "excludedCount": "수신자 {count}명 제외"
       },
       "personalize": {
+        "headerVariable": "헤더",
         "title": "변수 개인화",
         "subtitle": "템플릿 변수를 연락처 필드에 매핑하거나 고정 값을 입력하세요.",
         "headerImage": "헤더 이미지",
