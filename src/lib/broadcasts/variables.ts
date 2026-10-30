@@ -15,7 +15,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { Contact } from '@/types';
+import type { Contact, MessageTemplate } from '@/types';
 import { phonesMatch } from '@/lib/whatsapp/phone-utils';
 import { chunkIds } from '@/lib/supabase/batching';
 import { extractTemplateVariables } from '@/lib/whatsapp/template-validators';
@@ -51,7 +51,7 @@ export function resolveVariables(
   // Keys are typically "1","2",... — numeric-aware sort keeps
   // {{1}} before {{10}}.
   const keys = Object.keys(variables)
-    .filter((key) => key !== HEADER_VARIABLE_KEY)
+    .filter((key) => key !== HEADER_VARIABLE_KEY && !key.startsWith('button:'))
     .sort((a, b) => {
       const an = Number(a);
       const bn = Number(b);
@@ -71,6 +71,29 @@ export function resolveHeaderVariable(
 ): string | undefined {
   const mapping = variables[HEADER_VARIABLE_KEY];
   return mapping ? resolveVariable(mapping, contact, customValues) : undefined;
+}
+
+export function buttonVariables(template: Pick<MessageTemplate, 'buttons'>) {
+  return (template.buttons ?? []).flatMap((button, index) =>
+    button.type === 'URL' && extractTemplateVariables(button.url).length > 0
+      ? [{ key: `button:${index}`, index, button }]
+      : []
+  );
+}
+
+export function resolveButtonVariables(
+  variables: Record<string, VariableMapping>,
+  contact: Contact,
+  customValues?: Map<string, string>
+): Record<number, string> {
+  return Object.fromEntries(
+    Object.entries(variables).flatMap(([key, mapping]) => {
+      const match = /^button:(\d+)$/.exec(key);
+      return match
+        ? [[Number(match[1]), resolveVariable(mapping, contact, customValues)]]
+        : [];
+    })
+  );
 }
 
 function resolveVariable(

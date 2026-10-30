@@ -527,6 +527,7 @@ export interface BroadcastRecipient {
    */
   template_params?: string[] | null;
   template_header_text?: string | null;
+  template_button_params?: Record<number, string> | null;
   created_at: string;
   contact?: Contact;
 }

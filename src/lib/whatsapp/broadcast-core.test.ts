@@ -11,6 +11,7 @@ import {
   BroadcastError,
   type BroadcastPlan,
 } from './broadcast-core';
+import { buildSendComponents } from './template-send-builder';
 import { phoneVariants } from './phone-utils';
 import { DELIVER_BUDGET_MS, SEND_BATCH_DELAY_MS } from './broadcast-limits';
 
@@ -2154,6 +2155,40 @@ describe('broadcast text header snapshots', () => {
       broadcast_recipients: { rows: [failedRow({ template_params: [] })] },
       whatsapp_config: { rows: [CONFIG_ROW] },
       message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text', header_content: 'Hello {{name}}' }] },
+    });
+    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({ code: 'params_unrecoverable' });
+    expect(writes.filter((write) => write.values.status === 'pending')).toHaveLength(0);
+  });
+});
+
+describe('broadcast button parameter snapshots', () => {
+  const buttonTemplate = { ...TEMPLATE_NO_VARS, buttons: [
+    { type: 'QUICK_REPLY', text: 'Help' },
+    { type: 'URL', text: 'Order', url: 'https://example.com/orders/{{1}}' },
+    { type: 'URL', text: 'Invoice', url: 'https://example.com/invoices/{{1}}' },
+  ] };
+  it.each(['start', 'retry'] as const)('sends the original button values on %s', async (action) => {
+    const { db } = makeDb({
+      broadcasts: { rows: [sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' })] },
+      broadcast_recipients: { rows: [(action === 'start' ? pendingRow : failedRow)({
+        template_params: [], template_button_params: { 1: 'original-order', 2: 'original-invoice' },
+        contact: { id: 'c-1', phone: '14155550123', name: 'Changed contact' },
+      })] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [buttonTemplate] },
+    });
+    const plan = await (action === 'start' ? planBroadcastSend : planBroadcastRetry)(db, 'acc', 'b-1');
+    expect(buildSendComponents(plan.templateRow!, plan.planned[0].messageParams)).toEqual([
+      { type: 'button', sub_type: 'url', index: '1', parameters: [{ type: 'text', text: 'original-order' }] },
+      { type: 'button', sub_type: 'url', index: '2', parameters: [{ type: 'text', text: 'original-invoice' }] },
+    ]);
+  });
+  it('refuses a retry before claiming rows if any dynamic button has no saved value', async () => {
+    const { db, writes } = makeDb({
+      broadcasts: { rows: [sentBroadcast()] },
+      broadcast_recipients: { rows: [failedRow({ template_params: [], template_button_params: { 1: 'order' } })] },
+      whatsapp_config: { rows: [CONFIG_ROW] },
+      message_templates: { rows: [buttonTemplate] },
     });
     await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({ code: 'params_unrecoverable' });
     expect(writes.filter((write) => write.values.status === 'pending')).toHaveLength(0);

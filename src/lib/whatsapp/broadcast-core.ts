@@ -41,6 +41,7 @@ import type { Contact, MessageTemplate, WhatsAppConnectionType } from '@/types';
 import { findOrCreateContactsBulk } from '@/lib/api/v1/contacts';
 import {
   bodyPlaceholderKeys,
+  buttonVariables,
   fetchCustomValueIndex,
   isValidHttpUrl,
   resolveVariables,
@@ -537,6 +538,7 @@ interface FailedRecipientRow {
   attempt_count: number | null;
   template_params: unknown;
   template_header_text?: string | null;
+  template_button_params?: Record<number, string> | null;
   contact: Contact | null;
 }
 
@@ -620,7 +622,7 @@ export async function planBroadcastRetry(
     let query = db
       .from('broadcast_recipients')
       .select(
-        'id, contact_id, attempt_count, template_params, template_header_text, contact:contacts(*)',
+        'id, contact_id, attempt_count, template_params, template_header_text, template_button_params, contact:contacts(*)',
         { count: 'exact' }
       )
       .eq('broadcast_id', broadcastId)
@@ -694,6 +696,12 @@ export async function planBroadcastRetry(
       sendable.some((row) => !row.template_header_text?.trim())) {
     throw new BroadcastError('params_unrecoverable',
       'The original header value is unavailable. Create a new broadcast with a header value.', 422);
+  }
+
+  if (buttonVariables(templateRow).some(({ index }) =>
+    sendable.some((row) => !row.template_button_params?.[index]?.trim()))) {
+    throw new BroadcastError('params_unrecoverable',
+      'The original button value is unavailable. Create a new broadcast with button values.', 422);
   }
 
   // Media headers need a media id on every send; see resolveHeaderMediaId.
@@ -773,10 +781,11 @@ export async function planBroadcastRetry(
       attemptCount,
       phone: contact.phone as string,
       params,
-      ...((messageParams || row.template_header_text != null) ? {
+      ...((messageParams || row.template_header_text != null || row.template_button_params != null) ? {
         messageParams: {
           ...messageParams,
           ...(row.template_header_text != null ? { headerText: row.template_header_text } : {}),
+          ...(row.template_button_params != null ? { buttonParams: row.template_button_params } : {}),
         },
       } : {}),
     });
@@ -813,6 +822,7 @@ interface PendingRecipientRow {
   attempt_count: number | null;
   template_params: unknown;
   template_header_text?: string | null;
+  template_button_params?: Record<number, string> | null;
   contact: Contact | null;
 }
 
@@ -871,7 +881,7 @@ export async function planBroadcastSend(
   >((from, to) =>
     db
       .from('broadcast_recipients')
-      .select('id, contact_id, attempt_count, template_params, template_header_text, contact:contacts(*)')
+      .select('id, contact_id, attempt_count, template_params, template_header_text, template_button_params, contact:contacts(*)')
       .eq('broadcast_id', broadcastId)
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
@@ -953,10 +963,11 @@ export async function planBroadcastSend(
     attemptCount: row.attempt_count ?? 1,
     phone: row.contact!.phone as string,
     params: Array.isArray(row.template_params) ? (row.template_params as string[]) : [],
-    ...((messageParams || row.template_header_text != null) ? {
+    ...((messageParams || row.template_header_text != null || row.template_button_params != null) ? {
         messageParams: {
           ...messageParams,
           ...(row.template_header_text != null ? { headerText: row.template_header_text } : {}),
+          ...(row.template_button_params != null ? { buttonParams: row.template_button_params } : {}),
         },
       } : {}),
   }));

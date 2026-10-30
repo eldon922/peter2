@@ -5,6 +5,8 @@ import {
   numberChanged,
   resolveVariables,
   resolveHeaderVariable,
+  buttonVariables,
+  resolveButtonVariables,
   HEADER_VARIABLE_KEY,
 } from './variables';
 import type { Contact } from '@/types';
@@ -128,4 +130,29 @@ it('keeps header personalization separate from body parameters with the same nam
   expect(resolveVariables(mappings, contact)).toEqual(['Body name']);
   expect(resolveHeaderVariable(mappings, contact)).toBe('Jane');
   expect(resolveHeaderVariable({}, contact)).toBeUndefined();
+});
+
+it('resolves URL buttons separately from header/body placeholders and keeps template indexes', () => {
+  const template = {
+    buttons: [
+      { type: 'QUICK_REPLY' as const, text: 'Help' },
+      { type: 'URL' as const, text: 'Order', url: 'https://example.com/order/{{1}}' },
+      { type: 'URL' as const, text: 'Invoice', url: 'https://example.com/invoice/{{1}}' },
+      { type: 'URL' as const, text: 'Home', url: 'https://example.com/' },
+    ],
+  };
+  expect(buttonVariables(template).map(({ key, index }) => [key, index])).toEqual([
+    ['button:1', 1], ['button:2', 2],
+  ]);
+  const mappings = {
+    '1': { type: 'field' as const, value: 'name' },
+    [HEADER_VARIABLE_KEY]: { type: 'static' as const, value: 'Header' },
+    'button:1': { type: 'custom_field' as const, value: 'order' },
+    'button:2': { type: 'static' as const, value: 'invoice-123' },
+  };
+  expect(resolveVariables(mappings, contact)).toEqual(['Jane']);
+  expect(resolveHeaderVariable(mappings, contact)).toBe('Header');
+  expect(resolveButtonVariables(mappings, contact, new Map([['order', 'order-456']]))).toEqual({
+    1: 'order-456', 2: 'invoice-123',
+  });
 });

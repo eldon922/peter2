@@ -24,9 +24,9 @@ BEGIN
     VALUES (md5('page-chat-105')::uuid, 'customer', 'Hello');
   INSERT INTO broadcasts (id, user_id, account_id, name, template_name, total_recipients)
     VALUES (md5('page-broadcast')::uuid, owner_id, account, 'Page test', 'test', 105);
-  INSERT INTO broadcast_recipients (id, broadcast_id, contact_id, status, sent_at, phone_attempted, template_header_text)
+  INSERT INTO broadcast_recipients (id, broadcast_id, contact_id, status, sent_at, phone_attempted, template_header_text, template_button_params)
     SELECT md5('page-recipient-' || i)::uuid, md5('page-broadcast')::uuid, md5('page-contact-' || i)::uuid,
-      CASE WHEN i <= 10 THEN 'failed' ELSE 'sent' END, now(), 'original-' || i, 'Header ' || i
+      CASE WHEN i <= 10 THEN 'failed' ELSE 'sent' END, now(), 'original-' || i, 'Header ' || i, jsonb_build_object('1', 'link-' || i)
     FROM generate_series(1, 105) i;
 END $$;
 SET LOCAL ROLE authenticated;
@@ -45,6 +45,7 @@ BEGIN
   ASSERT (a->>'total')::int = 10, 'recipient status filter';
   a := broadcast_recipient_page(md5('page-broadcast')::uuid, p_search => 'original-105');
   ASSERT (a->>'total')::int = 1 AND a->'rows'->0->>'template_header_text' = 'Header 105', 'attempted phone search and stored header';
+  ASSERT a->'rows'->0->'template_button_params'->>'1' = 'link-105', 'stored button parameter';
   a := broadcast_recipient_page(md5('page-broadcast')::uuid, p_offset => 999);
   ASSERT (a->>'total')::int = 105 AND jsonb_array_length(a->'rows') = 0, 'empty recipient page retains total';
 

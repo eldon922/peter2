@@ -10,6 +10,7 @@ interface Props {
   /** Body with variables already substituted. */
   bodyText: string;
   headerText?: string;
+  buttonParams?: Record<number, string>;
   /** Media header link, when one was set for this broadcast. */
   mediaUrl?: string;
   /** Render WhatsApp formatting (*bold*, _italic_…) in the body. Default on. */
@@ -21,6 +22,7 @@ export function BroadcastMessagePreview({
   template,
   bodyText,
   headerText,
+  buttonParams,
   mediaUrl,
   formatted = true,
 }: Props) {
@@ -79,6 +81,14 @@ export function BroadcastMessagePreview({
               className="rounded-lg bg-[#D9FDD3] px-3 py-1.5 text-center text-sm font-medium text-[#027EB5] shadow-sm dark:bg-[#005C4B] dark:text-[#53BDEB]"
             >
               {b.text}
+              {b.type === 'URL' && (
+                <p className="mt-0.5 text-xs font-normal break-all">
+                  {renderTemplateBody(
+                    b.url,
+                    buttonParams?.[i] === undefined ? [] : [buttonParams[i]]
+                  )}
+                </p>
+              )}
             </div>
           ))}
         </div>

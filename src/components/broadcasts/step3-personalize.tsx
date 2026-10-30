@@ -19,6 +19,8 @@ import {
   HEADER_VARIABLE_KEY,
   resolveVariables,
   resolveHeaderVariable,
+  resolveButtonVariables,
+  buttonVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
@@ -136,8 +138,16 @@ export function Step3Personalize({
         key,
         label: `{{${key}}}`,
       })),
+      ...buttonVariables(template).map(({ key, index, button }) => ({
+        key,
+        label: t('personalize.buttonVariable', {
+          number: index + 1,
+          name: button.text,
+        }),
+        url: button.url,
+      })),
     ],
-    [template.body_text, template.header_type, template.header_content, t]
+    [template, t]
   );
 
   // A template with an IMAGE/VIDEO/DOCUMENT header needs that media on
@@ -246,7 +256,8 @@ export function Step3Personalize({
         </div>
       ) : placeholders.length === 0 ? null : (
         <div className="space-y-4">
-          {placeholders.map(({ key, label }) => {
+          {placeholders.map((placeholder) => {
+            const { key, label } = placeholder;
             const mapping = variables[key] ?? { type: 'static', value: '' };
 
             return (
@@ -260,6 +271,13 @@ export function Step3Personalize({
                   </span>
                 </div>
 
+                {'url' in placeholder && (
+                  <p className="text-muted-foreground mb-3 text-xs break-all">
+                    {t('personalize.buttonUrlHint', {
+                      url: placeholder.url as string,
+                    })}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
@@ -402,6 +420,11 @@ export function Step3Personalize({
           template={template}
           bodyText={previewText}
           headerText={previewHeader}
+          buttonParams={resolveButtonVariables(
+            variables,
+            previewContact,
+            firstContactCustomValues
+          )}
           formatted={formatted}
           mediaUrl={
             headerMedia.mediaId

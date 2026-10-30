@@ -49,6 +49,7 @@ export function SendConfirmationDialog({
     template: MessageTemplate;
     body: string;
     headerText?: string;
+    buttonParams?: Record<number, string>;
     count: number;
     phone: string | null;
   } | null>(null);
@@ -100,6 +101,7 @@ export function SendConfirmationDialog({
           template,
           body: renderTemplateBody(template.body_text, values) ?? '',
           headerText: recipient?.template_header_text ?? undefined,
+          buttonParams: recipient?.template_button_params ?? undefined,
           count: recipientResult.count ?? 0,
           phone:
             recipient?.contact?.phone ?? recipient?.phone_attempted ?? null,
@@ -144,6 +146,7 @@ export function SendConfirmationDialog({
               template={preview.template}
               bodyText={preview.body}
               headerText={preview.headerText}
+              buttonParams={preview.buttonParams}
               mediaUrl={
                 broadcast.header_media_url ||
                 (broadcast.header_media_id

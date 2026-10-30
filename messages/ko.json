@@ -895,6 +895,8 @@
         "excludedCount": "수신자 {count}명 제외"
       },
       "personalize": {
+        "buttonVariable": "버튼 {number}: {name}",
+        "buttonUrlHint": "{url}의 변수를 대체할 값을 입력하세요",
         "headerVariable": "헤더",
         "title": "변수 개인화",
         "subtitle": "템플릿 변수를 연락처 필드에 매핑하거나 고정 값을 입력하세요.",

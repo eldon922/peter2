@@ -9,6 +9,7 @@ import {
   fetchCustomValueIndex,
   resolveVariables,
   resolveHeaderVariable,
+  resolveButtonVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { normalizeKey } from '@/lib/contacts/dedupe';
@@ -341,22 +342,20 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         supabase,
         contacts.map((c) => c.id)
       );
-      const paramsByContact = new Map<string, string[]>(
-        contacts.map((contact) => [
-          contact.id,
-          resolveVariables(
-            payload.variables,
-            contact,
-            customValueIndex.get(contact.id)
-          ),
-        ])
-      );
-
       const recipientRows = contacts.map((contact) => ({
         broadcast_id: broadcast.id,
         contact_id: contact.id,
         status: 'pending' as const,
-        template_params: paramsByContact.get(contact.id) ?? [],
+        template_params: resolveVariables(
+          payload.variables,
+          contact,
+          customValueIndex.get(contact.id)
+        ),
+        template_button_params: resolveButtonVariables(
+          payload.variables,
+          contact,
+          customValueIndex.get(contact.id)
+        ),
         template_header_text:
           resolveHeaderVariable(
             payload.variables,

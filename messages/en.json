@@ -895,6 +895,8 @@
         "excludedCount": "{count} recipients excluded"
       },
       "personalize": {
+        "buttonVariable": "Button {number}: {name}",
+        "buttonUrlHint": "Enter the value to replace the placeholder in {url}",
         "headerVariable": "Header",
         "title": "Personalize Variables",
         "subtitle": "Map your template variables to contact fields or provide static values.",
