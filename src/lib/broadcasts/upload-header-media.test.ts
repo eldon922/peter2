@@ -45,4 +45,23 @@ describe('uploadHeaderMedia', () => {
       'failed'
     );
   });
+
+  it('identifies a browser-to-server connection failure', async () => {
+    vi.stubGlobal('fetch', fetchMock);
+    const cause = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValue(cause);
+    await expect(uploadHeaderMedia('https://cdn/x.jpg', 'image', 'Upload failed.')).rejects.toMatchObject({
+      message: expect.stringContaining('Could not reach the app server'),
+      cause,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes the HTTP status when a proxy returns HTML instead of an API error', async () => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue(new Response('<html>Gateway timeout</html>', { status: 504 }));
+    await expect(uploadHeaderMedia('https://cdn/x.jpg', 'image', 'Upload failed.')).rejects.toThrow(
+      'Upload failed. (HTTP 504)'
+    );
+  });
 });

@@ -1238,17 +1238,40 @@ export async function uploadPhoneMedia(
   form.append('messaging_product', 'whatsapp')
   form.append('file', blob, fileName)
 
-  const response = await fetch(`${META_API_BASE}/${phoneNumberId}/media`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: form,
-  })
-  if (!response.ok) {
-    await throwMetaError(response, `Media upload failed: ${response.status}`)
+  const signal = AbortSignal.timeout(30_000)
+  for (let attempt = 0; ; attempt++) {
+    let response: Response
+    let data: { id?: string } | undefined
+    try {
+      response = await fetch(`${META_API_BASE}/${phoneNumberId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
+        signal,
+      })
+      if (response.ok) data = await response.json()
+    } catch (cause) {
+      if (cause instanceof SyntaxError) {
+        throw new Error('WhatsApp returned an invalid media upload response.', { cause })
+      }
+      // Only the file is retried; uploading it cannot send a duplicate message.
+      if (attempt < 2 && !signal.aborted) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt))
+        continue
+      }
+      throw new Error(
+        signal.aborted
+          ? 'The media upload to WhatsApp timed out. Check the app server connection to graph.facebook.com and try again.'
+          : 'Could not connect to WhatsApp to upload media. Check the app server connection to graph.facebook.com and try again.',
+        { cause },
+      )
+    }
+    if (!response.ok) {
+      await throwMetaError(response, `Media upload failed: ${response.status}`)
+    }
+    if (!data?.id) {
+      throw new Error('Meta did not return a media id.')
+    }
+    return { id: data.id }
   }
-  const data = (await response.json()) as { id?: string }
-  if (!data.id) {
-    throw new Error('Meta did not return a media id.')
-  }
-  return { id: data.id }
 }

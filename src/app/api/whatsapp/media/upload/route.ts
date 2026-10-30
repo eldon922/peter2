@@ -34,6 +34,14 @@ function badRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
 }
 
+function uploadErrorResponse(error: unknown) {
+  console.error('[whatsapp-media] Upload failed:', error);
+  return NextResponse.json(
+    { error: error instanceof Error ? error.message : 'Could not upload the media.' },
+    { status: 502 }
+  );
+}
+
 async function loadCredentials(supabase: SupabaseClient, accountId: string) {
   const { data: config, error } = await supabase
     .from('whatsapp_config')
@@ -81,15 +89,8 @@ export async function POST(request: Request) {
       try {
         const { id } = await uploadMediaFromUrl({ url, kind, ...credentials });
         return NextResponse.json({ id, kind });
-      } catch (e) {
-        // The messages are written for the person who typed the link.
-        return NextResponse.json(
-          {
-            error:
-              e instanceof Error ? e.message : 'Could not upload the media.',
-          },
-          { status: 502 }
-        );
+      } catch (error) {
+        return uploadErrorResponse(error);
       }
     }
 
@@ -117,14 +118,17 @@ export async function POST(request: Request) {
     const credentials = await loadCredentials(supabase, accountId);
     if (!credentials) return notConfigured();
 
-    const { id } = await uploadPhoneMedia({
-      ...credentials,
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      mimeType: file.type,
-      fileName: file.name || `header.${kind}`,
-    });
-
-    return NextResponse.json({ id, mimeType: file.type, kind });
+    try {
+      const { id } = await uploadPhoneMedia({
+        ...credentials,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        mimeType: file.type,
+        fileName: file.name || `header.${kind}`,
+      });
+      return NextResponse.json({ id, mimeType: file.type, kind });
+    } catch (error) {
+      return uploadErrorResponse(error);
+    }
   } catch (error) {
     console.error('Error in WhatsApp media upload POST:', error);
     return toErrorResponse(error);

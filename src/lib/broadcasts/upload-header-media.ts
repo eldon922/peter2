@@ -24,8 +24,20 @@ export async function uploadHeaderMedia(
     init = { method: 'POST', body: form };
   }
 
-  const res = await fetch('/api/whatsapp/media/upload', init);
+  let res: Response;
+  try {
+    res = await fetch('/api/whatsapp/media/upload', init);
+  } catch (cause) {
+    throw new Error(
+      `${fallbackError} Could not reach the app server. Check your connection and try again.`,
+      { cause }
+    );
+  }
   const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-  if (!res.ok || !data.id) throw new Error(data.error || fallbackError);
+  if (!res.ok || !data.id) {
+    throw new Error(
+      data.error || (res.ok ? fallbackError : `${fallbackError} (HTTP ${res.status})`)
+    );
+  }
   return data.id;
 }

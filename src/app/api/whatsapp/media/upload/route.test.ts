@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const uploadMediaFromUrl = vi.hoisted(() => vi.fn())
 const uploadPhoneMedia = vi.hoisted(() => vi.fn())
@@ -51,11 +51,29 @@ function fileRequest(file: File, kind: string) {
 }
 
 beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
   hasConfig = true
   uploadMediaFromUrl.mockReset()
   uploadMediaFromUrl.mockResolvedValue({ id: 'link-media' })
   uploadPhoneMedia.mockReset()
   uploadPhoneMedia.mockResolvedValue({ id: 'file-media' })
+})
+
+afterEach(() => vi.restoreAllMocks())
+
+it.each(['link', 'file'])('reports %s upload failures and logs the original connection cause', async (source) => {
+  const cause = Object.assign(new Error('Connection timed out'), { code: 'ETIMEDOUT' })
+  const error = new Error('Could not connect to WhatsApp to upload media.', { cause })
+  uploadMediaFromUrl.mockRejectedValue(error)
+  uploadPhoneMedia.mockRejectedValue(error)
+  const request = source === 'link'
+    ? jsonRequest({ url: 'https://cdn/x.jpg', kind: 'image' })
+    : fileRequest(new File(['x'], 'a.png', { type: 'image/png' }), 'image')
+
+  const res = await POST(request)
+  expect(res.status).toBe(502)
+  expect(await res.json()).toEqual({ error: error.message })
+  expect(console.error).toHaveBeenCalledWith('[whatsapp-media] Upload failed:', error)
 })
 
 describe('POST /api/whatsapp/media/upload with a link', () => {
