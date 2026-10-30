@@ -67,6 +67,25 @@ export function ContactForm({
     exact: boolean;
   } | null>(null);
   const duplicateRequest = useRef(0);
+  const duplicateLookup = useRef<{
+    key: string;
+    promise: Promise<ExistingContact | null>;
+  } | null>(null);
+
+  async function lookupDuplicate(value: string) {
+    if (!accountId) return null;
+    const key = `${accountId}:${value}`;
+    if (duplicateLookup.current?.key === key)
+      return duplicateLookup.current.promise;
+    const promise = findExistingContact(supabase, accountId, value);
+    duplicateLookup.current = { key, promise };
+    try {
+      return await promise;
+    } finally {
+      if (duplicateLookup.current?.promise === promise)
+        duplicateLookup.current = null;
+    }
+  }
   const submitting = useRef(false);
 
   const [tags, setTags] = useState<Tag[]>([]);
@@ -96,7 +115,7 @@ export function ContactForm({
       return;
     }
     const request = ++duplicateRequest.current;
-    const existing = await findExistingContact(supabase, accountId, value);
+    const existing = await lookupDuplicate(value);
     if (request === duplicateRequest.current) {
       setDupMatch(
         existing
@@ -142,11 +161,7 @@ export function ContactForm({
 
     try {
       if (!isEdit && accountId) {
-        const existing = await findExistingContact(
-          supabase,
-          accountId,
-          phone.trim()
-        );
+        const existing = await lookupDuplicate(phone.trim());
         if (existing && isExactMatch(existing, phone.trim())) {
           setDupMatch({ contact: existing, exact: true });
           toast.error(t('toastConflict'));
