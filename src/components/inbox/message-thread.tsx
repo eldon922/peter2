@@ -238,6 +238,8 @@ export function MessageThread({
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const scrolledConversation = useRef<string | undefined>(undefined);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
@@ -490,13 +492,16 @@ export function MessageThread({
       });
   }, [conversationId, hasUnread, canAct]);
 
-  // Auto-scroll to bottom on new messages
+  const lastMessageId = messages.at(-1)?.id;
   useEffect(() => {
-    if (scrollRef.current) {
-      const el = scrollRef.current;
+    const el = scrollRef.current;
+    if (!el) return;
+    if (scrolledConversation.current !== conversationId || nearBottom.current || lastMessageId?.startsWith('temp-')) {
       el.scrollTop = el.scrollHeight;
+      nearBottom.current = true;
     }
-  }, [messages]);
+    scrolledConversation.current = conversationId;
+  }, [conversationId, lastMessageId]);
 
   const handleSend = useCallback(
     async (text: string, replyToId?: string) => {
@@ -1186,7 +1191,14 @@ export function MessageThread({
       </div>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        className="flex-1 overflow-y-auto px-4 py-4"
+      >
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
