@@ -267,6 +267,14 @@ export function Step3Personalize({
                     </label>
                     <Select
                       value={mapping.type}
+                      items={[
+                        { value: 'static', label: t('personalize.typeStatic') },
+                        { value: 'field', label: t('personalize.typeContact') },
+                        {
+                          value: 'custom_field',
+                          label: t('personalize.typeCustom'),
+                        },
+                      ]}
                       onValueChange={(val) =>
                         updateVariable(key, {
                           type: val as VariableType,
@@ -309,6 +317,10 @@ export function Step3Personalize({
                     ) : mapping.type === 'field' ? (
                       <Select
                         value={mapping.value || undefined}
+                        items={contactFields.map((field) => ({
+                          value: field.value,
+                          label: t(`personalize.fieldMap.${field.labelKey}`),
+                        }))}
                         onValueChange={(val) =>
                           updateVariable(key, { value: val || '' })
                         }
@@ -329,6 +341,10 @@ export function Step3Personalize({
                     ) : (
                       <Select
                         value={mapping.value || undefined}
+                        items={customFields.map((field) => ({
+                          value: field.id,
+                          label: field.field_name,
+                        }))}
                         onValueChange={(val) =>
                           updateVariable(key, { value: val || '' })
                         }
