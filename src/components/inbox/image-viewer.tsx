@@ -6,25 +6,7 @@ import { toast } from 'sonner';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { mediaDownloadName } from '@/lib/inbox/download-media';
-
-const EXTENSION_BY_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-};
-
-function saveBlob(blob: Blob, filename: string) {
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(href);
-}
+import { mediaDownloadName, saveMediaBlob } from '@/lib/inbox/download-media';
 
 interface Props {
   /** Image to show (an object URL or a public URL). */
@@ -45,10 +27,9 @@ export function ImageViewer({ src, alt, filename, open, onOpenChange }: Props) {
       const res = await fetch(src);
       if (!res.ok) throw new Error('download failed');
       const blob = await res.blob();
-      const ext = EXTENSION_BY_TYPE[blob.type] ?? 'jpg';
-      saveBlob(
+      saveMediaBlob(
         blob,
-        mediaDownloadName(filename, src, blob.type || `image/${ext}`)
+        mediaDownloadName(filename, src, blob.type || 'image/jpeg')
       );
     } catch {
       toast.error(t('downloadFailed'));
