@@ -555,7 +555,14 @@
       "customFieldsHint": "Gunakan nama kolom kustom yang sudah ada sebagai header kolom CSV. Nilai yang diisi memperbarui kolom tersebut; sel kosong mempertahankan nilai tersimpan. Kolom yang tidak dikenal diabaikan.",
       "readingFile": "Membaca CSV dan mencocokkan kolom kustom…",
       "customFieldsWarning": "Kolom kustom untuk {count} kontak tidak dapat disimpan. Lihat laporan di bawah.",
-      "detailCustomFields": "Kolom kustom: {fields}"
+      "detailCustomFields": "Kolom kustom: {fields}",
+      "intro": "Unggah CSV dengan kolom phone, lalu tinjau kontak Anda.",
+      "csvGuide": "Format CSV dan aturan pembaruan",
+      "chooseCsv": "Pilih file CSV",
+      "changeFile": "Ganti file",
+      "updateNote": "Kontak tersimpan diperbarui. Kolom kustom kosong mempertahankan nilai yang ada.",
+      "resultsHint": "Tinjau ringkasan dan baris yang perlu diperhatikan.",
+      "importingNote": "Biarkan jendela ini terbuka selama kontak diimpor."
     },
     "customFields": {
       "title": "Bidang khusus",

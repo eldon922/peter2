@@ -59,7 +59,7 @@ export function TagPickerList({
           {visible.map((tag) => (
             <label
               key={tag.id}
-              className="hover:bg-muted/50 flex cursor-pointer items-center gap-2.5 px-3 py-1.5"
+              className="hover:bg-muted/50 flex min-h-10 cursor-pointer items-center gap-2.5 px-3 py-2"
             >
               {selectionMode === 'single' ? (
                 <input
@@ -122,7 +122,7 @@ export function TagMultiSelect({
   return (
     <div
       className={cn(
-        'border-border bg-muted flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5',
+        'border-border bg-muted flex min-h-10 min-w-0 flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5',
         disabled && 'opacity-50',
         className
       )}
@@ -131,23 +131,25 @@ export function TagMultiSelect({
         <span
           key={tag.id}
           className={cn(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+            'inline-flex max-w-full min-w-0 items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2 text-xs font-medium',
             variant === 'danger'
-              ? 'border-red-500/30 bg-red-500/10 text-red-300'
+              ? 'border-red-500/30 bg-red-500/10 text-red-800 dark:text-red-300'
               : 'border-primary/30 bg-primary/10 text-primary'
           )}
         >
           <span
-            className="size-2 rounded-full"
+            className="size-2 shrink-0 rounded-full"
             style={{ backgroundColor: tag.color }}
           />
-          {tag.name}
+          <span className="truncate" title={tag.name}>
+            {tag.name}
+          </span>
           <button
             type="button"
             onClick={() => onToggle(tag.id)}
             disabled={disabled}
             aria-label={t('remove', { name: tag.name })}
-            className="hover:opacity-70"
+            className="hover:bg-foreground/5 focus-visible:ring-ring flex size-7 shrink-0 items-center justify-center rounded outline-none focus-visible:ring-2 pointer-coarse:size-10"
           >
             <X className="size-3" />
           </button>
@@ -157,7 +159,7 @@ export function TagMultiSelect({
       <Popover>
         <PopoverTrigger
           disabled={disabled}
-          className="text-muted-foreground hover:text-foreground inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-sm outline-none focus-visible:ring-2 pointer-coarse:min-h-10"
         >
           {selected.length === 0 ? (placeholder ?? t('placeholder')) : t('add')}
           <ChevronDown className="size-3.5" />

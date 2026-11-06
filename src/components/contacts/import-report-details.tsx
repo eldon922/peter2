@@ -18,12 +18,12 @@ type SectionKey =
   | 'customFieldFailed';
 
 const TONE: Record<SectionKey, string> = {
-  imported: 'text-primary',
-  updated: 'text-primary',
-  skipped: 'text-amber-400',
-  failed: 'text-red-400',
-  tagFailed: 'text-red-400',
-  customFieldFailed: 'text-red-400',
+  imported: 'text-emerald-800 dark:text-emerald-300',
+  updated: 'text-emerald-800 dark:text-emerald-300',
+  skipped: 'text-amber-800 dark:text-amber-200',
+  failed: 'text-red-700 dark:text-red-300',
+  tagFailed: 'text-red-700 dark:text-red-300',
+  customFieldFailed: 'text-red-700 dark:text-red-300',
 };
 
 function Section({
@@ -75,7 +75,7 @@ function Section({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium"
+        className="focus-visible:ring-ring flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium outline-none focus-visible:ring-2"
       >
         <span className={TONE[sectionKey]}>
           {t(`section.${sectionKey}`, { count: rows.length })}
@@ -112,7 +112,7 @@ function Section({
             <button
               type="button"
               onClick={() => setShown(shown + PAGE)}
-              className="border-border text-muted-foreground hover:text-foreground w-full border-t px-3 py-1.5 text-xs"
+              className="border-border text-muted-foreground hover:text-foreground focus-visible:ring-ring min-h-10 w-full border-t px-3 py-2 text-sm outline-none focus-visible:ring-2"
             >
               {t('reportShowMore', {
                 count: Math.min(PAGE, rows.length - shown),
@@ -130,7 +130,7 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
   const t = useTranslations('Contacts.importModal');
   return (
     <div className="mt-4 space-y-2">
-      <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
+      <p className="text-foreground text-sm font-semibold">
         {t('reportTitle')}
       </p>
       <Section sectionKey="failed" rows={report.failed} />
@@ -140,7 +140,7 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
       <Section sectionKey="updated" rows={report.updated} />
       <Section sectionKey="imported" rows={report.imported} />
       {report.skippedTags.length > 0 && (
-        <p className="text-xs leading-relaxed text-amber-500">
+        <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
           {t('reportSkippedTags', { names: report.skippedTags.join(', ') })}
         </p>
       )}

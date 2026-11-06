@@ -555,7 +555,14 @@
       "customFieldsHint": "기존 사용자 지정 필드 이름을 CSV 열 제목으로 사용하세요. 값이 있는 셀은 필드를 업데이트하며, 빈 셀은 저장된 값을 유지합니다. 알 수 없는 열은 무시됩니다.",
       "readingFile": "CSV를 읽고 사용자 지정 필드를 확인하는 중…",
       "customFieldsWarning": "{count}개 연락처의 사용자 지정 필드를 저장하지 못했습니다. 아래 보고서를 확인하세요.",
-      "detailCustomFields": "사용자 지정 필드: {fields}"
+      "detailCustomFields": "사용자 지정 필드: {fields}",
+      "intro": "phone 열이 있는 CSV를 업로드한 후 연락처를 확인하세요.",
+      "csvGuide": "CSV 형식 및 업데이트 규칙",
+      "chooseCsv": "CSV 파일 선택",
+      "changeFile": "파일 변경",
+      "updateNote": "저장된 연락처는 업데이트됩니다. 빈 사용자 지정 필드는 기존 값을 유지합니다.",
+      "resultsHint": "요약과 확인이 필요한 행을 검토하세요.",
+      "importingNote": "연락처를 가져오는 동안 이 창을 열어 두세요."
     },
     "customFields": {
       "title": "커스텀 필드",

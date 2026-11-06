@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Tag as TagRecord, CustomField } from '@/types';
 import { Input } from '@/components/ui/input';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
@@ -54,11 +54,18 @@ import {
   XCircle,
   AlertTriangle,
   Tag,
+  ChevronDown,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 const DEFAULT_TAG_COLOR = '#3b82f6';
 const PREVIEW_LIMIT = 5;
+
+const csvColumn = (chunks: ReactNode) => (
+  <code className="bg-muted text-foreground rounded px-1 py-0.5 text-xs">
+    {chunks}
+  </code>
+);
 
 function truncateFilename(name: string, max = 48): string {
   if (name.length <= max) return name;
@@ -79,11 +86,7 @@ function PreviewCell({
 }) {
   return (
     <span
-      className={cn(
-        'block truncate',
-        maxWidth,
-        mono && 'font-mono text-[11px]'
-      )}
+      className={cn('block truncate', maxWidth, mono && 'font-mono text-xs')}
       title={value}
     >
       {value}
@@ -113,10 +116,9 @@ function ImportPreviewTags({
         return (
           <span
             key={name}
-            className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none font-medium"
+            className="text-foreground inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-xs leading-none font-medium"
             style={{
               backgroundColor: `${color}18`,
-              color,
               border: `1px solid ${color}${isKnown ? '55' : '30'}`,
             }}
             title={isKnown ? name : t('willBeCreated', { name })}
@@ -813,153 +815,131 @@ export function ImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="border-border/80 bg-popover text-popover-foreground flex max-h-[min(90vh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <div className="border-border/80 shrink-0 space-y-4 border-b px-6 pt-6 pb-5">
-          <DialogHeader className="gap-1.5">
-            <DialogTitle className="text-popover-foreground text-lg">
-              {t('title')}
-            </DialogTitle>
-            <DialogDescription
-              className="text-muted-foreground leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: t.markup('desc', {
-                  phoneCode: (chunks) =>
-                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  nameCode: (chunks) =>
-                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  emailCode: (chunks) =>
-                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  companyCode: (chunks) =>
-                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                  tagsCode: (chunks) =>
-                    `<code class="rounded bg-muted px-1 py-0.5 text-[11px] text-muted-foreground">${chunks}</code>`,
-                }),
-              }}
-            />
-            {/* Says what happens to numbers already on file, because the
-                answer changed: they used to be skipped. */}
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              {t('mergeHint')}
-            </p>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              {t('customFieldsHint')}
-            </p>
-          </DialogHeader>
+      <DialogContent
+        showCloseButton={!importing}
+        className="bg-popover text-popover-foreground flex max-h-[min(90dvh,48rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl [&>[data-slot=dialog-close]]:size-10"
+      >
+        <DialogHeader className="border-border shrink-0 gap-2 border-b px-5 py-5 pr-14">
+          <DialogTitle className="text-lg font-semibold">
+            {t('title')}
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed">
+            {result
+              ? t('resultsHint')
+              : importing
+                ? t('importingNote')
+                : t('intro')}
+          </DialogDescription>
+        </DialogHeader>
 
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ')
-                fileInputRef.current?.click();
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                setDragging(false);
-              }
-            }}
-            onDrop={handleDrop}
-            className={cn(
-              'group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-5 transition-all',
-              dragging
-                ? 'border-primary bg-primary/10'
-                : file
-                  ? 'border-primary/35 bg-primary/[0.04]'
-                  : 'hover:border-primary/40 border-border/80 bg-background/40 hover:bg-background/70'
-            )}
-          >
-            {file ? (
-              <>
-                <div className="bg-primary/15 ring-primary/25 flex size-10 items-center justify-center rounded-lg ring-1">
-                  <FileText className="text-primary size-5" />
-                </div>
-                <p
-                  className="text-popover-foreground max-w-full truncate px-2 text-sm font-medium"
-                  title={file.name}
-                >
-                  {truncateFilename(file.name)}
-                </p>
-                <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-                  {parsingFile
-                    ? t('readingFile')
-                    : t('rowsReady', { count: parsedRows.length })}
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="bg-muted/80 ring-border/80 group-hover:bg-muted flex size-10 items-center justify-center rounded-lg ring-1 transition-colors">
-                  <Upload className="text-muted-foreground group-hover:text-foreground size-5" />
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  {t('uploadDropzone')}
-                </p>
-                <p className="text-muted-foreground text-[11px]">
-                  {t('uploadHint')}
-                </p>
-              </>
-            )}
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => {
-              const selected = e.target.files?.[0];
-              if (selected) void loadFile(selected);
-            }}
-            className="hidden"
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          {!result && (
-            <div className="mb-4 space-y-2">
-              <p className="text-popover-foreground text-sm font-medium">
-                {t('additionalTags')}
-              </p>
-              <TagMultiSelect
-                tags={availableTags}
-                value={selectedTagIds}
-                disabled={importing}
-                onToggle={(id) =>
-                  setSelectedTagIds((prev) =>
-                    prev.includes(id)
-                      ? prev.filter((tagId) => tagId !== id)
-                      : [...prev, id]
-                  )
-                }
-                onClear={() => setSelectedTagIds([])}
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+          {!result && !importing && (
+            <>
+              <button
+                type="button"
+                disabled={parsingFile}
+                aria-label={file ? t('changeFile') : t('chooseCsv')}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                    setDragging(false);
+                }}
+                onDrop={handleDrop}
+                className={cn(
+                  'border-border bg-background focus-visible:ring-ring w-full rounded-lg border text-left transition-colors outline-none focus-visible:ring-2 disabled:cursor-wait',
+                  file
+                    ? 'flex items-center gap-3 p-3'
+                    : 'hover:bg-muted/40 flex flex-col items-center justify-center gap-3 border-dashed px-5 py-7 text-center',
+                  dragging && 'border-primary bg-primary-soft'
+                )}
+              >
+                {file ? (
+                  <>
+                    <FileText className="text-muted-foreground size-6 shrink-0" />
+                    <span className="min-w-0 flex-1 space-y-1">
+                      <span
+                        className="text-foreground block truncate text-sm font-medium"
+                        title={file.name}
+                      >
+                        {truncateFilename(file.name)}
+                      </span>
+                      <span className="text-muted-foreground block text-xs">
+                        {parsingFile
+                          ? t('readingFile')
+                          : t('rowsReady', { count: parsedRows.length })}
+                      </span>
+                    </span>
+                    <span className="text-primary shrink-0 text-xs font-medium">
+                      {t('changeFile')}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="text-muted-foreground size-6" />
+                    <span className="text-foreground text-sm font-medium">
+                      {t('uploadDropzone')}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {t('uploadHint')}
+                    </span>
+                  </>
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => {
+                  const selected = e.target.files?.[0];
+                  if (selected) void loadFile(selected);
+                }}
+                className="hidden"
               />
-              <Input
-                value={extraTags}
-                disabled={importing || !canEditSettings}
-                onChange={(event) => setExtraTags(event.target.value)}
-                aria-label={t('newTags')}
-                placeholder={t('newTags')}
-              />
-            </div>
+              <details className="group text-sm">
+                <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-md outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden">
+                  {t('csvGuide')}
+                  <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="text-muted-foreground space-y-3 pt-2 text-xs leading-relaxed">
+                  <p>
+                    {t.rich('desc', {
+                      phoneCode: csvColumn,
+                      nameCode: csvColumn,
+                      emailCode: csvColumn,
+                      companyCode: csvColumn,
+                      tagsCode: csvColumn,
+                    })}
+                  </p>
+                  <p>{t('mergeHint')}</p>
+                  <p>{t('customFieldsHint')}</p>
+                </div>
+              </details>
+              {file && (
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {t('updateNote')}
+                </p>
+              )}
+            </>
           )}
           {preview.length > 0 && !result && !importing && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-muted-foreground text-[11px] font-semibold tracking-[0.14em] uppercase">
+                <p className="text-foreground text-sm font-semibold">
                   {t('preview', { count: preview.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {inFileDropped.length > 0 && (
-                    <span className="bg-muted/90 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-amber-500">
+                    <span className="bg-muted/90 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-amber-800 dark:text-amber-200">
                       <AlertTriangle className="size-3" />
                       {t('previewDuplicates', { count: inFileDropped.length })}
                     </span>
                   )}
                   {tagStats.rowsWithTags > 0 && (
-                    <span className="bg-muted/90 text-muted-foreground inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px]">
+                    <span className="bg-muted/90 text-muted-foreground inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs">
                       <Tag className="text-primary/80 size-3" />
                       {t('previewTags', {
                         tags: tagStats.unique,
@@ -970,34 +950,39 @@ export function ImportModal({
                 </div>
               </div>
 
-              <div className="border-border ring-border/50 overflow-hidden rounded-xl border ring-1">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[32rem] text-xs">
+              <div className="border-border overflow-hidden rounded-lg border">
+                <div
+                  className="focus-visible:outline-ring overflow-x-auto focus-visible:outline-2"
+                  tabIndex={0}
+                  role="region"
+                  aria-label={t('preview', { count: preview.length })}
+                >
+                  <table className="w-full min-w-[32rem] text-sm">
                     <thead>
                       <tr className="border-border bg-background/60 border-b">
-                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
+                        <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap">
                           {t('columns.phone')}
                         </th>
-                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
+                        <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap">
                           {t('columns.name')}
                         </th>
-                        <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
+                        <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap">
                           {t('columns.email')}
                         </th>
                         {previewHasCompany && (
-                          <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
+                          <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap">
                             {t('columns.company')}
                           </th>
                         )}
                         {previewHasTags && (
-                          <th className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap">
+                          <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap">
                             {t('columns.tags')}
                           </th>
                         )}
                         {previewCustomFields.map((field) => (
                           <th
                             key={field.id}
-                            className="text-muted-foreground px-3 py-2 text-left font-medium whitespace-nowrap"
+                            className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium whitespace-nowrap"
                           >
                             {field.field_name}
                           </th>
@@ -1017,20 +1002,20 @@ export function ImportModal({
                               maxWidth="max-w-[7.5rem]"
                             />
                           </td>
-                          <td className="text-popover-foreground px-3 py-2">
+                          <td className="text-popover-foreground px-3 py-2.5">
                             <PreviewCell
                               value={row.name || '—'}
                               maxWidth="max-w-[8.5rem]"
                             />
                           </td>
-                          <td className="text-muted-foreground px-3 py-2">
+                          <td className="text-muted-foreground px-3 py-2.5">
                             <PreviewCell
                               value={row.email || '—'}
                               maxWidth="max-w-[10rem]"
                             />
                           </td>
                           {previewHasCompany && (
-                            <td className="text-muted-foreground px-3 py-2">
+                            <td className="text-muted-foreground px-3 py-2.5">
                               <PreviewCell
                                 value={row.company || '—'}
                                 maxWidth="max-w-[7rem]"
@@ -1048,7 +1033,7 @@ export function ImportModal({
                           {previewCustomFields.map((field) => (
                             <td
                               key={field.id}
-                              className="text-muted-foreground px-3 py-2"
+                              className="text-muted-foreground px-3 py-2.5"
                             >
                               <PreviewCell
                                 value={row.customValues?.[field.id] || '—'}
@@ -1063,15 +1048,48 @@ export function ImportModal({
               </div>
 
               {parsedRows.length > PREVIEW_LIMIT && (
-                <p className="text-muted-foreground text-center text-[11px]">
+                <p className="text-muted-foreground text-center text-xs">
                   {t('moreRows', { count: parsedRows.length - PREVIEW_LIMIT })}
                 </p>
               )}
             </div>
           )}
 
+          {!result && !importing && (
+            <div className="border-border space-y-3 border-t pt-5">
+              <p className="text-foreground text-sm font-semibold">
+                {t('additionalTags')}
+              </p>
+              <TagMultiSelect
+                className="bg-background min-h-10"
+                tags={availableTags}
+                value={selectedTagIds}
+                disabled={importing}
+                onToggle={(id) =>
+                  setSelectedTagIds((prev) =>
+                    prev.includes(id)
+                      ? prev.filter((tagId) => tagId !== id)
+                      : [...prev, id]
+                  )
+                }
+                onClear={() => setSelectedTagIds([])}
+              />
+              <Input
+                className="bg-background h-10"
+                value={extraTags}
+                disabled={importing || !canEditSettings}
+                onChange={(event) => setExtraTags(event.target.value)}
+                aria-label={t('newTags')}
+                placeholder={t('newTags')}
+              />
+            </div>
+          )}
           {!result && importing && progress && (
-            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex min-h-52 flex-col items-center justify-center gap-3 py-8 text-center"
+            >
               <Loader2 className="text-primary size-5 animate-spin" />
               <p className="text-popover-foreground text-sm font-medium">
                 {t(`stage.${progress.stage}`)}
@@ -1099,18 +1117,21 @@ export function ImportModal({
           )}
 
           {result && (
-            <div className="border-border bg-background/50 rounded-xl border p-4">
-              <p className="text-popover-foreground text-sm font-medium">
+            <div className="space-y-4">
+              <p
+                role="status"
+                className="text-foreground text-base font-semibold"
+              >
                 {result.partial ? t('importPartial') : t('importComplete')}
               </p>
               {result.partial && (
-                <p className="mt-1 text-xs leading-relaxed text-amber-500">
+                <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
                   {t('importPartialHint')}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap gap-3">
                 {result.report.imported.length > 0 && (
-                  <div className="text-primary flex items-center gap-1.5 text-sm">
+                  <div className="flex items-center gap-1.5 text-sm text-emerald-800 dark:text-emerald-300">
                     <CheckCircle className="size-4 shrink-0" />
                     {t('resultImported', {
                       count: result.report.imported.length,
@@ -1118,7 +1139,7 @@ export function ImportModal({
                   </div>
                 )}
                 {result.report.updated.length > 0 && (
-                  <div className="text-primary flex items-center gap-1.5 text-sm">
+                  <div className="flex items-center gap-1.5 text-sm text-emerald-800 dark:text-emerald-300">
                     <CheckCircle className="size-4 shrink-0" />
                     {t('resultUpdated', {
                       count: result.report.updated.length,
@@ -1126,13 +1147,13 @@ export function ImportModal({
                   </div>
                 )}
                 {result.tagsAssigned > 0 && (
-                  <div className="flex items-center gap-1.5 text-sm text-cyan-400">
+                  <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
                     <CheckCircle className="size-4 shrink-0" />
                     {t('resultTags', { count: result.tagsAssigned })}
                   </div>
                 )}
                 {result.report.skipped.length > 0 && (
-                  <div className="flex items-center gap-1.5 text-sm text-amber-400">
+                  <div className="flex items-center gap-1.5 text-sm text-amber-800 dark:text-amber-200">
                     <AlertTriangle className="size-4 shrink-0" />
                     {t('resultSkipped', {
                       count: result.report.skipped.length,
@@ -1140,7 +1161,7 @@ export function ImportModal({
                   </div>
                 )}
                 {result.report.tagFailed.length > 0 && (
-                  <div className="flex items-center gap-1.5 text-sm text-red-400">
+                  <div className="flex items-center gap-1.5 text-sm text-red-700 dark:text-red-300">
                     <XCircle className="size-4 shrink-0" />
                     {t('resultTagFailed', {
                       count: result.report.tagFailed.length,
@@ -1148,14 +1169,14 @@ export function ImportModal({
                   </div>
                 )}
                 {result.report.customFieldFailed.length > 0 && (
-                  <p className="text-sm text-red-400">
+                  <p className="text-sm text-red-700 dark:text-red-300">
                     {t('customFieldsWarning', {
                       count: result.report.customFieldFailed.length,
                     })}
                   </p>
                 )}
                 {result.report.failed.length > 0 && (
-                  <div className="flex items-center gap-1.5 text-sm text-red-400">
+                  <div className="flex items-center gap-1.5 text-sm text-red-700 dark:text-red-300">
                     <XCircle className="size-4 shrink-0" />
                     {t('resultFailed', { count: result.report.failed.length })}
                   </div>
@@ -1166,12 +1187,13 @@ export function ImportModal({
           )}
         </div>
 
-        <DialogFooter className="border-border/80 bg-background/50 mt-0 mb-4 shrink-0 gap-2 border-t px-6 py-4 sm:justify-end">
+        <DialogFooter className="mx-0 mb-0 shrink-0 flex-col gap-2 px-5 py-4 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="outline"
+            disabled={importing}
             onClick={() => handleOpenChange(false)}
-            className="border-border text-muted-foreground hover:bg-muted"
+            className="h-auto min-h-10 px-4 py-2 whitespace-normal"
           >
             {result ? t('close') : t('cancel')}
           </Button>
@@ -1180,7 +1202,7 @@ export function ImportModal({
               type="button"
               disabled={parsedRows.length === 0 || parsingFile || importing}
               onClick={handleImport}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="h-auto min-h-10 px-5 py-2 whitespace-normal"
             >
               {importing && <Loader2 className="size-4 animate-spin" />}
               {parsedRows.length > 0
