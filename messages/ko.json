@@ -942,7 +942,14 @@
         "toastInvalidMediaFile": "{kind}은(는) 다음 중 하나여야 합니다: {types}.",
         "toastMediaTooLarge": "파일 크기가 {size}MB입니다 — 제한은 {limit}MB입니다.",
         "headerMediaMissing": "이 템플릿을 보내려면 미디어 파일 또는 URL이 필요합니다.",
-        "headerMediaInvalid": "유효한 http(s) URL을 입력하세요."
+        "headerMediaInvalid": "유효한 http(s) URL을 입력하세요.",
+        "valuePlaceholder": "값을 입력하세요…",
+        "loadingFields": "연락처 필드 불러오는 중…",
+        "noCustomFields": "사용 가능한 사용자 지정 필드가 없습니다",
+        "valueRequired": "이 변수의 값을 입력하거나 필드를 선택하세요.",
+        "missingValues": "계속하려면 남은 변수 {count}개를 설정하세요.",
+        "previewContact": "{name}의 연락처 정보를 사용한 미리보기입니다.",
+        "noVariables": "이 템플릿에는 개인화할 변수가 없습니다."
       },
       "scheduleSend": {
         "title": "검토 및 전송",

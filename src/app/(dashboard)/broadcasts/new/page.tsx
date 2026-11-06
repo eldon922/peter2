@@ -11,8 +11,14 @@ import { Step2SelectAudience } from '@/components/broadcasts/step2-select-audien
 import { Step3Personalize } from '@/components/broadcasts/step3-personalize';
 import { Step4ScheduleSend } from '@/components/broadcasts/step4-schedule-send';
 import { useBroadcastSending } from '@/hooks/use-broadcast-sending';
-import { NO_HEADER_MEDIA, type HeaderMedia } from '@/lib/broadcasts/header-media';
-import { defaultHeaderMedia, whatChangingTemplateClears } from '@/lib/broadcasts/template-change';
+import {
+  NO_HEADER_MEDIA,
+  type HeaderMedia,
+} from '@/lib/broadcasts/header-media';
+import {
+  defaultHeaderMedia,
+  whatChangingTemplateClears,
+} from '@/lib/broadcasts/template-change';
 import { useLeaveGuard } from '@/hooks/use-leave-guard';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { BroadcastSavedError } from '@/lib/broadcasts/finish-broadcast';
@@ -66,8 +72,16 @@ export default function NewBroadcastPage() {
   // The variable values and the image belong to the template they were set for.
   function selectTemplate(next: MessageTemplate) {
     if (next.id !== template?.id) {
-      const clears = whatChangingTemplateClears(template, variables, headerMedia);
-      if (clears && !window.confirm(t('changeTemplateConfirm', { items: clears }))) return;
+      const clears = whatChangingTemplateClears(
+        template,
+        variables,
+        headerMedia
+      );
+      if (
+        clears &&
+        !window.confirm(t('changeTemplateConfirm', { items: clears }))
+      )
+        return;
       setVariables({});
       setHeaderMedia(defaultHeaderMedia(next));
     }
@@ -103,7 +117,9 @@ export default function NewBroadcastPage() {
       });
       await release();
       if (scheduledAt) {
-        toast.success(t('toastScheduled', { time: formatScheduledAt(scheduledAt) }));
+        toast.success(
+          t('toastScheduled', { time: formatScheduledAt(scheduledAt) })
+        );
       }
       router.push(`/broadcasts/${broadcastId}`);
     } catch (err) {
@@ -190,63 +206,41 @@ export default function NewBroadcastPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('subtitle')}
-        </p>
+        <h1 className="text-foreground text-2xl font-bold">{t('title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t('subtitle')}</p>
       </div>
 
       {/* Step Indicator */}
-      <div className="flex items-center justify-between">
+      <ol aria-label={t('title')} className="grid grid-cols-4 gap-2 sm:gap-4">
         {steps.map((step, index) => {
           const isActive = index === currentStep;
           const isCompleted = index < currentStep;
 
           return (
-            // Only steps that still have a connector after them stretch.
-            // The last one used to take an equal share of the row with
-            // nothing but its circle to fill it, so it sat hard left of
-            // a quarter-width gap and threw the whole row off-centre.
-            <div
+            <li
               key={step.key}
-              className={`flex items-center ${
-                index < steps.length - 1 ? 'flex-1' : ''
-              }`}
+              aria-current={isActive ? 'step' : undefined}
+              className={`flex min-w-0 flex-col gap-2 border-b-2 pb-3 ${isActive || isCompleted ? 'border-primary' : 'border-border'}`}
             >
-              <div className="flex items-center gap-2">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-all ${
-                    isCompleted
-                      ? 'bg-primary text-primary-foreground'
-                      : isActive
-                        ? 'border-2 border-primary bg-primary/10 text-primary'
-                        : 'border border-border bg-muted text-muted-foreground'
-                  }`}
-                >
-                  {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
-                </div>
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                 <span
-                  className={`hidden text-sm font-medium sm:block ${
-                    isActive ? 'text-foreground' : isCompleted ? 'text-primary' : 'text-muted-foreground'
-                  }`}
+                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${isCompleted ? 'bg-primary text-primary-foreground' : isActive ? 'bg-primary-soft text-primary' : 'bg-muted text-muted-foreground'}`}
+                >
+                  {isCompleted ? <Check className="size-3.5" /> : index + 1}
+                </span>
+                <span
+                  className={`min-w-0 text-xs font-medium break-words sm:text-sm ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
                 >
                   {t(`steps.${step.label}`)}
                 </span>
               </div>
-              {index < steps.length - 1 && (
-                <div
-                  className={`mx-3 h-px flex-1 ${
-                    index < currentStep ? 'bg-primary' : 'bg-muted'
-                  }`}
-                />
-              )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
       {/* Step Content */}
       <div className="relative min-h-[400px]">

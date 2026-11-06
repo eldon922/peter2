@@ -1,6 +1,6 @@
 # Workflow UI refinement
 
-Status: proposed for user review. No product changes are approved by this document alone.
+Status: approved by the user on 2026-11-06. Implement approach 2 below.
 
 ## Intent and scope
 
@@ -14,7 +14,7 @@ Preserve the existing accent choices, fonts, light/dark modes, translations, per
 2. **Restructure the affected workflows (recommended):** give forms, previews, feedback and actions distinct roles using the existing design system. Keep the same steps and behavior.
 3. **Replace the whole dashboard design:** broader consistency work, but affects unrelated settings, navigation and workflows.
 
-The recommendation is approach 2. This is the designer's proposal, not a recorded user choice.
+The user approved approach 2: refine the affected workflows within the existing visual system.
 
 ## Broadcasts
 

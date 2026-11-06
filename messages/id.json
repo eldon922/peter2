@@ -942,7 +942,14 @@
         "toastInvalidMediaFile": "{kind} harus salah satu dari: {types}.",
         "toastMediaTooLarge": "Ukuran file {size} MB — batasnya {limit} MB.",
         "headerMediaMissing": "File media atau URL diperlukan untuk mengirim template ini.",
-        "headerMediaInvalid": "Masukkan URL http(s) yang valid."
+        "headerMediaInvalid": "Masukkan URL http(s) yang valid.",
+        "valuePlaceholder": "Masukkan nilai…",
+        "loadingFields": "Memuat kolom kontak…",
+        "noCustomFields": "Belum ada kolom kustom",
+        "valueRequired": "Tambahkan nilai atau pilih kolom untuk variabel ini.",
+        "missingValues": "Lengkapi {count} variabel yang tersisa untuk melanjutkan.",
+        "previewContact": "Pratinjau menggunakan detail kontak {name}.",
+        "noVariables": "Template ini tidak memiliki variabel untuk dipersonalisasi."
       },
       "scheduleSend": {
         "title": "Tinjau & Kirim",

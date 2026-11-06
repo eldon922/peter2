@@ -3,7 +3,11 @@
 import { Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 
 /**
@@ -20,7 +24,7 @@ export function FormattingToggle({
   const t = useTranslations('Broadcasts.wizard');
   return (
     <div className="flex items-center gap-1.5">
-      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+      <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
         <Switch checked={checked} onCheckedChange={onCheckedChange} />
         {t('applyFormatting')}
       </label>
@@ -32,13 +36,13 @@ export function FormattingToggle({
           delay={100}
           closeDelay={150}
           aria-label={t('formattingInfoLabel')}
-          className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring flex size-9 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 pointer-coarse:size-11"
         >
           <Info className="size-4" />
         </PopoverTrigger>
         <PopoverContent
           align="end"
-          className="w-64 max-w-[calc(100vw-2rem)] gap-1 p-3 text-xs text-popover-foreground"
+          className="text-popover-foreground w-64 max-w-[calc(100vw-2rem)] gap-1 p-3 text-xs"
         >
           {t('formattingInfo')}
         </PopoverContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Check, FileIcon, ImageIcon, Loader2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -27,7 +27,7 @@ interface Props {
 }
 
 const tabClass = (active: boolean) =>
-  `inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+  `inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
     active
       ? 'bg-primary text-primary-foreground'
       : 'text-muted-foreground hover:text-foreground'
@@ -46,6 +46,7 @@ export function HeaderMediaPicker({
   onSubmit,
 }: Props) {
   const t = useTranslations('Broadcasts.wizard.personalize');
+  const urlId = useId();
   const [mode, setMode] = useState<'upload' | 'url'>(
     value.source ?? (value.url && !value.mediaId ? 'url' : 'upload')
   );
@@ -111,6 +112,7 @@ export function HeaderMediaPicker({
       <div className="border-border bg-muted mb-3 inline-flex rounded-lg border p-0.5">
         <button
           type="button"
+          aria-pressed={mode === 'upload'}
           onClick={() => switchMode('upload')}
           className={tabClass(mode === 'upload')}
         >
@@ -119,6 +121,7 @@ export function HeaderMediaPicker({
         </button>
         <button
           type="button"
+          aria-pressed={mode === 'url'}
           onClick={() => switchMode('url')}
           className={tabClass(mode === 'url')}
         >
@@ -128,11 +131,11 @@ export function HeaderMediaPicker({
 
       {mode === 'upload' ? (
         <div>
-          <label className="border-border bg-muted/50 hover:border-primary/50 hover:bg-muted flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors">
+          <label className="border-border bg-muted/50 hover:border-primary/50 hover:bg-muted focus-within:ring-ring flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors focus-within:ring-2">
             <input
               type="file"
               accept={MEDIA_SPECS[kind].mimeTypes.join(',')}
-              className="hidden"
+              className="sr-only"
               disabled={uploading}
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -180,10 +183,14 @@ export function HeaderMediaPicker({
         </div>
       ) : (
         <div>
-          <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+          <label
+            htmlFor={urlId}
+            className="text-muted-foreground mb-1.5 block text-xs font-medium"
+          >
             {t('imageUrl')}
           </label>
           <Input
+            id={urlId}
             type="url"
             value={value.url}
             onChange={(e) => onChange({ mediaId: '', url: e.target.value })}
@@ -191,7 +198,7 @@ export function HeaderMediaPicker({
               if (e.key === 'Enter' && error === null) onSubmit?.();
             }}
             placeholder={t('imageUrlPlaceholder')}
-            className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
+            className="border-border bg-background text-foreground placeholder:text-muted-foreground h-10"
           />
           {linkPreview && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -205,7 +212,7 @@ export function HeaderMediaPicker({
       )}
 
       {error && (
-        <p className="mt-1.5 text-xs text-amber-300">
+        <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-200">
           {error === 'missing'
             ? t('headerMediaMissing')
             : t('headerMediaInvalid')}

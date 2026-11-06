@@ -942,7 +942,14 @@
         "toastInvalidMediaFile": "{kind} must be one of: {types}.",
         "toastMediaTooLarge": "File is {size} MB — the limit is {limit} MB.",
         "headerMediaMissing": "A media file or URL is required to send this template.",
-        "headerMediaInvalid": "Enter a valid http(s) URL."
+        "headerMediaInvalid": "Enter a valid http(s) URL.",
+        "valuePlaceholder": "Enter a value…",
+        "loadingFields": "Loading contact fields…",
+        "noCustomFields": "No custom fields available",
+        "valueRequired": "Add a value or choose a field for this variable.",
+        "missingValues": "Complete {count, plural, one {# remaining variable} other {# remaining variables}} to continue.",
+        "previewContact": "Preview using contact details for {name}.",
+        "noVariables": "This template has no variables to personalize."
       },
       "scheduleSend": {
         "title": "Review & Send",
