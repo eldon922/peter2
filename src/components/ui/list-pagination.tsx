@@ -36,18 +36,22 @@ export function ListPagination({
 }) {
   const t = useTranslations('Pagination');
   return (
-    <div className="border-border text-muted-foreground flex shrink-0 items-center justify-between gap-2 border-t px-3 py-2 text-xs">
-      <span>
+    <nav
+      aria-label={t('label')}
+      className="border-border text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-3 py-3 text-xs"
+    >
+      <span aria-live="polite" aria-atomic="true" className="tabular-nums">
         {t('range', {
           from: total ? page * pageSize + 1 : 0,
           to: Math.min(total, (page + 1) * pageSize),
           total,
         })}
       </span>
-      <div className="flex gap-1">
+      <div className="flex shrink-0 gap-1">
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-9 pointer-coarse:size-11"
           disabled={busy || page === 0}
           aria-label={t('previous')}
           onClick={() => onPageChange(page - 1)}
@@ -57,6 +61,7 @@ export function ListPagination({
         <Button
           variant="ghost"
           size="icon-sm"
+          className="size-9 pointer-coarse:size-11"
           disabled={busy || (page + 1) * pageSize >= total}
           aria-label={t('next')}
           onClick={() => onPageChange(page + 1)}
@@ -64,6 +69,6 @@ export function ListPagination({
           <ChevronRight className="size-4" />
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }

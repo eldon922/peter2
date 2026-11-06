@@ -608,11 +608,36 @@ export function MessageComposer({
   // ---- Render --------------------------------------------------------
 
   return (
-    <div className="border-border bg-card border-t p-3">
-      {!readOnly && <PhoneCountryWarning />}
-      {!draft && !recording && (
+    <div className="border-border bg-card border-t p-3 sm:p-4">
+      {replyTo && (
+        <div className="mb-2">
+          <ReplyQuote
+            authorLabel={replyTo.authorLabel}
+            preview={replyTo.preview}
+            onDismiss={onClearReply}
+          />
+        </div>
+      )}
+      {sessionExpired && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-500/10 px-3 py-2">
+          <p className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+            {t('sessionExpiredHint')}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto min-h-9 px-2 py-1 text-xs text-amber-900 dark:text-amber-200"
+            onClick={onOpenTemplates}
+          >
+            <LayoutTemplate className="mr-1 h-3 w-3" />
+            {t('templates')}
+          </Button>
+        </div>
+      )}
+
+      {!inputsDisabled && !draft && !recording && (
         <div
-          className="mb-2 flex items-center gap-1"
+          className="bg-muted/40 mb-3 flex w-fit items-center gap-1 rounded-lg p-1"
           role="toolbar"
           aria-label={t('formatting')}
         >
@@ -630,6 +655,7 @@ export function MessageComposer({
               disabled={inputsDisabled}
               aria-label={t(label)}
               title={t(label)}
+              className="size-9 pointer-coarse:size-11"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => applyFormat(marker)}
             >
@@ -638,35 +664,19 @@ export function MessageComposer({
           ))}
         </div>
       )}
-      {!draft && !recording && /[*_~`]/.test(text) && (
-        <div className="bg-muted mb-2 rounded-md px-3 py-2 text-sm break-words whitespace-pre-wrap">
+      {!readOnly && !draft && !recording && /[*_~`]/.test(text) && (
+        <div
+          role="region"
+          aria-label={t('formatPreview')}
+          tabIndex={0}
+          className="border-border bg-muted/40 focus-visible:ring-ring mb-3 max-h-32 overflow-y-auto rounded-lg border px-3 py-2 text-sm break-words whitespace-pre-wrap outline-none focus-visible:ring-2"
+        >
+          <p className="text-muted-foreground mb-1 text-xs font-medium">
+            {t('formatPreview')}
+          </p>
           <FormattedText text={text} />
         </div>
       )}
-      {replyTo && (
-        <div className="mb-2">
-          <ReplyQuote
-            authorLabel={replyTo.authorLabel}
-            preview={replyTo.preview}
-            onDismiss={onClearReply}
-          />
-        </div>
-      )}
-      {sessionExpired && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2">
-          <p className="text-xs text-amber-400">{t('sessionExpiredHint')}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-amber-400 hover:text-amber-300"
-            onClick={onOpenTemplates}
-          >
-            <LayoutTemplate className="mr-1 h-3 w-3" />
-            {t('templates')}
-          </Button>
-        </div>
-      )}
-
       {/* Hidden file inputs driven by the attach menu. */}
       <input
         ref={imageInputRef}
@@ -729,7 +739,8 @@ export function MessageComposer({
           <Button
             size="sm"
             onClick={stopRecording}
-            className="bg-primary hover:bg-primary/90 h-9 w-9 shrink-0 p-0"
+            className="bg-primary hover:bg-primary/90 h-10 w-10 shrink-0 p-0"
+            aria-label={t('stopAndAttach')}
             title={t('stopAndAttach')}
           >
             <Square className="h-4 w-4" />
@@ -750,8 +761,9 @@ export function MessageComposer({
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={readOnly}
+              aria-label={t('moreActions')}
               title={readOnly ? t('readOnlyTitle') : t('moreActions')}
-              className="text-muted-foreground hover:text-foreground inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 disabled:cursor-not-allowed disabled:opacity-50 xl:hidden"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md p-0 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 xl:hidden"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -771,7 +783,10 @@ export function MessageComposer({
                 <LayoutTemplate className="mr-2 h-4 w-4" />
                 {t('sendTemplate')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDraft} disabled={drafting}>
+              <DropdownMenuItem
+                onClick={handleDraft}
+                disabled={drafting || !canManageReplies}
+              >
                 {drafting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -837,6 +852,7 @@ export function MessageComposer({
             <DropdownMenu>
               <DropdownMenuTrigger
                 disabled={inputsDisabled || busy}
+                aria-label={t('attachMedia')}
                 title={
                   readOnly
                     ? t('readOnlyTitle')
@@ -844,7 +860,7 @@ export function MessageComposer({
                       ? undefined
                       : t('attachMedia')
                 }
-                className="text-muted-foreground hover:text-foreground inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md p-0 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -886,6 +902,7 @@ export function MessageComposer({
             <DropdownMenu>
               <DropdownMenuTrigger
                 disabled={inputsDisabled}
+                aria-label={t('moreActions')}
                 title={
                   readOnly
                     ? t('readOnlyTitle')
@@ -893,7 +910,7 @@ export function MessageComposer({
                       ? undefined
                       : t('moreActions')
                 }
-                className="text-muted-foreground hover:text-foreground inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md p-0 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md p-0 outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" />
               </DropdownMenuTrigger>
@@ -917,8 +934,9 @@ export function MessageComposer({
               size="sm"
               canAct={!readOnly}
               gateReason="send messages"
+              aria-label={t('sendTemplate')}
               title={readOnly ? undefined : t('sendTemplate')}
-              className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 p-0"
+              className="text-muted-foreground hover:text-foreground h-10 w-10 shrink-0 p-0"
               onClick={onOpenTemplates}
             >
               <LayoutTemplate className="h-4 w-4" />
@@ -930,8 +948,9 @@ export function MessageComposer({
               canAct={!readOnly}
               gateReason="send messages"
               disabled={drafting || !canManageReplies}
+              aria-label={t('draftWithAI')}
               title={readOnly ? undefined : t('draftWithAI')}
-              className="text-muted-foreground hover:text-primary h-9 w-9 shrink-0 p-0"
+              className="text-muted-foreground hover:text-primary h-10 w-10 shrink-0 p-0"
               onClick={handleDraft}
             >
               {drafting ? (
@@ -944,6 +963,7 @@ export function MessageComposer({
 
           <textarea
             ref={textareaRef}
+            aria-label={t('message')}
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -965,7 +985,7 @@ export function MessageComposer({
               // `cols` default (~20 chars), and a flex item won't shrink
               // below that on its own — so on a narrow phone the row
               // would overflow instead of the box getting smaller.
-              'border-border bg-muted text-foreground placeholder-muted-foreground focus:border-primary/50 min-w-0 flex-1 resize-none rounded-xl border px-4 py-2.5 text-sm transition-colors outline-none',
+              'border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus-visible:ring-ring min-h-11 min-w-0 flex-1 resize-none rounded-lg border px-3 py-2.5 text-sm transition-colors outline-none focus-visible:ring-2',
               (sessionExpired || readOnly) && 'cursor-not-allowed opacity-50'
             )}
           />
@@ -976,20 +996,24 @@ export function MessageComposer({
             gateReason="send messages"
             disabled={!text.trim() || sessionExpired || sending}
             onClick={handleSend}
-            className="bg-primary hover:bg-primary/90 h-9 w-9 shrink-0 p-0 disabled:opacity-40"
+            aria-label={t('send')}
+            title={t('send')}
+            className="bg-primary hover:bg-primary/90 h-10 w-10 shrink-0 p-0 disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
           </GatedButton>
         </div>
       )}
 
-      {/* Hint sits outside the flex row so its height doesn't push
-          `items-end` buttons below the textarea. Indented to line up
-          under the textarea left edge. */}
-      {!draft && !recording && (
-        <p className="text-muted-foreground mt-1 pl-[5.5rem] text-[10px]">
-          {t('draftHint')}
-        </p>
+      {!readOnly && (
+        <div className="mt-3 space-y-2">
+          <PhoneCountryWarning />
+          {!draft && !recording && canManageReplies && (
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {t('draftHint')}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Interactive-message builder dialog. */}
@@ -1109,6 +1133,7 @@ function MediaDraftPreview({
                 onSend();
               }
             }}
+            aria-label={t('addCaption')}
             placeholder={t('addCaption')}
             className="border-border bg-muted text-foreground placeholder-muted-foreground focus:border-primary/50 flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors outline-none"
           />
@@ -1118,9 +1143,10 @@ function MediaDraftPreview({
           canAct={!readOnly}
           gateReason="send messages"
           disabled={busy}
+          aria-label={t('send')}
           onClick={onSend}
           className={cn(
-            'bg-primary hover:bg-primary/90 h-9 w-9 shrink-0 p-0 disabled:opacity-40',
+            'bg-primary hover:bg-primary/90 h-10 w-10 shrink-0 p-0 disabled:opacity-40',
             draft.kind === 'audio' && 'ml-auto'
           )}
         >

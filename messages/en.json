@@ -154,7 +154,10 @@
       "noMessagesYet": "No messages yet",
       "unknown": "Unknown",
       "contactRemoved": "Removed",
-      "untagged": "Untagged"
+      "untagged": "Untagged",
+      "loadError": "Could not load conversations. Please try again.",
+      "refreshError": "Could not refresh conversations. The list may be out of date.",
+      "retry": "Try again"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -197,7 +200,7 @@
       "noCustomerMessages": "No customer messages"
     },
     "composer": {
-      "draftHint": "Tap the ✨ to draft a reply with AI — you can edit it before sending",
+      "draftHint": "Use AI to draft a reply, then review it before sending.",
       "sessionExpiredHint": "24-hour session expired. Use a template to re-engage.",
       "templates": "Templates",
       "readOnlyPlaceholder": "Read-only — viewers can browse but not reply",
@@ -229,7 +232,9 @@
       "bold": "Bold",
       "italic": "Italic",
       "strike": "Strikethrough",
-      "code": "Monospace"
+      "code": "Monospace",
+      "message": "Message",
+      "formatPreview": "Formatted preview"
     },
     "bubble": {
       "photo": "Photo",
@@ -2008,13 +2013,14 @@
     "remove": "Remove {name}"
   },
   "PhoneFormat": {
-    "warning": "Check country codes before sending. Local numbers starting with 0 are automatically changed to +{code} (DEFAULT_COUNTRY_CODE) when sending messages or broadcasts. Use full international numbers for other countries.",
-    "fallback": "Use full international phone numbers. Local numbers starting with 0 use the configured DEFAULT_COUNTRY_CODE when messages or broadcasts are sent."
+    "warning": "Local numbers starting with 0 use +{code} by default. Include a country code for numbers from other countries.",
+    "fallback": "Use full international phone numbers. Local numbers starting with 0 use your default country code."
   },
   "Pagination": {
     "range": "{from}–{to} of {total}",
     "previous": "Previous page",
-    "next": "Next page"
+    "next": "Next page",
+    "label": "Pagination"
   },
   "Activity": {
     "loading": "Loading…"

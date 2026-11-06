@@ -46,6 +46,7 @@ import {
   AlertCircle,
   MessageCircle,
   Filter,
+  Search,
   Download,
   ChevronDown,
   Trash2,
@@ -1056,8 +1057,8 @@ export default function BroadcastDetailPage() {
           recipientSearch !== deferredRecipientSearch
         }
       >
-        <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-          <h2 className="text-foreground text-sm font-medium">
+        <div className="border-border flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center xl:justify-between">
+          <h2 className="text-foreground text-sm font-semibold">
             {statusFilter !== 'all' || deferredRecipientSearch.trim()
               ? t('recipientsHeader', {
                   filtered: recipientCount,
@@ -1065,30 +1066,33 @@ export default function BroadcastDetailPage() {
                 })
               : t('recipientsHeaderAll', { total: broadcast.total_recipients })}
           </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              value={recipientSearch}
-              onChange={(event) => setRecipientSearch(event.target.value)}
-              placeholder={t('searchRecipients')}
-              aria-label={t('searchRecipients')}
-              className="h-8 w-56"
-            />
-            {(loadingRecipients ||
-              filtering ||
-              recipientSearch !== deferredRecipientSearch) && (
-              <Loader2
-                className="text-primary size-4 animate-spin"
-                role="status"
-                aria-label={tActivity('loading')}
+          <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <div className="relative col-span-2 min-w-0 sm:w-64">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                value={recipientSearch}
+                onChange={(event) => setRecipientSearch(event.target.value)}
+                placeholder={t('searchRecipients')}
+                aria-label={t('searchRecipients')}
+                className="bg-background h-10 w-full pr-9 pl-9"
               />
-            )}
+              {(loadingRecipients ||
+                filtering ||
+                recipientSearch !== deferredRecipientSearch) && (
+                <Loader2
+                  className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin"
+                  role="status"
+                  aria-label={tActivity('loading')}
+                />
+              )}
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-border text-muted-foreground hover:bg-muted"
+                    className="h-auto min-h-10 px-3 py-2 whitespace-normal"
                   />
                 }
               >
@@ -1130,7 +1134,7 @@ export default function BroadcastDetailPage() {
               size="sm"
               onClick={handleExport}
               disabled={exporting || broadcast.total_recipients === 0}
-              className="border-border text-muted-foreground hover:bg-muted"
+              className="h-auto min-h-10 px-3 py-2 whitespace-normal"
             >
               {exporting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

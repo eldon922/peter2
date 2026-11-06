@@ -14,6 +14,7 @@ import { Search, ChevronDown, X, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -62,6 +63,7 @@ export function ConversationList({
   latestInbound = null,
 }: ConversationListProps) {
   const t = useTranslations('Inbox.conversationList');
+  const tActivity = useTranslations('Activity');
 
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(
     () => [
@@ -93,6 +95,8 @@ export function ConversationList({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   // Contact-based filters (issue #272). Tags use OR logic (a conversation
   // matches if its contact carries any selected tag), consistent with
   // Broadcast audience filtering. Company is an exact match on the field.
@@ -143,8 +147,9 @@ export function ConversationList({
         p_offset: page * 25,
       });
       if (cancelled) return;
-      if (error) {
-        console.error('Failed to fetch conversations:', error.message);
+      if (error || !data) {
+        console.error('Failed to fetch conversations:', error?.message);
+        setLoadError(true);
         setLoading(false);
         return;
       }
@@ -162,8 +167,14 @@ export function ConversationList({
         )
       );
       loadedPage.current = pageKey;
+      setLoadError(false);
       setLoading(false);
-    })();
+    })().catch((error) => {
+      if (cancelled) return;
+      console.error('Failed to fetch conversations:', error);
+      setLoadError(true);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -175,6 +186,7 @@ export function ConversationList({
     search,
     selectedTagIds,
     selectedCompany,
+    refreshAttempt,
   ]);
 
   // Realtime inbound: reopen / refresh the badge immediately.
@@ -302,22 +314,26 @@ export function ConversationList({
     // w-full on mobile so the list occupies the whole viewport when it's
     // the single pane showing; fixed 320px on desktop where it shares the
     // row with the thread + contact sidebar.
-    <div className="border-border bg-card flex h-full w-full flex-col border-r lg:w-80">
+    <div
+      aria-busy={loading}
+      className="border-border bg-card flex h-full w-full min-w-0 flex-col border-r lg:w-80"
+    >
       {/* Search + Filter */}
       <div className="border-border space-y-2 border-b p-3">
         <div className="relative">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             value={search}
             onChange={handleSearchChange}
             placeholder={t('searchPlaceholder')}
-            className="border-border bg-muted text-foreground placeholder-muted-foreground focus:border-primary/50 pl-9 text-sm"
+            aria-label={t('searchPlaceholder')}
+            className="bg-background h-10 pl-9 text-sm"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-1">
           <DropdownMenu>
-            <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs">
+            <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:ring-ring inline-flex h-9 items-center justify-center gap-1 rounded-md px-2 text-xs outline-none focus-visible:ring-2">
               {activeFilter?.label ?? t('filterAll')}
               <ChevronDown className="h-3 w-3" />
             </DropdownMenuTrigger>
@@ -346,7 +362,7 @@ export function ConversationList({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  'hover:bg-muted inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs',
+                  'hover:bg-muted focus-visible:ring-ring inline-flex h-9 items-center justify-center gap-1 rounded-md px-2 text-xs outline-none focus-visible:ring-2',
                   selectedTagIds.length > 0
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
@@ -390,7 +406,7 @@ export function ConversationList({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  'hover:bg-muted inline-flex h-7 max-w-40 items-center justify-center gap-1 rounded-md px-2 text-xs',
+                  'hover:bg-muted focus-visible:ring-ring inline-flex h-9 max-w-40 items-center justify-center gap-1 rounded-md px-2 text-xs outline-none focus-visible:ring-2',
                   selectedCompany
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
@@ -443,7 +459,7 @@ export function ConversationList({
                 <button
                   key={id}
                   onClick={() => toggleTag(id)}
-                  className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]"
+                  className="bg-muted text-foreground hover:bg-muted/70 focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-md px-2 py-1 text-xs outline-none focus-visible:ring-2"
                 >
                   <span
                     className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -461,7 +477,7 @@ export function ConversationList({
             {selectedCompany && (
               <button
                 onClick={() => setSelectedCompany(null)}
-                className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]"
+                className="bg-muted text-foreground hover:bg-muted/70 focus-visible:ring-ring inline-flex min-h-8 items-center gap-1 rounded-md px-2 py-1 text-xs outline-none focus-visible:ring-2"
               >
                 <span className="max-w-24 truncate">{selectedCompany}</span>
                 <X className="h-3 w-3" />
@@ -469,13 +485,36 @@ export function ConversationList({
             )}
             <button
               onClick={clearContactFilters}
-              className="text-muted-foreground hover:text-foreground px-1 text-[11px]"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring min-h-8 rounded-md px-2 text-xs outline-none focus-visible:ring-2"
             >
               {t('clearAll')}
             </button>
           </div>
         )}
       </div>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="border-border bg-muted/40 space-y-2 border-b px-3 py-3"
+        >
+          <p className="text-foreground text-sm leading-relaxed">
+            {conversations.length ? t('refreshError') : t('loadError')}
+          </p>
+          <Button
+            variant="outline"
+            className="h-9 px-3"
+            disabled={loading}
+            onClick={() => {
+              loadedPage.current = '';
+              setLoadError(false);
+              setRefreshAttempt((value) => value + 1);
+            }}
+          >
+            {t('retry')}
+          </Button>
+        </div>
+      )}
 
       {/* Conversation Items.
           `min-h-0` is load-bearing: a flex child defaults to
@@ -485,15 +524,33 @@ export function ConversationList({
           parent's overflow-hidden with no scrollbar (issue #229). */}
       <ScrollArea className="min-h-0 flex-1">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="border-primary h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
+          <div
+            role="status"
+            aria-label={tActivity('loading')}
+            className="space-y-5 p-4"
+          >
+            {[0, 1, 2].map((row) => (
+              <div
+                key={row}
+                aria-hidden
+                className="flex animate-pulse items-center gap-3"
+              >
+                <div className="bg-muted size-10 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="bg-muted h-3 w-2/3 rounded" />
+                  <div className="bg-muted h-3 w-full rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <p className="text-muted-foreground text-sm">
-              {t('noConversations')}
-            </p>
-          </div>
+          !loadError && (
+            <div className="px-4 py-12 text-center">
+              <p className="text-muted-foreground text-sm">
+                {t('noConversations')}
+              </p>
+            </div>
+          )
         ) : (
           <div className="flex flex-col">
             {filtered.slice(0, 25).map((conv) => (
@@ -596,9 +653,10 @@ function ConversationItem({
   return (
     <button
       onClick={handleClick}
+      aria-pressed={isActive}
       className={cn(
-        'hover:bg-muted/50 flex w-full items-start gap-3 px-3 py-3 text-left transition-colors',
-        isActive && 'border-primary bg-muted/70 border-l-2'
+        'hover:bg-muted/50 focus-visible:ring-ring flex w-full items-start gap-3 px-3 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset',
+        isActive && 'bg-primary-soft hover:bg-primary-soft-2'
       )}
     >
       {/* Avatar */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Info } from 'lucide-react';
 
 export function PhoneCountryWarning() {
   const t = useTranslations('PhoneFormat');
@@ -18,8 +19,12 @@ export function PhoneCountryWarning() {
     return () => controller.abort();
   }, []);
   return (
-    <p className="my-2 text-xs text-amber-700 dark:text-amber-300" role="note">
-      {code ? t('warning', { code }) : t('fallback')}
-    </p>
+    <div
+      className="text-muted-foreground flex items-start gap-2 text-xs leading-relaxed"
+      role="note"
+    >
+      <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <p>{code ? t('warning', { code }) : t('fallback')}</p>
+    </div>
   );
 }
