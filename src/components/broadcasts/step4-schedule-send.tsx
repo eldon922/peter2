@@ -210,9 +210,8 @@ export function Step4ScheduleSend({
 
   return (
     <div className="space-y-6">
-      <PhoneCountryWarning />
       <div>
-        <h2 className="text-foreground text-lg font-semibold">
+        <h2 className="text-foreground text-xl font-semibold tracking-tight">
           {t('scheduleSend.title')}
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -220,114 +219,132 @@ export function Step4ScheduleSend({
         </p>
       </div>
 
-      {/* Broadcast Name */}
-      <div>
-        <label className="text-foreground mb-1.5 block text-sm font-medium">
-          {t('scheduleSend.broadcastName')}
-        </label>
-        <Input
-          value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder={t('scheduleSend.broadcastNamePlaceholder')}
-          className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
-        />
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          {/* Broadcast Name */}
+          <div>
+            <label
+              htmlFor="broadcast-name"
+              className="text-foreground mb-1.5 block text-sm font-medium"
+            >
+              {t('scheduleSend.broadcastName')}
+            </label>
+            <Input
+              id="broadcast-name"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder={t('scheduleSend.broadcastNamePlaceholder')}
+              className="bg-background h-10"
+            />
+          </div>
 
-      {/* Summary Card */}
-      <div className="border-border bg-card/50 space-y-3 rounded-xl border p-4">
-        <p className="text-foreground text-sm font-medium">
-          {t('scheduleSend.summary')}
-        </p>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-muted-foreground text-xs">
-              {t('scheduleSend.template')}
+          {/* Summary Card */}
+          <div className="border-border bg-card space-y-4 rounded-xl border p-5">
+            <p className="text-foreground text-sm font-medium">
+              {t('scheduleSend.summary')}
             </p>
-            <p className="text-foreground break-words">{template.name}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">
-              {t('scheduleSend.language')}
-            </p>
-            <p className="text-foreground">{template.language ?? 'en_US'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">
-              {t('scheduleSend.audience')}
-            </p>
-            {audienceBlock}
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">
-              {t('scheduleSend.estimatedReach')}
-            </p>
-            <div className="flex items-center gap-1.5">
-              {loadingReach ? (
-                <Loader2 className="text-primary h-3 w-3 animate-spin" />
-              ) : (
-                <>
-                  <Users className="text-primary h-3.5 w-3.5" />
-                  <p className="text-foreground font-medium">
-                    {reach.toLocaleString()}
+            <div className="grid grid-cols-2 gap-x-5 gap-y-4 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  {t('scheduleSend.template')}
+                </p>
+                <p className="text-foreground break-words">{template.name}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  {t('scheduleSend.language')}
+                </p>
+                <p className="text-foreground">
+                  {template.language ?? 'en_US'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  {t('scheduleSend.audience')}
+                </p>
+                {audienceBlock}
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  {t('scheduleSend.estimatedReach')}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {loadingReach ? (
+                    <Loader2 className="text-primary h-3 w-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Users className="text-primary h-3.5 w-3.5" />
+                      <p className="text-foreground font-medium">
+                        {reach.toLocaleString()}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">
+                  {t('scheduleSend.variables')}
+                </p>
+                <p className="text-foreground">
+                  {t('scheduleSend.variablesMapped', {
+                    count: mappedVariables,
+                  })}
+                </p>
+              </div>
+              {headerMedia && (
+                <div className="min-w-0">
+                  <p className="text-muted-foreground text-xs">
+                    {t('scheduleSend.headerMedia')}
                   </p>
-                </>
+                  <p className="text-foreground truncate">{headerMedia}</p>
+                </div>
               )}
             </div>
           </div>
-          <div>
-            <p className="text-muted-foreground text-xs">
-              {t('scheduleSend.variables')}
-            </p>
-            <p className="text-foreground">
-              {t('scheduleSend.variablesMapped', { count: mappedVariables })}
-            </p>
-          </div>
-          {headerMedia && (
-            <div className="min-w-0">
-              <p className="text-muted-foreground text-xs">
-                {t('scheduleSend.headerMedia')}
+
+          {/* Recipients */}
+          {resolved && reach > 0 && (
+            <div className="border-border bg-card space-y-2 rounded-xl border p-5">
+              <p className="text-foreground text-sm font-medium">
+                {t('contactList.title')}
               </p>
-              <p className="text-foreground truncate">{headerMedia}</p>
+              <AudienceContactList resolved={resolved} />
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Message preview */}
-      <div className="border-border bg-card/50 space-y-3 rounded-xl border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-foreground text-sm font-medium">
-              {t('scheduleSend.messagePreview')}
-            </p>
-            <span className="text-muted-foreground text-xs">
-              ({previewLabel})
-            </span>
+          <PhoneCountryWarning />
+        </div>
+        {/* Message preview */}
+        <section
+          aria-label={t('scheduleSend.messagePreview')}
+          className="border-border bg-card min-w-0 space-y-4 rounded-xl border p-4 sm:p-5 lg:sticky lg:top-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-foreground text-sm font-medium">
+                {t('scheduleSend.messagePreview')}
+              </p>
+              <span className="text-muted-foreground text-xs">
+                {previewLabel}
+              </span>
+            </div>
+            <FormattingToggle
+              checked={formatted}
+              onCheckedChange={setFormatted}
+            />
           </div>
-          <FormattingToggle
-            checked={formatted}
-            onCheckedChange={setFormatted}
-          />
-        </div>
-        <BroadcastMessagePreview
-          template={template}
-          bodyText={previewBody}
-          headerText={previewHeader}
-          buttonParams={previewButtons}
-          mediaUrl={headerMediaUrl}
-          formatted={formatted}
-        />
+          <div className="lg:max-h-[calc(100dvh-14rem)] lg:overflow-y-auto">
+            <BroadcastMessagePreview
+              template={template}
+              bodyText={previewBody}
+              headerText={previewHeader}
+              buttonParams={previewButtons}
+              mediaUrl={headerMediaUrl}
+              formatted={formatted}
+            />
+          </div>
+        </section>
       </div>
-
-      {/* Recipients */}
-      {resolved && reach > 0 && (
-        <div className="border-border bg-card/50 space-y-2 rounded-xl border p-4">
-          <p className="text-foreground text-sm font-medium">
-            {t('contactList.title')}
-          </p>
-          <AudienceContactList resolved={resolved} />
-        </div>
-      )}
 
       {/* Processing overlay */}
       {isProcessing && (
@@ -370,31 +387,31 @@ export function Step4ScheduleSend({
           </p>
           <Button
             onClick={onOpenSaved}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-auto min-h-10 px-5 py-2 whitespace-normal"
           >
             {t('scheduleSend.openSaved')}
           </Button>
         </div>
       )}
 
-      <div className="border-border flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+      <div className="border-border bg-background sticky bottom-0 z-10 flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="outline"
           onClick={onBack}
           disabled={isProcessing || locked}
-          className="border-border text-muted-foreground"
+          className="h-10 px-4"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('back')}
         </Button>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
           {onSaveDraft && (
             <Button
               variant="outline"
               onClick={onSaveDraft}
               disabled={!name.trim() || isProcessing || locked}
-              className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+              className="h-auto min-h-10 px-4 py-2 whitespace-normal"
             >
               <Save className="h-4 w-4" />
               {t('scheduleSend.saveDraft')}
@@ -411,7 +428,7 @@ export function Step4ScheduleSend({
               loadingReach ||
               reach === 0
             }
-            className="border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+            className="h-auto min-h-10 px-4 py-2 whitespace-normal"
           >
             <CalendarClock className="h-4 w-4" />
             {t('scheduleSend.schedule')}
@@ -441,15 +458,15 @@ export function Step4ScheduleSend({
                     loadingReach ||
                     reach === 0
                   }
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="col-span-2 h-auto min-h-10 px-5 py-2 whitespace-normal sm:col-span-1"
                 />
               }
             >
               <Send className="h-4 w-4" />
               {t('scheduleSend.sendNow')}
             </DialogTrigger>
-            <DialogContent className="border-border bg-popover max-h-[90vh] overflow-y-auto sm:max-w-lg">
-              <DialogHeader>
+            <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl [&>[data-slot=dialog-close]]:size-10">
+              <DialogHeader className="border-border shrink-0 border-b px-5 py-5 pr-14">
                 <DialogTitle className="text-popover-foreground">
                   {pendingSchedule
                     ? t('scheduleSend.scheduleTitle')
@@ -460,7 +477,7 @@ export function Step4ScheduleSend({
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3 text-sm">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5 text-sm">
                 {pendingSchedule && (
                   <p className="text-popover-foreground font-medium">
                     {formatScheduledAt(pendingSchedule)}
@@ -517,16 +534,16 @@ export function Step4ScheduleSend({
                     formatted={formatted}
                   />
                 </div>
-                <p className="text-xs text-amber-500">
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
                   {t('scheduleSend.cannotUndo')}
                 </p>
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="mx-0 mb-0 shrink-0 flex-col px-5 py-4 sm:flex-row">
                 <Button
                   variant="outline"
                   onClick={() => setShowConfirm(false)}
-                  className="border-border text-muted-foreground"
+                  className="h-10 px-4"
                 >
                   {t('cancel')}
                 </Button>
@@ -536,9 +553,13 @@ export function Step4ScheduleSend({
                     if (pendingSchedule) onSchedule(pendingSchedule);
                     else onSend();
                   }}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="h-auto min-h-10 px-5 py-2 whitespace-normal"
                 >
-                  <Send className="h-4 w-4" />
+                  {pendingSchedule ? (
+                    <CalendarClock className="size-4" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
                   {pendingSchedule
                     ? t('scheduleSend.scheduleConfirm', { count: reach })
                     : t('scheduleSend.sendTo', { count: reach })}

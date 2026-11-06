@@ -8,9 +8,11 @@ import { Loader2, FileText, ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 const categoryColors: Record<string, string> = {
-  Marketing: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  Utility: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  Authentication: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  Marketing:
+    'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20',
+  Utility: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20',
+  Authentication:
+    'bg-orange-500/10 text-orange-800 dark:text-orange-300 border-orange-500/20',
 };
 
 interface Step1Props {
@@ -20,7 +22,12 @@ interface Step1Props {
   onBack: () => void;
 }
 
-export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack }: Step1Props) {
+export function Step1ChooseTemplate({
+  selectedTemplate,
+  onSelect,
+  onNext,
+  onBack,
+}: Step1Props) {
   const t = useTranslations('Broadcasts.wizard');
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +49,9 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
         if (fetchError) throw fetchError;
         setTemplates(data ?? []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('chooseTemplate.errorLoad'));
+        setError(
+          err instanceof Error ? err.message : t('chooseTemplate.errorLoad')
+        );
       } finally {
         setLoading(false);
       }
@@ -54,7 +63,7 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <Loader2 className="text-primary h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -70,31 +79,40 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">{t('chooseTemplate.title')}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h2 className="text-foreground text-lg font-semibold">
+          {t('chooseTemplate.title')}
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">
           {t('chooseTemplate.subtitle')}
         </p>
       </div>
 
       {templates.length === 0 ? (
-        <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-border bg-card/50">
-          <FileText className="mb-2 h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{t('chooseTemplate.noTemplates')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t('chooseTemplate.createFirst')}</p>
+        <div className="border-border bg-card/50 flex h-48 flex-col items-center justify-center rounded-xl border">
+          <FileText className="text-muted-foreground mb-2 h-8 w-8" />
+          <p className="text-muted-foreground text-sm">
+            {t('chooseTemplate.noTemplates')}
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t('chooseTemplate.createFirst')}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((template) => {
             const isSelected = selectedTemplate?.id === template.id;
-            const catColor = categoryColors[template.category] ?? categoryColors.Utility;
+            const catColor =
+              categoryColors[template.category] ?? categoryColors.Utility;
 
             return (
               <button
                 key={template.id}
+                type="button"
+                aria-pressed={isSelected}
                 onClick={() => onSelect(template)}
-                className={`flex min-w-0 flex-col gap-3 rounded-xl border p-4 text-left transition-all ${
+                className={`focus-visible:ring-ring flex min-w-0 flex-col gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
                   isSelected
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                    ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
                     : 'border-border bg-card/50 hover:border-border hover:bg-card'
                 }`}
               >
@@ -105,7 +123,7 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
                     lets it actually shrink inside the flex row, and the chip
                     holds its size / wraps underneath instead of overflowing. */}
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h3 className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">
+                  <h3 className="text-foreground min-w-0 flex-1 text-sm font-medium break-words">
                     {template.name}
                   </h3>
                   <span
@@ -114,8 +132,10 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
                     {template.category}
                   </span>
                 </div>
-                <p className="line-clamp-3 text-xs text-muted-foreground">{template.body_text}</p>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <p className="text-muted-foreground line-clamp-3 text-xs">
+                  {template.body_text}
+                </p>
+                <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
                   <span>{template.language ?? 'en_US'}</span>
                   {/* Status is omitted on purpose — every template
                       shown here is already filtered to APPROVED,
@@ -127,14 +147,14 @@ export function Step1ChooseTemplate({ selectedTemplate, onSelect, onNext, onBack
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-border pt-4">
-        <Button variant="outline" onClick={onBack} className="border-border text-muted-foreground">
+      <div className="border-border bg-background sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t py-4">
+        <Button variant="outline" onClick={onBack} className="h-10 px-4">
           {t('back')}
         </Button>
         <Button
           onClick={onNext}
           disabled={!selectedTemplate}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="h-10 px-5"
         >
           {t('next')}
           <ArrowRight className="h-4 w-4" />

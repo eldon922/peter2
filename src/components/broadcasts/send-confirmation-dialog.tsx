@@ -45,6 +45,7 @@ export function SendConfirmationDialog({
   onConfirm: () => void;
 }) {
   const t = useTranslations('Broadcasts.wizard');
+  const tActivity = useTranslations('Activity');
   const [preview, setPreview] = useState<{
     template: MessageTemplate;
     body: string;
@@ -128,53 +129,70 @@ export function SendConfirmationDialog({
         if (!busy) onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl [&>[data-slot=dialog-close]]:size-10"
+        showCloseButton={!busy}
+      >
+        <DialogHeader className="border-border shrink-0 border-b px-5 py-5 pr-14">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             {broadcast.name} · {broadcast.template_name} ·{' '}
             {broadcast.template_language}
           </DialogDescription>
         </DialogHeader>
-        {preview ? (
-          <div className="space-y-3">
-            <p className="text-sm">
-              {t('scheduleSend.recipientCount', { count: preview.count })}
-              {preview.phone ? ` · ${preview.phone}` : ''}
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {preview ? (
+            <div className="space-y-5">
+              <p className="text-sm">
+                {t('scheduleSend.recipientCount', { count: preview.count })}
+                {preview.phone ? ` · ${preview.phone}` : ''}
+              </p>
+              <BroadcastMessagePreview
+                template={preview.template}
+                bodyText={preview.body}
+                headerText={preview.headerText}
+                buttonParams={preview.buttonParams}
+                mediaUrl={
+                  broadcast.header_media_url ||
+                  (broadcast.header_media_id
+                    ? `/api/whatsapp/media/${broadcast.header_media_id}`
+                    : undefined)
+                }
+              />
+              <PhoneCountryWarning />
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
+                {t('scheduleSend.cannotUndo')}
+              </p>
+            </div>
+          ) : failed ? (
+            <p
+              role="alert"
+              className="rounded-lg bg-red-50 p-4 text-sm leading-relaxed text-red-800 dark:bg-red-400/10 dark:text-red-200"
+            >
+              {t('scheduleSend.previewUnavailable')}
             </p>
-            <BroadcastMessagePreview
-              template={preview.template}
-              bodyText={preview.body}
-              headerText={preview.headerText}
-              buttonParams={preview.buttonParams}
-              mediaUrl={
-                broadcast.header_media_url ||
-                (broadcast.header_media_id
-                  ? `/api/whatsapp/media/${broadcast.header_media_id}`
-                  : undefined)
-              }
-            />
-            <PhoneCountryWarning />
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              {t('scheduleSend.cannotUndo')}
-            </p>
-          </div>
-        ) : failed ? (
-          <p role="alert" className="text-sm text-red-500">
-            {t('scheduleSend.previewUnavailable')}
-          </p>
-        ) : (
-          <Loader2 className="size-5 animate-spin" />
-        )}
-        <DialogFooter>
+          ) : (
+            <div
+              role="status"
+              aria-label={tActivity('loading')}
+              className="text-muted-foreground flex min-h-52 items-center justify-center gap-2 text-sm"
+            >
+              <Loader2 className="size-4 animate-spin" />
+              {tActivity('loading')}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="mx-0 mb-0 shrink-0 flex-col px-5 py-4 sm:flex-row">
           <Button
             variant="outline"
+            className="h-auto min-h-10 px-4 py-2 whitespace-normal"
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >
             {t('cancel')}
           </Button>
           <Button
+            className="h-auto min-h-10 px-5 py-2 whitespace-normal"
             disabled={busy || !preview || preview.count === 0}
             onClick={onConfirm}
           >

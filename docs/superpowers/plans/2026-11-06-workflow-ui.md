@@ -41,7 +41,7 @@ Browser scripts and fixture services live under `/workspace/work/workflow-ui/`, 
 
 ## Task 2: Review, schedule and send confirmations
 
-**Files:** `src/components/broadcasts/step4-schedule-send.tsx`, `send-confirmation-dialog.tsx`, `schedule-dialog.tsx`; `messages/{en,id,ko}.json` if needed.
+**Files:** `src/components/broadcasts/step1-choose-template.tsx`, `step2-select-audience.tsx` (matching navigation and selection states), `step4-schedule-send.tsx`, `send-confirmation-dialog.tsx`, `schedule-dialog.tsx`; `messages/{en,id,ko}.json` if needed.
 
 **Interfaces:** Keep `onSend`, `onSchedule`, `onConfirm` and saved-broadcast guards intact; reuse `BroadcastMessagePreview` and existing recipient snapshots.
 

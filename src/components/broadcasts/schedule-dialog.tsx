@@ -35,8 +35,16 @@ export function ScheduleDialog({
   ...form
 }: ScheduleDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-popover sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!form.busy) onOpenChange(next);
+      }}
+    >
+      <DialogContent
+        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md [&>[data-slot=dialog-close]]:size-10"
+        showCloseButton={!form.busy}
+      >
         {/* Mounted only while open, so each opening starts fresh. */}
         <ScheduleForm {...form} onCancel={() => onOpenChange(false)} />
       </DialogContent>
@@ -73,17 +81,17 @@ function ScheduleForm({
 
   return (
     <>
-      <DialogHeader>
+      <DialogHeader className="border-border shrink-0 border-b px-5 py-5 pr-14">
         <DialogTitle className="text-popover-foreground">{title}</DialogTitle>
         <DialogDescription className="text-muted-foreground">
           {description}
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-1.5">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-5">
         <label
           htmlFor="broadcast-send-at"
-          className="block text-sm font-medium text-foreground"
+          className="text-foreground block text-sm font-medium"
         >
           {t('sendAt')}
         </label>
@@ -96,30 +104,39 @@ function ScheduleForm({
             setValue(e.target.value);
             setInPast(false);
           }}
+          disabled={busy}
+          aria-describedby="broadcast-time-zone"
           aria-invalid={inPast}
-          className="border-border bg-muted text-foreground"
+          className="bg-background h-10"
         />
-        <p className="text-xs text-muted-foreground">
+        <p
+          id="broadcast-time-zone"
+          className="text-muted-foreground text-xs leading-relaxed"
+        >
           {t('timeZone', {
             zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           })}
         </p>
-        {inPast && <p className="text-xs text-red-400">{t('pastError')}</p>}
+        {inPast && (
+          <p role="alert" className="text-xs text-red-700 dark:text-red-300">
+            {t('pastError')}
+          </p>
+        )}
       </div>
 
-      <DialogFooter>
+      <DialogFooter className="mx-0 mb-0 shrink-0 flex-col px-5 py-4 sm:flex-row">
         <Button
           variant="outline"
           onClick={onCancel}
           disabled={busy}
-          className="border-border text-muted-foreground"
+          className="h-auto min-h-10 px-4 py-2 whitespace-normal"
         >
           {t('cancel')}
         </Button>
         <Button
           onClick={confirm}
           disabled={!value || busy}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
+          className="h-auto min-h-10 px-5 py-2 whitespace-normal"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
           {confirmLabel}

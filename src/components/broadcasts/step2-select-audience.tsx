@@ -228,6 +228,8 @@ export function Step2SelectAudience({
             return (
               <button
                 key={option.type}
+                type="button"
+                aria-pressed={isSelected}
                 onClick={() =>
                   onUpdate({
                     ...audience,
@@ -244,7 +246,7 @@ export function Step2SelectAudience({
                       option.type === 'csv' ? audience.csvContacts : undefined,
                   })
                 }
-                className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all ${
+                className={`focus-visible:ring-ring flex items-start gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
                   isSelected
                     ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
                     : 'border-border bg-card/50 hover:border-border'
@@ -309,6 +311,7 @@ export function Step2SelectAudience({
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)]">
               <select
+                aria-label={t('selectAudience.field')}
                 value={audience.customField?.fieldId ?? ''}
                 onChange={(e) => updateCustomField({ fieldId: e.target.value })}
                 className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-9 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
@@ -321,6 +324,7 @@ export function Step2SelectAudience({
                 ))}
               </select>
               <select
+                aria-label={t('selectAudience.operator')}
                 value={audience.customField?.operator ?? 'is'}
                 onChange={(e) =>
                   updateCustomField({
@@ -339,6 +343,7 @@ export function Step2SelectAudience({
               </select>
               <input
                 type="text"
+                aria-label={t('selectAudience.value')}
                 value={audience.customField?.value ?? ''}
                 onChange={(e) => updateCustomField({ value: e.target.value })}
                 placeholder={t('selectAudience.valuePlaceholder')}
@@ -487,20 +492,12 @@ export function Step2SelectAudience({
           )}
       </div>
 
-      <div className="border-border flex items-center justify-between border-t pt-4">
-        <Button
-          variant="outline"
-          onClick={onBack}
-          className="border-border text-muted-foreground"
-        >
+      <div className="border-border bg-background sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t py-4">
+        <Button variant="outline" onClick={onBack} className="h-10 px-4">
           <ArrowLeft className="h-4 w-4" />
           {t('back')}
         </Button>
-        <Button
-          onClick={onNext}
-          disabled={!isValid}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button onClick={onNext} disabled={!isValid} className="h-10 px-5">
           {t('next')}
           <ArrowRight className="h-4 w-4" />
         </Button>
