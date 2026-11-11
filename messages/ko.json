@@ -961,7 +961,8 @@
         "valueRequired": "이 변수의 값을 입력하거나 필드를 선택하세요.",
         "missingValues": "계속하려면 남은 변수 {count}개를 설정하세요.",
         "previewContact": "{name}의 연락처 정보를 사용한 미리보기입니다.",
-        "noVariables": "이 템플릿에는 개인화할 변수가 없습니다."
+        "noVariables": "이 템플릿에는 개인화할 변수가 없습니다.",
+        "fieldUnavailable": "이 필드는 더 이상 사용할 수 없습니다. 다른 필드를 선택하세요."
       },
       "scheduleSend": {
         "title": "검토 및 전송",

@@ -961,7 +961,8 @@
         "valueRequired": "Tambahkan nilai atau pilih kolom untuk variabel ini.",
         "missingValues": "Lengkapi {count} variabel yang tersisa untuk melanjutkan.",
         "previewContact": "Pratinjau menggunakan detail kontak {name}.",
-        "noVariables": "Template ini tidak memiliki variabel untuk dipersonalisasi."
+        "noVariables": "Template ini tidak memiliki variabel untuk dipersonalisasi.",
+        "fieldUnavailable": "Kolom ini tidak lagi tersedia. Pilih kolom lain."
       },
       "scheduleSend": {
         "title": "Tinjau & Kirim",

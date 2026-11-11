@@ -166,14 +166,21 @@ export function Step3Personalize({
    */
   const unmappedKeys = useMemo(() => {
     const missing: string[] = [];
-    for (const { key, label } of placeholders) {
+    for (const { key } of placeholders) {
       const mapping = variables[key];
-      if (!mapping || !mapping.value?.trim()) {
-        missing.push(label);
+      if (
+        !mapping?.value?.trim() ||
+        (mapping.type === 'custom_field' &&
+          (loadingFields ||
+            !customFields.some((field) => field.id === mapping.value))) ||
+        (mapping.type === 'field' &&
+          !contactFields.some((field) => field.value === mapping.value))
+      ) {
+        missing.push(key);
       }
     }
     return missing;
-  }, [placeholders, variables]);
+  }, [placeholders, variables, customFields, loadingFields]);
 
   function updateVariable(key: string, patch: Partial<VariableMapping>) {
     const current = variables[key] ?? {
@@ -256,7 +263,7 @@ export function Step3Personalize({
                 const { key, label } = placeholder;
                 const id = `${formId}-${key}`;
                 const mapping = variables[key] ?? { type: 'static', value: '' };
-                const missing = !mapping.value.trim();
+                const missing = unmappedKeys.includes(key);
                 const valueLabel =
                   mapping.type === 'static'
                     ? t('personalize.staticValue')
@@ -358,7 +365,7 @@ export function Step3Personalize({
                           />
                         ) : (
                           <Select
-                            value={mapping.value || null}
+                            value={missing ? null : mapping.value}
                             disabled={
                               mapping.type === 'custom_field' &&
                               (loadingFields || customFields.length === 0)
@@ -397,7 +404,9 @@ export function Step3Personalize({
                                       ? t('personalize.loadingFields')
                                       : customFields.length === 0
                                         ? t('personalize.noCustomFields')
-                                        : t('personalize.selectCustomField')
+                                        : mapping.value && missing
+                                          ? t('personalize.fieldUnavailable')
+                                          : t('personalize.selectCustomField')
                                 }
                               />
                             </SelectTrigger>

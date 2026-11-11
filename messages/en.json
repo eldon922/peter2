@@ -961,7 +961,8 @@
         "valueRequired": "Add a value or choose a field for this variable.",
         "missingValues": "Complete {count, plural, one {# remaining variable} other {# remaining variables}} to continue.",
         "previewContact": "Preview using contact details for {name}.",
-        "noVariables": "This template has no variables to personalize."
+        "noVariables": "This template has no variables to personalize.",
+        "fieldUnavailable": "This field is no longer available. Choose another field."
       },
       "scheduleSend": {
         "title": "Review & Send",
