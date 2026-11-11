@@ -27,7 +27,7 @@ interface Props {
 }
 
 const tabClass = (active: boolean) =>
-  `inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+  `inline-flex min-h-10 scroll-mb-48 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
     active
       ? 'bg-primary text-primary-foreground'
       : 'text-muted-foreground hover:text-foreground'
@@ -135,7 +135,7 @@ export function HeaderMediaPicker({
             <input
               type="file"
               accept={MEDIA_SPECS[kind].mimeTypes.join(',')}
-              className="sr-only"
+              className="sr-only scroll-mb-48"
               disabled={uploading}
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -198,7 +198,7 @@ export function HeaderMediaPicker({
               if (e.key === 'Enter' && error === null) onSubmit?.();
             }}
             placeholder={t('imageUrlPlaceholder')}
-            className="border-border bg-background text-foreground placeholder:text-muted-foreground h-10"
+            className="border-border bg-background text-foreground placeholder:text-muted-foreground h-10 scroll-mb-48"
           />
           {linkPreview && (
             // eslint-disable-next-line @next/next/no-img-element

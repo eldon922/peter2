@@ -234,7 +234,7 @@ export function Step4ScheduleSend({
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
               placeholder={t('scheduleSend.broadcastNamePlaceholder')}
-              className="bg-background h-10"
+              className="bg-background h-10 scroll-mb-48"
             />
           </div>
 

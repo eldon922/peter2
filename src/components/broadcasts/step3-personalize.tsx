@@ -316,7 +316,7 @@ export function Step3Personalize({
                           <SelectTrigger
                             id={`${id}-source`}
                             aria-labelledby={`${id}-label ${id}-source-label`}
-                            className="bg-background w-full min-w-0 data-[size=default]:h-10 [&_[data-slot=select-value]]:truncate"
+                            className="bg-background w-full min-w-0 scroll-mb-48 data-[size=default]:h-10 [&_[data-slot=select-value]]:truncate"
                           >
                             <SelectValue />
                           </SelectTrigger>
@@ -354,7 +354,7 @@ export function Step3Personalize({
                               updateVariable(key, { value: e.target.value })
                             }
                             placeholder={t('personalize.valuePlaceholder')}
-                            className="bg-background h-10"
+                            className="bg-background h-10 scroll-mb-48"
                           />
                         ) : (
                           <Select
@@ -387,7 +387,7 @@ export function Step3Personalize({
                                 missing ? `${id}-hint` : undefined
                               }
                               aria-required
-                              className="bg-background w-full min-w-0 data-[size=default]:h-10 [&_[data-slot=select-value]]:truncate"
+                              className="bg-background w-full min-w-0 scroll-mb-48 data-[size=default]:h-10 [&_[data-slot=select-value]]:truncate"
                             >
                               <SelectValue
                                 placeholder={

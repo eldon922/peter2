@@ -110,7 +110,7 @@ export function Step1ChooseTemplate({
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => onSelect(template)}
-                className={`focus-visible:ring-ring flex min-w-0 flex-col gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
+                className={`focus-visible:ring-ring flex min-w-0 scroll-mb-48 flex-col gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
                   isSelected
                     ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
                     : 'border-border bg-card/50 hover:border-border hover:bg-card'

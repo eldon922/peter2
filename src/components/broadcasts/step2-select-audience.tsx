@@ -246,7 +246,7 @@ export function Step2SelectAudience({
                       option.type === 'csv' ? audience.csvContacts : undefined,
                   })
                 }
-                className={`focus-visible:ring-ring flex items-start gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
+                className={`focus-visible:ring-ring flex scroll-mb-48 items-start gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
                   isSelected
                     ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
                     : 'border-border bg-card/50 hover:border-border'
@@ -288,6 +288,7 @@ export function Step2SelectAudience({
             </p>
           ) : (
             <TagMultiSelect
+              className="[&_button]:scroll-mb-48"
               tags={tags}
               value={audience.tagIds ?? []}
               onToggle={toggleTag}
@@ -314,7 +315,7 @@ export function Step2SelectAudience({
                 aria-label={t('selectAudience.field')}
                 value={audience.customField?.fieldId ?? ''}
                 onChange={(e) => updateCustomField({ fieldId: e.target.value })}
-                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-9 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
               >
                 <option value="">{t('selectAudience.selectField')}</option>
                 {customFields.map((f) => (
@@ -331,7 +332,7 @@ export function Step2SelectAudience({
                     operator: e.target.value as CustomFieldOperator,
                   })
                 }
-                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-9 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
               >
                 {OPERATOR_OPTIONS.map(
                   (op: { value: CustomFieldOperator; label: string }) => (
@@ -347,7 +348,7 @@ export function Step2SelectAudience({
                 value={audience.customField?.value ?? ''}
                 onChange={(e) => updateCustomField({ value: e.target.value })}
                 placeholder={t('selectAudience.valuePlaceholder')}
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary h-9 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
               />
             </div>
           )}
@@ -369,7 +370,7 @@ export function Step2SelectAudience({
             id="broadcast-csv"
             type="file"
             accept=".csv,text/csv"
-            className="text-muted-foreground file:border-border file:bg-muted file:text-foreground block w-full text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-2"
+            className="text-muted-foreground file:border-border file:bg-muted file:text-foreground block w-full scroll-mb-48 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-2"
             onChange={async (event) => {
               const file = event.target.files?.[0];
               const request = ++csvRequest.current;
@@ -424,6 +425,7 @@ export function Step2SelectAudience({
           </p>
         ) : (
           <TagMultiSelect
+            className="[&_button]:scroll-mb-48"
             tags={tags}
             value={audience.excludeTagIds ?? []}
             onToggle={toggleExcludeTag}
