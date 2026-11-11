@@ -251,6 +251,7 @@ export function ImportModal({
   }
 
   function handleOpenChange(next: boolean) {
+    if (!next && importing) return;
     if (!next) reset();
     onOpenChange(next);
   }
