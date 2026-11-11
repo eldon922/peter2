@@ -135,12 +135,25 @@ export function SendConfirmationDialog({
       >
         <DialogHeader className="border-border shrink-0 border-b px-5 py-5 pr-14">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="break-words">
-            {broadcast.name} · {broadcast.template_name} ·{' '}
-            {broadcast.template_language}
-          </DialogDescription>
+          <DialogDescription>{t('scheduleSend.confirmDesc')}</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <dl className="mb-5 space-y-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground text-xs">
+                {t('scheduleSend.broadcastName')}
+              </dt>
+              <dd className="mt-1 wrap-anywhere">{broadcast.name}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">
+                {t('scheduleSend.template')}
+              </dt>
+              <dd className="mt-1 wrap-anywhere">
+                {broadcast.template_name} · {broadcast.template_language}
+              </dd>
+            </div>
+          </dl>
           {preview ? (
             <div className="space-y-5">
               <p className="text-sm">
