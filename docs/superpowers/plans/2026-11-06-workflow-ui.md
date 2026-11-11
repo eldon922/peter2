@@ -34,10 +34,10 @@ Browser scripts and fixture services live under `/workspace/work/workflow-ui/`, 
 
 **Interfaces:** Preserve all component props and variable keys. Continue resolving body, header and button values through the existing variable helpers. Preview sources remain unchanged.
 
-- [ ] Write and run `node /workspace/work/workflow-ui/broadcasts.mjs` against current UI: assert distinct control names and desktop editor/preview alignment. Expect failure on unlabeled controls or stacked preview.
-- [ ] Widen the wizard, make the active mobile step readable, group variable controls, put a bounded sticky preview alongside the desktop form and keep actions reachable. Add local, translated required-field guidance and associate each input/select with its variable. Keep field selections controlled from first render.
-- [ ] Verify body/header/button requirements still disable Next independently, custom selections display names, long URLs do not overflow, and incomplete mappings are clearly identified. Capture desktop/tablet/mobile light/dark screens.
-- [ ] Run relevant variable/header/template tests, TypeScript and scoped lint; commit `fix(broadcasts): clarify personalization and wizard navigation`.
+- [x] Write and run `node /workspace/work/workflow-ui/broadcasts.mjs` against current UI: assert distinct control names and desktop editor/preview alignment. Expect failure on unlabeled controls or stacked preview.
+- [x] Widen the wizard, make the active mobile step readable, group variable controls, put a bounded sticky preview alongside the desktop form and keep actions reachable. Add local, translated required-field guidance and associate each input/select with its variable. Keep field selections controlled from first render.
+- [x] Verify body/header/button requirements still disable Next independently, custom selections display names, long URLs do not overflow, and incomplete mappings are clearly identified. Capture desktop/tablet/mobile light/dark screens.
+- [x] Run relevant variable/header/template tests, TypeScript and scoped lint; commit `fix(broadcasts): clarify personalization and wizard navigation`.
 
 ## Task 2: Review, schedule and send confirmations
 
@@ -45,10 +45,10 @@ Browser scripts and fixture services live under `/workspace/work/workflow-ui/`, 
 
 **Interfaces:** Keep `onSend`, `onSchedule`, `onConfirm` and saved-broadcast guards intact; reuse `BroadcastMessagePreview` and existing recipient snapshots.
 
-- [ ] Extend `broadcasts.mjs` with a short-viewport confirmation assertion: footer remains reachable without scrolling the entire modal, and Schedule requires time selection followed by message confirmation. Expect current scrolling-footer layout to fail.
-- [ ] Use compact review details, a clear name field and side-by-side preview. Standardize modal header/body/footer regions, loading and error states; make long descriptions and action labels reflow.
-- [ ] Verify no send occurs before final confirmation, zero/missing recipients block actions, saved broadcast locks survive, and mobile, long-preview, loading and failure states remain usable.
-- [ ] Run schedule/finish/broadcast-core tests and scoped lint; commit `fix(broadcasts): make review and confirmation actions accessible`.
+- [x] Run `confirmations.mjs` with a short-viewport confirmation assertion: footer remains reachable without scrolling the entire modal, and Schedule requires time selection followed by message confirmation. Expect current scrolling-footer layout to fail.
+- [x] Use compact review details, a clear name field and side-by-side preview. Standardize modal header/body/footer regions, loading and error states; make long descriptions and action labels reflow.
+- [x] Verify no send occurs before final confirmation, zero/missing recipients block actions, saved broadcast locks survive, and mobile, long-preview, loading and failure states remain usable.
+- [x] Run schedule/finish/broadcast-core tests and scoped lint; commit `fix(broadcasts): make review and confirmation actions accessible`.
 
 ## Task 3: Contact import
 
@@ -56,10 +56,10 @@ Browser scripts and fixture services live under `/workspace/work/workflow-ui/`, 
 
 **Interfaces:** Preserve parse/import/custom-value/tag logic and `ImportModal` props. Optional additional tags apply exactly as before.
 
-- [ ] Write and run `node /workspace/work/workflow-ui/import.mjs`: upload a fixture and assert that a preview row is visible before scrolling at 375×812. Expect failure with the current tall header.
-- [ ] Keep title/footer fixed, move instructions into a concise disclosure in the body, compact the chosen-file presentation, put preview before optional tags and improve result hierarchy and semantic colors. Increase tag-removal target without changing selection behavior.
-- [ ] Verify initial, parsing, importing, complete and partial-failure states; phone/tablet/desktop layout; long custom fields/tags; blank-value preservation, CSV dedupe and matching returned contacts by phone. Verify close is blocked while importing and errors remain available in the report.
-- [ ] Run CSV/import tests, TypeScript and scoped lint; commit `fix(contacts): prioritize import preview and keep actions reachable`.
+- [x] Write and run `node /workspace/work/workflow-ui/import.mjs`: upload a fixture and assert that a preview row is visible before scrolling at 375×812. Expect failure with the current tall header.
+- [x] Keep title/footer fixed, move instructions into a concise disclosure in the body, compact the chosen-file presentation, put preview before optional tags and improve result hierarchy and semantic colors. Increase tag-removal target without changing selection behavior.
+- [x] Verify initial, parsing, importing, complete and partial-failure states; phone/tablet/desktop layout; long custom fields/tags; blank-value preservation, CSV dedupe and matching returned contacts by phone. Verify close is blocked while importing and errors remain available in the report.
+- [x] Run CSV/import tests, TypeScript and scoped lint; commit `fix(contacts): prioritize import preview and keep actions reachable`.
 
 ## Task 4: Inbox composer and list controls
 
@@ -67,14 +67,16 @@ Browser scripts and fixture services live under `/workspace/work/workflow-ui/`, 
 
 **Interfaces:** Preserve composer send/reply/draft/media behavior, role restrictions, list queries, filters and pagination API.
 
-- [ ] Write and run `node /workspace/work/workflow-ui/inbox.mjs`: require a named Send button, readable formatting preview and usable narrow search/pagination. Expect the current unnamed send control to fail.
-- [ ] Group composer helpers, quiet country-code guidance, label icon controls and improve target/focus sizes. Reflow recipient controls and pagination at narrow widths; keep counts and loading feedback readable.
-- [ ] Verify reply, draft preservation during pending send, viewer read-only controls, filtering and next/previous pages. Capture mobile/tablet/desktop in both themes and check keyboard focus.
-- [ ] Run inbox/pagination tests and scoped lint; commit `fix(inbox): simplify composer and responsive list controls`.
+- [x] Write and run `node /workspace/work/workflow-ui/inbox.mjs`: require a named Send button, readable formatting preview and usable narrow search/pagination. Expect the current unnamed send control to fail.
+- [x] Group composer helpers, quiet country-code guidance, label icon controls and improve target/focus sizes. Reflow recipient controls and pagination at narrow widths; keep counts and loading feedback readable.
+- [x] Verify reply, draft preservation during pending send, viewer read-only controls, filtering and next/previous pages. Capture mobile/tablet/desktop in both themes and check keyboard focus.
+- [x] Run inbox/pagination tests and scoped lint; commit `fix(inbox): simplify composer and responsive list controls`.
 
 ## Completion
 
-- [ ] Compare every spec requirement with the rendered components; document any implementation decisions in the ledger.
-- [ ] Run full tests, TypeScript, lint and production build. Record screenshots and review limits.
-- [ ] Have a fresh reviewer inspect the complete range against spec, plan, browser evidence and the five Review Focus conditions. Address material findings and verify fixes.
-- [ ] Update this plan and the validation record, push dev, and verify the remote SHA and clean working tree.
+- [x] Compare every spec requirement with the rendered components; document any implementation decisions in the ledger.
+- [x] Run full tests, TypeScript, lint and production build. Record screenshots and review limits.
+- [x] Have a fresh reviewer inspect the complete range against spec, plan, browser evidence and the five Review Focus conditions. Address material findings and verify fixes.
+- [x] Update this plan and the validation record, push dev, and verify the remote SHA and clean working tree.
+
+Completed on 2026-11-11 (UTC). See [the validation record](../../workflow-ui-validation.md) for results, final review fixes and browser limits. Implementation commits are published on `dev`.

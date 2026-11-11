@@ -1,6 +1,6 @@
 # Workflow UI refinement
 
-Status: approved by the user on 2026-11-06. Implement approach 2 below.
+Status: approved by the user on 2026-11-06; approach 2 implemented and verified on 2026-11-11 (UTC). See [the validation record](../../workflow-ui-validation.md).
 
 ## Intent and scope
 
