@@ -387,7 +387,7 @@ export function Step3Personalize({
                                 missing ? `${id}-hint` : undefined
                               }
                               aria-required
-                              className="bg-background w-full min-w-0 scroll-mb-48 data-[size=default]:h-10 [&_[data-slot=select-value]]:truncate"
+                              className="bg-background w-full min-w-0 scroll-mb-48 items-start whitespace-normal data-[size=default]:h-auto data-[size=default]:min-h-10 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:wrap-anywhere *:data-[slot=select-value]:whitespace-normal"
                             >
                               <SelectValue
                                 placeholder={
@@ -414,7 +414,11 @@ export function Step3Personalize({
                                     </SelectItem>
                                   ))
                                 : customFields.map((field) => (
-                                    <SelectItem key={field.id} value={field.id}>
+                                    <SelectItem
+                                      key={field.id}
+                                      value={field.id}
+                                      className="items-start py-2 [&>*]:min-w-0 [&>*]:shrink [&>*]:wrap-anywhere [&>*]:whitespace-normal"
+                                    >
                                       {field.field_name}
                                     </SelectItem>
                                   ))}
