@@ -151,6 +151,8 @@ export function MessageComposer({
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const formattingRef = useRef<HTMLDivElement>(null);
+  const [hasSelection, setHasSelection] = useState(false);
 
   // Enter-to-send only on devices with a mouse/keyboard (fine pointer).
   // On touch devices (phones) Enter inserts a newline and the Send button
@@ -293,6 +295,7 @@ export function MessageComposer({
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setText(e.target.value);
+      setHasSelection(false);
       adjustHeight();
     },
     [adjustHeight]
@@ -608,7 +611,7 @@ export function MessageComposer({
   // ---- Render --------------------------------------------------------
 
   return (
-    <div className="border-border bg-card border-t p-3 sm:p-4">
+    <div className="border-border bg-card relative border-t p-3 sm:p-4">
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote
@@ -635,11 +638,27 @@ export function MessageComposer({
         </div>
       )}
 
-      {!inputsDisabled && !draft && !recording && (
+      {hasSelection && !inputsDisabled && !draft && !recording && (
         <div
-          className="bg-muted/40 mb-3 flex w-fit items-center gap-1 rounded-lg p-1"
+          ref={formattingRef}
+          className="border-border bg-popover text-popover-foreground absolute right-3 bottom-full z-20 mb-2 flex w-fit max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-lg border p-1 shadow-lg"
           role="toolbar"
           aria-label={t('formatting')}
+          onBlur={(event) => {
+            if (
+              !event.currentTarget.contains(event.relatedTarget as Node) &&
+              event.relatedTarget !== textareaRef.current
+            )
+              setHasSelection(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            const editor = textareaRef.current;
+            editor?.focus();
+            editor?.setSelectionRange(editor.selectionEnd, editor.selectionEnd);
+            setHasSelection(false);
+          }}
         >
           {[
             { marker: '*', label: 'bold', Icon: Bold },
@@ -966,7 +985,31 @@ export function MessageComposer({
             aria-label={t('message')}
             value={text}
             onChange={handleChange}
-            onKeyDown={handleKeyDown}
+            onSelect={(event) =>
+              setHasSelection(
+                event.currentTarget.selectionStart !==
+                  event.currentTarget.selectionEnd
+              )
+            }
+            onBlur={(event) => {
+              if (!formattingRef.current?.contains(event.relatedTarget as Node))
+                setHasSelection(false);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Tab' && event.shiftKey && hasSelection) {
+                const firstAction =
+                  formattingRef.current?.querySelector<HTMLButtonElement>(
+                    'button:not(:disabled)'
+                  );
+                if (firstAction) {
+                  event.preventDefault();
+                  firstAction.focus();
+                  return;
+                }
+              }
+              if (event.key === 'Escape') setHasSelection(false);
+              handleKeyDown(event);
+            }}
             placeholder={
               readOnly
                 ? t('readOnlyPlaceholder')
