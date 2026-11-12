@@ -19,6 +19,7 @@ import {
   StickyNote,
   Plus,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,6 +28,7 @@ import { useTranslations } from "next-intl";
 
 interface ContactSidebarProps {
   contact: Contact | null;
+  onDeleteChat?: () => void;
   /**
    * Overrides the docked-panel container classes. The same component is
    * presented two ways: as the fixed-width panel on the right at xl+, and
@@ -38,12 +40,17 @@ interface ContactSidebarProps {
   session?: { expired: boolean; remaining: string };
 }
 
-export function ContactSidebar({ contact, className, session }: ContactSidebarProps) {
+export function ContactSidebar({ contact, className, session, onDeleteChat }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
   const { accountId } = useAuth();
   const canAct = useCan("send-messages");
+  const deleteAction = canAct && onDeleteChat ? (
+    <Button variant="destructive" className="w-full" onClick={onDeleteChat}>
+      <Trash2 className="size-4" />{tThread("deleteChat")}
+    </Button>
+  ) : null;
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
@@ -135,8 +142,9 @@ export function ContactSidebar({ contact, className, session }: ContactSidebarPr
 
   if (!contact) {
     return (
-      <div className={cn("flex h-full w-70 items-center justify-center border-l border-border bg-card", className)}>
-        <p className="text-sm text-muted-foreground">{tThread("selectConversation")}</p>
+      <div className={cn("flex h-full w-70 flex-col items-center justify-center gap-4 border-l border-border bg-card p-4", className)}>
+        <p className="text-sm text-muted-foreground">{onDeleteChat ? tThread("contactRemoved") : tThread("selectConversation")}</p>
+        {deleteAction}
       </div>
     );
   }
@@ -206,6 +214,8 @@ export function ContactSidebar({ contact, className, session }: ContactSidebarPr
               </div>
             )}
           </div>
+
+          {deleteAction && <div className="mt-4">{deleteAction}</div>}
 
           {/* Divider */}
           <div className="my-4 border-t border-border" />

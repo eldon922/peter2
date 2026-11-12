@@ -1,6 +1,6 @@
 'use client';
-import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -32,7 +32,6 @@ import {
   RefreshCw,
   PanelRightOpen,
   PanelRightClose,
-  Trash2,
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -109,6 +108,8 @@ interface MessageThreadProps {
     assignedAgentId: string | null
   ) => void;
   onConversationDeleted?: (id: string) => void;
+  deleteChatOpen?: boolean;
+  onDeleteChatOpenChange?: (open: boolean) => void;
   /**
    * On mobile, the thread is shown full-screen with the conversation list
    * hidden. This callback lets the page deselect the active conversation
@@ -210,6 +211,8 @@ export function MessageThread({
   onStatusChange,
   onAssignChange,
   onConversationDeleted,
+  deleteChatOpen = false,
+  onDeleteChatOpenChange,
   onBack,
   resyncToken = 0,
   onRefresh,
@@ -498,7 +501,11 @@ export function MessageThread({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (scrolledConversation.current !== conversationId || nearBottom.current || lastMessageId?.startsWith('temp-')) {
+    if (
+      scrolledConversation.current !== conversationId ||
+      nearBottom.current ||
+      lastMessageId?.startsWith('temp-')
+    ) {
       el.scrollTop = el.scrollHeight;
       nearBottom.current = true;
     }
@@ -960,16 +967,6 @@ export function MessageThread({
       {/* Header — solid card surface sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
       <div className="border-border bg-card flex items-center justify-between gap-2 border-b px-3 py-3 sm:px-4">
-        {canManageContacts && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('deleteChat')}
-            onClick={() => setDeleteTarget({})}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        )}
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Back-to-list button — mobile only. Hidden on lg+ where the
               conversation list is always visible next to the thread. */}
@@ -1001,12 +998,6 @@ export function MessageThread({
             >
               {contactIdentity}
             </button>
-            <div className="flex min-w-0 items-center gap-1">
-              <span className="text-muted-foreground truncate text-xs">
-                {contact.phone}
-              </span>
-              <PhoneCountryWarning phone={contact.phone} tooltip />
-            </div>
             <button
               type="button"
               onClick={onShowContactPanel}
@@ -1015,6 +1006,12 @@ export function MessageThread({
             >
               {contactIdentity}
             </button>
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="text-muted-foreground truncate text-xs">
+                {contact.phone}
+              </span>
+              <PhoneCountryWarning phone={contact.phone} tooltip />
+            </div>
           </div>
           {/* Session timer badge. Shown only where the header actually
               has room for it, which is not a straight "bigger screen"
@@ -1200,7 +1197,8 @@ export function MessageThread({
         ref={scrollRef}
         onScroll={(event) => {
           const el = event.currentTarget;
-          nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          nearBottom.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
         className="flex-1 overflow-y-auto px-4 py-4"
       >
@@ -1355,9 +1353,12 @@ export function MessageThread({
         onSelect={handleSendTemplate}
       />
       <Dialog
-        open={deleteTarget !== null}
+        open={deleteTarget !== null || deleteChatOpen}
         onOpenChange={(open) => {
-          if (!open && !deleting) setDeleteTarget(null);
+          if (!open && !deleting) {
+            setDeleteTarget(null);
+            onDeleteChatOpenChange?.(false);
+          }
         }}
       >
         <DialogContent>
@@ -1371,7 +1372,10 @@ export function MessageThread({
             <Button
               variant="outline"
               disabled={deleting}
-              onClick={() => setDeleteTarget(null)}
+              onClick={() => {
+                setDeleteTarget(null);
+                onDeleteChatOpenChange?.(false);
+              }}
             >
               {t('cancelDelete')}
             </Button>
@@ -1379,10 +1383,10 @@ export function MessageThread({
               variant="destructive"
               disabled={deleting}
               onClick={async () => {
-                if (!deleteTarget) return;
+                if (!deleteTarget && !deleteChatOpen) return;
                 setDeleting(true);
                 try {
-                  const messageId = deleteTarget.messageId;
+                  const messageId = deleteTarget?.messageId;
                   const response = await fetch(
                     messageId
                       ? `/api/inbox/messages/${messageId}`
@@ -1403,6 +1407,7 @@ export function MessageThread({
                     onConversationDeleted?.(conversation.id);
                   }
                   setDeleteTarget(null);
+                  onDeleteChatOpenChange?.(false);
                 } catch {
                   toast.error(t('deleteFailed'));
                 } finally {

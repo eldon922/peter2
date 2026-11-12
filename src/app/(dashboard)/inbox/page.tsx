@@ -137,6 +137,13 @@ function InboxPageInner() {
 
   /** Below xl the panel isn't rendered, so the detail opens as a sheet. */
   const [contactSheetOpen, setContactSheetOpen] = useState(false);
+  const [deleteChatOpen, setDeleteChatOpen] = useState(false);
+  const requestDeleteChat = activeConversation
+    ? () => {
+        setContactSheetOpen(false);
+        setDeleteChatOpen(true);
+      }
+    : undefined;
   const handleOpenContactSheet = useCallback(() => {
     setContactSheetOpen(true);
   }, []);
@@ -551,6 +558,7 @@ function InboxPageInner() {
       // when conversationId changes — so messages would stay empty until
       // the user navigated away and back. Bail out early instead.
       if (activeConversation?.id === conv.id) return;
+      setDeleteChatOpen(false);
       setActiveConversation(conv);
       setActiveContact(conv.contact ?? null);
       setMessages(getCachedMessages(conv.id) ?? []);
@@ -739,6 +747,8 @@ function InboxPageInner() {
             onUpdateMessage={handleUpdateMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
+            deleteChatOpen={deleteChatOpen}
+            onDeleteChatOpenChange={setDeleteChatOpen}
             onConversationDeleted={(id) => {
               setConversations((rows) => rows.filter((row) => row.id !== id));
               closeChat();
@@ -767,7 +777,11 @@ function InboxPageInner() {
           // is untouched by this, so the manual toggle's setting is still
           // there when the window is widened back out.
           <div className="hidden xl:block">
-            <ContactSidebar contact={activeContact} session={sessionInfo} />
+            <ContactSidebar
+              contact={activeContact}
+              session={sessionInfo}
+              onDeleteChat={requestDeleteChat}
+            />
           </div>
         )}
       </div>
@@ -791,6 +805,7 @@ function InboxPageInner() {
           <ContactSidebar
             contact={activeContact}
             session={sessionInfo}
+            onDeleteChat={requestDeleteChat}
             className="w-full border-l-0"
           />
         </SheetContent>
