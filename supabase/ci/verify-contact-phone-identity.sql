@@ -22,7 +22,7 @@ BEGIN
     PERFORM update_contact_details(md5('identity-edit')::uuid, '62', '+6281234567890', 'Alias');
     RAISE EXCEPTION 'Editing created a local/international alias';
   EXCEPTION WHEN unique_violation THEN NULL; END;
-  ASSERT (SELECT phone = '629999999999' FROM contacts WHERE id = md5('identity-edit')::uuid), 'collision must not change the saved contact';
+  ASSERT (SELECT phone = '+629999999999' FROM contacts WHERE id = md5('identity-edit')::uuid), 'collision must not change the saved contact';
   BEGIN
     PERFORM update_contact_details(md5('identity-edit')::uuid, '44', '+447700900123', 'Alias');
     RAISE EXCEPTION 'Custom country code collision was accepted';
@@ -39,7 +39,7 @@ DO $$ BEGIN
     FROM contacts WHERE id = md5('identity-local')::uuid), 'unchanged phone fields must preserve old alias records without rewriting them';
 END $$;
 SELECT update_contact_details(md5('identity-uk')::uuid, '44', '+447700900123', 'UK');
-DO $$ BEGIN ASSERT (SELECT phone = '447700900123' FROM contacts WHERE id = md5('identity-uk')::uuid), 'explicit phone-format edits must be saved'; END $$;
+DO $$ BEGIN ASSERT (SELECT phone = '+447700900123' FROM contacts WHERE id = md5('identity-uk')::uuid), 'explicit phone-format edits must retain the international prefix'; END $$;
 RESET ROLE;
 
 INSERT INTO contacts (id, user_id, account_id, phone) VALUES

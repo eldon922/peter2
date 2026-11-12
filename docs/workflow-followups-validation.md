@@ -18,12 +18,13 @@ Apply these migrations **before deploying the application changes**:
 
 1. `067_recover_broadcast_engagement.sql` repairs engagement from resolved quotations, customer reactions and persisted reply timestamps, then refreshes counters.
 2. `068_contact_phone_identity.sql` adds canonical phone preparation and atomic editing, and updates removed-contact restoration to preserve chat history while reusing the same identity. New application callers require these functions.
+3. `069_contact_international_phone_prefix.sql` retains `+` on saved international numbers across all write paths and adds missing prefixes to existing international records. Digits-only matching and WhatsApp sending remain unchanged; legacy local numbers are preserved.
 
 Historical messages with missing quotation context cannot establish which broadcast received a reply. Migration 067 does not guess those assignments or erase existing positive engagement. Counts represent unique recipients, not the number of replies or reactions.
 
 Existing duplicate contact records are not automatically removed. New writes and explicit phone edits prevent canonical aliases; recreating or restoring a removed contact reattaches its history. Existing split conversations can be combined during restoration while preserving their children and state.
 
-Neither migration was applied to the hosted database. No real WhatsApp messages were sent.
+These migrations were not applied to the hosted database. No real WhatsApp messages were sent.
 
 ## Final review fixes
 
@@ -54,3 +55,5 @@ Browser checks render the real components with fixture authentication and data s
 SQL ran against a disposable local PostgreSQL 17 database with pgvector. Unchanged migration 051 was skipped because its cron extensions are unavailable in that image. Existing workflow permission, retention and progress checks passed with the new functions installed. No dependencies were added.
 
 Evidence remains under `/workspace/work/`: `followups-fix-tests-final.log`, `followups-fix-types-final.log`, `followups-fix-lint.log`, `followups-fix-build.log`, `followups-fix-browser.log`, `followups-review-green.log`, `followups-alias-import-final.log`, `followups-import-final.log`, `followups-thread-browser.log`, `followups-history-green.log`, `followups-identity-sql.log`, `followups-existing-sql.log` and `followups-concurrency-final.log`. Review and fix notes are in `followups-2026-11-12/`; browser fixtures and screenshots are in `workflow-ui/`.
+
+The subsequent `+` prefix correction passed 153 targeted tests in six files and fresh PostgreSQL checks for migration backfill/idempotence, insert/edit/restore formatting, unchanged normalized uniqueness, phone history, identity and existing workflow permissions. Evidence is in `phone-prefix-tests.log`, `phone-prefix-migrations.log` and `phone-prefix-*-sql.log`. The correction changes database formatting only; no application dependencies or UI code changed.
