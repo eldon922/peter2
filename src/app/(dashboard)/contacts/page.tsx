@@ -61,14 +61,67 @@ import { ImportModal } from '@/components/contacts/import-modal';
 import { FieldsAndTagsDialog } from '@/components/contacts/fields-and-tags-dialog';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
-import {
-  TagMultiSelect,
-  TagPickerList,
-} from '@/components/ui/tag-multi-select';
+import { TagPickerList } from '@/components/ui/tag-multi-select';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { contactsCsv } from '@/lib/contacts/export-csv';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import { useTranslations } from 'next-intl';
+
+function ContactTagFilter({
+  label,
+  tags,
+  value,
+  onToggle,
+  onClear,
+}: {
+  label: string;
+  tags: Tag[];
+  value: string[];
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const t = useTranslations('Contacts.page');
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            className="border-border text-muted-foreground hover:bg-muted shrink-0"
+          />
+        }
+      >
+        <Filter className="size-4" />
+        {label}
+        {value.length > 0 && (
+          <span className="bg-primary text-primary-foreground ml-1 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold">
+            {value.length}
+          </span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-max max-w-[min(28rem,calc(100vw-2rem))] min-w-64 p-0"
+      >
+        <div className="border-border flex items-center justify-between border-b px-3 py-2">
+          <span className="text-popover-foreground text-sm font-medium">
+            {label}
+          </span>
+          {value.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-muted-foreground hover:text-foreground min-h-9 px-2 text-xs"
+            >
+              {t('clearAll')}
+            </button>
+          )}
+        </div>
+        <TagPickerList tags={tags} value={value} onToggle={onToggle} />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const PAGE_SIZE = 25;
 
@@ -714,7 +767,10 @@ export default function ContactsPage() {
           <div className="relative w-full sm:flex-1">
             <SearchInput
               value={search}
-              onClear={() => { setSearch(''); setPage(0); }}
+              onClear={() => {
+                setSearch('');
+                setPage(0);
+              }}
               onChange={(e) => {
                 setSearch(e.target.value);
                 // Reset pagination when the query changes — the result
@@ -726,75 +782,32 @@ export default function ContactsPage() {
             />
           </div>
 
-          <Popover>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="outline"
-                  className="border-border text-muted-foreground hover:bg-muted shrink-0"
-                />
-              }
-            >
-              <Filter className="size-4" />
-              {t('filterByTags')}
-              {selectedTagIds.length > 0 && (
-                <span className="bg-primary text-primary-foreground ml-1 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold">
-                  {selectedTagIds.length}
-                </span>
-              )}
-            </PopoverTrigger>
-            {/* Sized to the tag names rather than a fixed 256px: the
-                names are user-created and were being truncated to fit a
-                width that had nothing to do with them. `w-max` takes the
-                widest row, with a floor so a short list still looks like
-                a panel and a ceiling so one long tag can't run off the
-                screen. */}
-            <PopoverContent
-              align="start"
-              className="w-max max-w-[min(28rem,calc(100vw-2rem))] min-w-64 p-0"
-            >
-              <div className="border-border flex items-center justify-between border-b px-3 py-2">
-                <span className="text-popover-foreground text-sm font-medium">
-                  {t('filterByTags')}
-                </span>
-                {selectedTagIds.length > 0 && (
-                  <button
-                    onClick={clearTagFilters}
-                    className="text-muted-foreground hover:text-foreground text-xs"
-                  >
-                    {t('clearAll')}
-                  </button>
-                )}
-              </div>
-              <TagPickerList
-                tags={[untaggedOption, ...allTags]}
-                value={selectedTagIds}
-                onToggle={toggleTagFilter}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs">
-            {t('excludeTags')}
-          </span>
-          <TagMultiSelect
-            tags={[untaggedOption, ...allTags]}
-            value={excludedTagIds}
-            variant="danger"
-            onToggle={(id) => {
-              setExcludedTagIds((prev) =>
-                prev.includes(id)
-                  ? prev.filter((tagId) => tagId !== id)
-                  : [...prev, id]
-              );
-              setPage(0);
-            }}
-            onClear={() => {
-              setExcludedTagIds([]);
-              setPage(0);
-            }}
-          />
+          <div className="flex flex-wrap gap-2">
+            <ContactTagFilter
+              label={t('filterByTags')}
+              tags={[untaggedOption, ...allTags]}
+              value={selectedTagIds}
+              onToggle={toggleTagFilter}
+              onClear={clearTagFilters}
+            />
+            <ContactTagFilter
+              label={t('excludeTags')}
+              tags={[untaggedOption, ...allTags]}
+              value={excludedTagIds}
+              onToggle={(id) => {
+                setExcludedTagIds((prev) =>
+                  prev.includes(id)
+                    ? prev.filter((tagId) => tagId !== id)
+                    : [...prev, id]
+                );
+                setPage(0);
+              }}
+              onClear={() => {
+                setExcludedTagIds([]);
+                setPage(0);
+              }}
+            />
+          </div>
         </div>
 
         {/* Active tag-filter chips */}
