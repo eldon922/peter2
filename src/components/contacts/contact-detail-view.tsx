@@ -1,4 +1,7 @@
 'use client';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { findExistingContact, isExactMatch, isUniqueViolation } from '@/lib/contacts/dedupe';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -66,6 +69,7 @@ export function ContactDetailView({
   onUpdated,
 }: ContactDetailViewProps) {
   const t = useTranslations('Contacts.detailView');
+  const tForm = useTranslations('Contacts.form');
   const supabase = createClient();
   const { accountId, defaultCurrency } = useAuth();
 
@@ -242,28 +246,54 @@ export function ContactDetailView({
     }
 
     setSavingDetails(true);
-    const { error } = await supabase
-      .from('contacts')
-      .update({
-        name: editName.trim() || null,
-        phone: editPhone.trim(),
-        email: editEmail.trim() || null,
-        company: editCompany.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', contactId);
+    try {
+      const countryCode = await fetchDefaultCountryCode();
+      if (
+        accountId &&
+        contact &&
+        toMetaPhone(contact.phone, countryCode) !==
+          toMetaPhone(editPhone, countryCode)
+      ) {
+        const existing = await findExistingContact(
+          supabase,
+          accountId,
+          editPhone,
+          countryCode,
+          contactId
+        );
+        if (existing && isExactMatch(existing, editPhone, countryCode)) {
+          toast.error(tForm('toastConflict'));
+          return;
+        }
+      }
+      const { error } = await supabase.rpc('update_contact_details', {
+        p_contact_id: contactId,
+        p_default_country_code: countryCode,
+        p_phone: editPhone,
+        p_name: editName.trim() || null,
+        p_email: editEmail.trim() || null,
+        p_company: editCompany.trim() || null,
+      });
 
-    if (error) {
+      if (error) {
+        toast.error(
+          isUniqueViolation(error)
+            ? tForm('toastConflict')
+            : t('toastUpdateFailed')
+        );
+      } else {
+        toast.success(t('toastUpdated'));
+        fetchContact();
+        // The trigger will have banked the old number if this save changed
+        // it, so pull the history back in rather than waiting for a reopen.
+        fetchPhoneHistory();
+        onUpdated();
+      }
+    } catch {
       toast.error(t('toastUpdateFailed'));
-    } else {
-      toast.success(t('toastUpdated'));
-      fetchContact();
-      // The trigger will have banked the old number if this save changed
-      // it, so pull the history back in rather than waiting for a reopen.
-      fetchPhoneHistory();
-      onUpdated();
+    } finally {
+      setSavingDetails(false);
     }
-    setSavingDetails(false);
   }
 
   async function toggleTag(tagId: string) {

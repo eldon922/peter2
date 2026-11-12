@@ -404,7 +404,8 @@
       "dupSimilar": "Kontak dengan nomor yang sangat mirip sudah ada.",
       "loadingTags": "Memuat tag...",
       "noTagsAvailable": "Tidak ada tag tersedia. Buat tag di Pengaturan.",
-      "phoneRequired": "Nomor telepon wajib diisi"
+      "phoneRequired": "Nomor telepon wajib diisi",
+      "phoneCheckFailed": "Nomor telepon ini belum dapat diperiksa. Coba lagi sebelum menyimpan."
     },
     "detailView": {
       "tabs": {

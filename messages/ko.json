@@ -404,7 +404,8 @@
       "dupSimilar": "매우 유사한 번호를 가진 연락처가 이미 있습니다.",
       "loadingTags": "태그를 불러오는 중...",
       "noTagsAvailable": "사용 가능한 태그가 없습니다. 설정에서 태그를 만드세요.",
-      "phoneRequired": "전화번호는 필수입니다"
+      "phoneRequired": "전화번호는 필수입니다",
+      "phoneCheckFailed": "이 전화번호를 확인하지 못했습니다. 저장하기 전에 다시 시도하세요."
     },
     "detailView": {
       "tabs": {

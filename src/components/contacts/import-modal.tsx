@@ -10,6 +10,7 @@ import {
   dedupeByPhone,
   isUniqueViolation,
   normalizeKey,
+  phoneLookupKeys,
 } from '@/lib/contacts/dedupe';
 import {
   parseContactCsv,
@@ -36,6 +37,9 @@ import {
   withRetry,
 } from '@/lib/supabase/batching';
 import { cn } from '@/lib/utils';
+import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -152,6 +156,7 @@ export function ImportModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileRequest = useRef(0);
   const [parsingFile, setParsingFile] = useState(false);
+  const [countryCode, setCountryCode] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [csvCustomFieldIds, setCsvCustomFieldIds] = useState<string[]>([]);
 
@@ -235,6 +240,7 @@ export function ImportModal({
   } | null>(null);
 
   function reset() {
+    setCountryCode(null);
     fileRequest.current++;
     setParsingFile(false);
     setCsvCustomFieldIds([]);
@@ -265,7 +271,7 @@ export function ImportModal({
     setCsvCustomFieldIds([]);
     setParsingFile(true);
     try {
-      const [text, fields] = await Promise.all([
+      const [text, fields, code] = await Promise.all([
         selected.text(),
         fetchAllRows<CustomField>((from, to) =>
           supabase
@@ -275,6 +281,7 @@ export function ImportModal({
             .order('id')
             .range(from, to)
         ),
+        fetchDefaultCountryCode(),
       ]);
       if (request !== fileRequest.current) return;
       if (fields.error) throw fields.error;
@@ -284,6 +291,7 @@ export function ImportModal({
         hasCompanyColumn: csvHasCompany,
         customFieldIds = [],
       } = parseContactCsv(text, fields.rows);
+      setCountryCode(code);
       setCustomFields(fields.rows);
       setCsvCustomFieldIds(customFieldIds);
 
@@ -299,17 +307,24 @@ export function ImportModal({
       // Collapse repeats of the same number now, so everything downstream —
       // preview, counts, insert — works from one list.
       // A repeated number still contributes its tags (and any blank fields).
-      const { unique, dropped } = dedupeByPhone(rows, (kept, repeat) => {
-        const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
-        for (const name of repeat.tagNames) {
-          if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
-        }
-        kept.name ??= repeat.name;
-        kept.email ??= repeat.email;
-        kept.company ??= repeat.company;
-        if (repeat.customValues)
-          kept.customValues = { ...repeat.customValues, ...kept.customValues };
-      });
+      const { unique, dropped } = dedupeByPhone(
+        rows,
+        (kept, repeat) => {
+          const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
+          for (const name of repeat.tagNames) {
+            if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
+          }
+          kept.name ??= repeat.name;
+          kept.email ??= repeat.email;
+          kept.company ??= repeat.company;
+          if (repeat.customValues)
+            kept.customValues = {
+              ...repeat.customValues,
+              ...kept.customValues,
+            };
+        },
+        (phone) => toMetaPhone(phone, code)
+      );
       setParsedRows(unique);
       setInFileDropped(
         dropped.map(({ row, reason }) => ({
@@ -341,7 +356,8 @@ export function ImportModal({
   }
 
   async function handleImport() {
-    if (parsedRows.length === 0 || parsingFile || importing) return;
+    if (parsedRows.length === 0 || parsingFile || importing || !countryCode)
+      return;
     setImporting(true);
     setProgress({ stage: 'checking', done: 0, total: parsedRows.length });
 
@@ -389,7 +405,9 @@ export function ImportModal({
       //    proportional to the file, not to the account.
       const importedKeys = [
         ...new Set(
-          unique.map((row) => normalizeKey(row.phone)).filter(Boolean)
+          unique
+            .flatMap((row) => phoneLookupKeys(row.phone, countryCode))
+            .filter(Boolean)
         ),
       ];
       const existingByPhone = new Map<
@@ -427,7 +445,8 @@ export function ImportModal({
           name: string | null;
         }[]) {
           if (r.phone_normalized) {
-            existingByPhone.set(r.phone_normalized, { id: r.id, name: r.name });
+            for (const key of phoneLookupKeys(r.phone_normalized, countryCode))
+              existingByPhone.set(key, { id: r.id, name: r.name });
           }
         }
         checked += slice.length;
@@ -522,10 +541,16 @@ export function ImportModal({
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
         const chunk = toInsert.slice(i, i + chunkSize);
+        await prepareContactPhones(
+          supabase,
+          accountId,
+          chunk.map((row) => row.phone),
+          countryCode
+        );
         const rows = chunk.map((row) => ({
           user_id: user.id,
           account_id: accountId,
-          phone: row.phone,
+          phone: toMetaPhone(row.phone, countryCode),
           name: row.name || null,
           email: row.email || null,
           company: row.company || null,
@@ -577,7 +602,7 @@ export function ImportModal({
           }
         } else {
           const sourceByPhone = new Map(
-            chunk.map((row) => [normalizeKey(row.phone), row])
+            chunk.map((row) => [toMetaPhone(row.phone, countryCode), row])
           );
           for (const inserted of data ?? []) {
             const source = sourceByPhone.get(inserted.phone_normalized);

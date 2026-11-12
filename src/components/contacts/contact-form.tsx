@@ -27,6 +27,9 @@ import { Badge } from '@/components/ui/badge';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 
 interface ContactFormProps {
   open: boolean;
@@ -67,6 +70,7 @@ export function ContactForm({
     exact: boolean;
   } | null>(null);
   const duplicateRequest = useRef(0);
+  const countryCode = useRef<string | undefined>(undefined);
   const duplicateLookup = useRef<{
     key: string;
     promise: Promise<ExistingContact | null>;
@@ -74,10 +78,21 @@ export function ContactForm({
 
   async function lookupDuplicate(value: string) {
     if (!accountId) return null;
-    const key = `${accountId}:${value}`;
+    const key = `${accountId}:${contact?.id ?? ''}:${value}`;
     if (duplicateLookup.current?.key === key)
       return duplicateLookup.current.promise;
-    const promise = findExistingContact(supabase, accountId, value);
+    const promise = (async () => {
+      if (!countryCode.current) {
+        countryCode.current = await fetchDefaultCountryCode();
+      }
+      return findExistingContact(
+        supabase,
+        accountId,
+        value,
+        countryCode.current,
+        contact?.id
+      );
+    })();
     duplicateLookup.current = { key, promise };
     try {
       return await promise;
@@ -108,18 +123,36 @@ export function ContactForm({
   // Look up an existing contact with this number (new contacts only).
   // Runs on blur so we don't query on every keystroke.
   async function checkDuplicate() {
-    if (isEdit || !accountId) return;
+    if (!accountId) return;
     const value = phone.trim();
     if (!value) {
       setDupMatch(null);
       return;
     }
     const request = ++duplicateRequest.current;
-    const existing = await lookupDuplicate(value);
+    let existing: ExistingContact | null;
+    try {
+      existing = await lookupDuplicate(value);
+    } catch {
+      if (request === duplicateRequest.current)
+        toast.error(t('phoneCheckFailed'));
+      return;
+    }
     if (request === duplicateRequest.current) {
+      if (
+        contact &&
+        toMetaPhone(contact.phone, countryCode.current) ===
+          toMetaPhone(value, countryCode.current)
+      ) {
+        setDupMatch(null);
+        return;
+      }
       setDupMatch(
         existing
-          ? { contact: existing, exact: isExactMatch(existing, value) }
+          ? {
+              contact: existing,
+              exact: isExactMatch(existing, value, countryCode.current),
+            }
           : null
       );
     }
@@ -160,9 +193,17 @@ export function ContactForm({
     setSaving(true);
 
     try {
-      if (!isEdit && accountId) {
+      countryCode.current ??= await fetchDefaultCountryCode();
+      const phoneChanged =
+        !contact ||
+        toMetaPhone(contact.phone, countryCode.current) !==
+          toMetaPhone(phone, countryCode.current);
+      if (phoneChanged && accountId) {
         const existing = await lookupDuplicate(phone.trim());
-        if (existing && isExactMatch(existing, phone.trim())) {
+        if (
+          existing &&
+          isExactMatch(existing, phone.trim(), countryCode.current)
+        ) {
           setDupMatch({ contact: existing, exact: true });
           toast.error(t('toastConflict'));
           return;
@@ -179,25 +220,29 @@ export function ContactForm({
       let contactId = contact?.id;
 
       if (isEdit && contactId) {
-        const { error } = await supabase
-          .from('contacts')
-          .update({
-            name: name.trim() || null,
-            phone: phone.trim(),
-            email: email.trim() || null,
-            company: company.trim() || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', contactId);
+        const { error } = await supabase.rpc('update_contact_details', {
+          p_contact_id: contactId,
+          p_default_country_code: countryCode.current,
+          p_phone: phone,
+          p_name: name.trim() || null,
+          p_email: email.trim() || null,
+          p_company: company.trim() || null,
+        });
         if (error) throw error;
       } else {
+        await prepareContactPhones(
+          supabase,
+          accountId,
+          [phone],
+          countryCode.current
+        );
         const { data, error } = await supabase
           .from('contacts')
           .insert({
             user_id: user.id,
             account_id: accountId,
             name: name.trim() || null,
-            phone: phone.trim(),
+            phone: toMetaPhone(phone.trim(), countryCode.current),
             email: email.trim() || null,
             company: company.trim() || null,
           })
@@ -237,10 +282,8 @@ export function ContactForm({
       if (isUniqueViolation(err)) {
         toast.error(t('toastConflict'));
         if (!isEdit && accountId) {
-          const existing = await findExistingContact(
-            supabase,
-            accountId,
-            phone.trim()
+          const existing = await lookupDuplicate(phone.trim()).catch(
+            () => null
           );
           if (existing) setDupMatch({ contact: existing, exact: true });
         }

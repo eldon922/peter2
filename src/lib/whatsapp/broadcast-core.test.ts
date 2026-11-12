@@ -148,7 +148,11 @@ function makeDb(
       if (orSuffixes) {
         const suffixes = orSuffixes;
         rows = rows.filter((r) =>
-          suffixes.some((s) => String(r.phone ?? '').endsWith(s))
+          suffixes.some((s) =>
+            String(r.phone ?? '')
+              .replace(/\D/g, '')
+              .endsWith(s)
+          )
         );
       }
       const matched = rows.length;
@@ -196,7 +200,7 @@ function makeDb(
       or: (expr: string) => {
         orSuffixes = expr
           .split(',')
-          .map((atom) => atom.replace(/^phone\.like\.\*/, ''));
+          .map((atom) => atom.replace(/^phone(?:_normalized)?\.like\.\*/, ''));
         return chain;
       },
       order: () => chain,
@@ -224,6 +228,7 @@ function makeDb(
 
   return {
     db: {
+      rpc: vi.fn(async () => ({ data: null, error: null })),
       from: (table: string) => builder(table),
     } as unknown as SupabaseClient,
     writes,
@@ -433,6 +438,22 @@ describe('createBroadcast contact resolution', () => {
       (w) => w.table === 'contacts' && w.op === 'insert'
     );
     expect(contactInserts).toHaveLength(0);
+  });
+
+  it('reuses a formatted local contact for an international API recipient', async () => {
+    const { db, writes } = contactsDb([
+      { id: 'c-local', account_id: 'acc', phone: '0812 3456 7890' },
+    ]);
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo',
+      recipients: [{ to: '+6281234567890' }],
+    });
+    expect(plan.planned).toHaveLength(1);
+    expect(
+      writes.filter(
+        (write) => write.table === 'contacts' && write.op === 'insert'
+      )
+    ).toHaveLength(0);
   });
 
   it('matches a trunk-prefix variant the same way the single-row helper does', async () => {
@@ -2133,64 +2154,152 @@ describe('deliverBroadcast only sends rows that are still waiting for it', () =>
 });
 
 describe('broadcast text header snapshots', () => {
-  it.each(['start', 'retry'] as const)('replays the saved named header on %s after the contact is renamed', async (action) => {
-    const { db } = makeDb({
-      broadcasts: { rows: [sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' })] },
-      broadcast_recipients: { rows: [(action === 'start' ? pendingRow : failedRow)({
-        template_params: [],
-        template_header_text: 'Original name',
-        contact: { id: 'c-1', phone: '14155550123', name: 'Changed name' },
-      })] },
-      whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text', header_content: 'Hello {{name}}' }] },
-    });
-    const plan = await (action === 'start' ? planBroadcastSend : planBroadcastRetry)(db, 'acc', 'b-1');
-    expect(plan.planned[0].params).toEqual([]);
-    expect(plan.planned[0].messageParams?.headerText).toBe('Original name');
-  });
+  it.each(['start', 'retry'] as const)(
+    'replays the saved named header on %s after the contact is renamed',
+    async (action) => {
+      const { db } = makeDb({
+        broadcasts: {
+          rows: [
+            sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' }),
+          ],
+        },
+        broadcast_recipients: {
+          rows: [
+            (action === 'start' ? pendingRow : failedRow)({
+              template_params: [],
+              template_header_text: 'Original name',
+              contact: {
+                id: 'c-1',
+                phone: '14155550123',
+                name: 'Changed name',
+              },
+            }),
+          ],
+        },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: {
+          rows: [
+            {
+              ...TEMPLATE_NO_VARS,
+              header_type: 'text',
+              header_content: 'Hello {{name}}',
+            },
+          ],
+        },
+      });
+      const plan = await (
+        action === 'start' ? planBroadcastSend : planBroadcastRetry
+      )(db, 'acc', 'b-1');
+      expect(plan.planned[0].params).toEqual([]);
+      expect(plan.planned[0].messageParams?.headerText).toBe('Original name');
+    }
+  );
 
   it('refuses a retry with a missing header value before claiming any rows', async () => {
     const { db, writes } = makeDb({
       broadcasts: { rows: [sentBroadcast()] },
       broadcast_recipients: { rows: [failedRow({ template_params: [] })] },
       whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [{ ...TEMPLATE_NO_VARS, header_type: 'text', header_content: 'Hello {{name}}' }] },
+      message_templates: {
+        rows: [
+          {
+            ...TEMPLATE_NO_VARS,
+            header_type: 'text',
+            header_content: 'Hello {{name}}',
+          },
+        ],
+      },
     });
-    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({ code: 'params_unrecoverable' });
-    expect(writes.filter((write) => write.values.status === 'pending')).toHaveLength(0);
+    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({
+      code: 'params_unrecoverable',
+    });
+    expect(
+      writes.filter((write) => write.values.status === 'pending')
+    ).toHaveLength(0);
   });
 });
 
 describe('broadcast button parameter snapshots', () => {
-  const buttonTemplate = { ...TEMPLATE_NO_VARS, buttons: [
-    { type: 'QUICK_REPLY', text: 'Help' },
-    { type: 'URL', text: 'Order', url: 'https://example.com/orders/{{1}}' },
-    { type: 'URL', text: 'Invoice', url: 'https://example.com/invoices/{{1}}' },
-  ] };
-  it.each(['start', 'retry'] as const)('sends the original button values on %s', async (action) => {
-    const { db } = makeDb({
-      broadcasts: { rows: [sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' })] },
-      broadcast_recipients: { rows: [(action === 'start' ? pendingRow : failedRow)({
-        template_params: [], template_button_params: { 1: 'original-order', 2: 'original-invoice' },
-        contact: { id: 'c-1', phone: '14155550123', name: 'Changed contact' },
-      })] },
-      whatsapp_config: { rows: [CONFIG_ROW] },
-      message_templates: { rows: [buttonTemplate] },
-    });
-    const plan = await (action === 'start' ? planBroadcastSend : planBroadcastRetry)(db, 'acc', 'b-1');
-    expect(buildSendComponents(plan.templateRow!, plan.planned[0].messageParams)).toEqual([
-      { type: 'button', sub_type: 'url', index: '1', parameters: [{ type: 'text', text: 'original-order' }] },
-      { type: 'button', sub_type: 'url', index: '2', parameters: [{ type: 'text', text: 'original-invoice' }] },
-    ]);
-  });
+  const buttonTemplate = {
+    ...TEMPLATE_NO_VARS,
+    buttons: [
+      { type: 'QUICK_REPLY', text: 'Help' },
+      { type: 'URL', text: 'Order', url: 'https://example.com/orders/{{1}}' },
+      {
+        type: 'URL',
+        text: 'Invoice',
+        url: 'https://example.com/invoices/{{1}}',
+      },
+    ],
+  };
+  it.each(['start', 'retry'] as const)(
+    'sends the original button values on %s',
+    async (action) => {
+      const { db } = makeDb({
+        broadcasts: {
+          rows: [
+            sentBroadcast({ status: action === 'start' ? 'sending' : 'sent' }),
+          ],
+        },
+        broadcast_recipients: {
+          rows: [
+            (action === 'start' ? pendingRow : failedRow)({
+              template_params: [],
+              template_button_params: {
+                1: 'original-order',
+                2: 'original-invoice',
+              },
+              contact: {
+                id: 'c-1',
+                phone: '14155550123',
+                name: 'Changed contact',
+              },
+            }),
+          ],
+        },
+        whatsapp_config: { rows: [CONFIG_ROW] },
+        message_templates: { rows: [buttonTemplate] },
+      });
+      const plan = await (
+        action === 'start' ? planBroadcastSend : planBroadcastRetry
+      )(db, 'acc', 'b-1');
+      expect(
+        buildSendComponents(plan.templateRow!, plan.planned[0].messageParams)
+      ).toEqual([
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '1',
+          parameters: [{ type: 'text', text: 'original-order' }],
+        },
+        {
+          type: 'button',
+          sub_type: 'url',
+          index: '2',
+          parameters: [{ type: 'text', text: 'original-invoice' }],
+        },
+      ]);
+    }
+  );
   it('refuses a retry before claiming rows if any dynamic button has no saved value', async () => {
     const { db, writes } = makeDb({
       broadcasts: { rows: [sentBroadcast()] },
-      broadcast_recipients: { rows: [failedRow({ template_params: [], template_button_params: { 1: 'order' } })] },
+      broadcast_recipients: {
+        rows: [
+          failedRow({
+            template_params: [],
+            template_button_params: { 1: 'order' },
+          }),
+        ],
+      },
       whatsapp_config: { rows: [CONFIG_ROW] },
       message_templates: { rows: [buttonTemplate] },
     });
-    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({ code: 'params_unrecoverable' });
-    expect(writes.filter((write) => write.values.status === 'pending')).toHaveLength(0);
+    await expect(planBroadcastRetry(db, 'acc', 'b-1')).rejects.toMatchObject({
+      code: 'params_unrecoverable',
+    });
+    expect(
+      writes.filter((write) => write.values.status === 'pending')
+    ).toHaveLength(0);
   });
 });

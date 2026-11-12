@@ -1,4 +1,5 @@
 'use client';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -1313,7 +1314,10 @@ export function MessageThread({
               try {
                 const { error } = await createClient().rpc(
                   'save_conversation_contact',
-                  { p_conversation_id: conversation.id }
+                  {
+                    p_conversation_id: conversation.id,
+                    p_default_country_code: await fetchDefaultCountryCode(),
+                  }
                 );
                 if (error) throw error;
                 onRefresh?.();

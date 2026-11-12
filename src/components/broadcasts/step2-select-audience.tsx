@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { parseContactCsv } from '@/lib/contacts/parse-contact-csv';
 import { dedupeByPhone } from '@/lib/contacts/dedupe';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 import { UNTAGGED } from '@/lib/contacts/tag-filter';
 import { createClient } from '@/lib/supabase/client';
 import { CustomField, Tag } from '@/types';
@@ -379,8 +381,14 @@ export function Step2SelectAudience({
               if (!file) return;
               setCsvLoading(true);
               try {
-                const { rows } = parseContactCsv(await file.text());
-                const { unique } = dedupeByPhone(rows);
+                const [text, countryCode] = await Promise.all([
+                  file.text(),
+                  fetchDefaultCountryCode(),
+                ]);
+                const { rows } = parseContactCsv(text);
+                const { unique } = dedupeByPhone(rows, undefined, (phone) =>
+                  toMetaPhone(phone, countryCode)
+                );
                 if (request !== csvRequest.current) return;
                 if (unique.length === 0)
                   setCsvError(importT('toastNoValidRows'));

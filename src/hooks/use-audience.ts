@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 
 import { createClient } from '@/lib/supabase/client';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 import {
   resolveAudience,
   resolvedCount,
@@ -28,7 +30,15 @@ export function useAudience(audience: AudienceConfig) {
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      resolveAudience(createClient(), audience)
+      (async () => {
+        const code =
+          audience.type === 'csv' ? await fetchDefaultCountryCode() : undefined;
+        return resolveAudience(
+          createClient(),
+          audience,
+          code ? (phone) => toMetaPhone(phone, code) : undefined
+        );
+      })()
         .then((resolved) => {
           if (!cancelled) setResult({ audience, resolved, failed: false });
         })

@@ -12,7 +12,7 @@ export function sanitizePhoneForMeta(phone: string): string {
  * Country code assumed for numbers saved in domestic format (see
  * `toMetaPhone`). Set DEFAULT_COUNTRY_CODE to change it.
  */
-const DEFAULT_COUNTRY_CODE = (process.env.DEFAULT_COUNTRY_CODE ?? '62').replace(/\D/g, '')
+export const DEFAULT_COUNTRY_CODE = (process.env.DEFAULT_COUNTRY_CODE ?? '62').replace(/\D/g, '')
 
 /**
  * The number to hand to Meta. Like `sanitizePhoneForMeta`, plus it fixes
@@ -21,10 +21,10 @@ const DEFAULT_COUNTRY_CODE = (process.env.DEFAULT_COUNTRY_CODE ?? '62').replace(
  * "00" international prefix is dropped. Use this when sending; the plain
  * digits form stays the key for matching and dedupe.
  */
-export function toMetaPhone(phone: string): string {
+export function toMetaPhone(phone: string, countryCode = DEFAULT_COUNTRY_CODE): string {
   const digits = sanitizePhoneForMeta(phone)
   if (digits.startsWith('00')) return digits.slice(2)
-  if (digits.startsWith('0')) return DEFAULT_COUNTRY_CODE + digits.slice(1)
+  if (digits.startsWith('0')) return countryCode.replace(/\D/g, '') + digits.slice(1)
   return digits
 }
 

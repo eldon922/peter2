@@ -126,7 +126,8 @@ async function allContactIds(supabase: Supabase): Promise<string[]> {
 
 export async function resolveAudience(
   supabase: Supabase,
-  audience: AudienceConfig
+  audience: AudienceConfig,
+  phoneKey: (phone: string) => string = normalizeKey
 ): Promise<ResolvedAudience> {
   const excludeTagIds = audience.excludeTagIds ?? [];
   let ids: string[];
@@ -159,12 +160,11 @@ export async function resolveAudience(
           .select('phone')
           .in('id', chunk);
         if (error) throw new Error(error.message);
-        for (const row of data ?? [])
-          excludedPhones.add(normalizeKey(row.phone));
+        for (const row of data ?? []) excludedPhones.add(phoneKey(row.phone));
       }
     }
     let contacts = audience.csvContacts.filter(
-      (row) => !excludedPhones.has(normalizeKey(row.phone))
+      (row) => !excludedPhones.has(phoneKey(row.phone))
     );
     if (excludeTagIds.includes(UNTAGGED)) {
       const tagged = await fetchAllRows<{ contact_id: string }>((from, to) =>
@@ -184,10 +184,10 @@ export async function resolveAudience(
           .select('phone')
           .in('id', chunk);
         if (error) throw new Error(error.message);
-        for (const row of data ?? []) taggedPhones.add(normalizeKey(row.phone));
+        for (const row of data ?? []) taggedPhones.add(phoneKey(row.phone));
       }
       contacts = contacts.filter((row) =>
-        taggedPhones.has(normalizeKey(row.phone))
+        taggedPhones.has(phoneKey(row.phone))
       );
     }
     return {

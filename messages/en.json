@@ -404,7 +404,8 @@
       "dupSimilar": "A contact with a very similar number already exists.",
       "loadingTags": "Loading tags...",
       "noTagsAvailable": "No tags available. Create tags in Settings.",
-      "phoneRequired": "Phone number is required"
+      "phoneRequired": "Phone number is required",
+      "phoneCheckFailed": "Could not check this phone number. Try again before saving."
     },
     "detailView": {
       "tabs": {

@@ -12,7 +12,10 @@ import {
   resolveButtonVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
-import { normalizeKey } from '@/lib/contacts/dedupe';
+import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { phoneLookupKeys } from '@/lib/contacts/dedupe';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
+import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
 import { isHeaderMediaKind } from '@/lib/media-specs';
 import { uploadHeaderMedia } from '@/lib/broadcasts/upload-header-media';
@@ -122,10 +125,16 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
   async function resolveAudience(audience: AudienceConfig): Promise<Contact[]> {
     const supabase = createClient();
-    const resolved = await resolveWizardAudience(supabase, audience);
+    const countryCode =
+      audience.type === 'csv' ? await fetchDefaultCountryCode() : undefined;
+    const resolved = await resolveWizardAudience(
+      supabase,
+      audience,
+      countryCode ? (phone) => toMetaPhone(phone, countryCode) : undefined
+    );
     if (!resolved) return [];
     if (resolved.kind === 'csv')
-      return upsertCsvContacts(supabase, resolved.contacts);
+      return upsertCsvContacts(supabase, resolved.contacts, countryCode!);
     if (resolved.kind === 'ids')
       return fetchContactsByIds(supabase, resolved.ids);
     const { rows, error } = await fetchAllRows<Contact>((from, to) =>
@@ -148,7 +157,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
    */
   async function upsertCsvContacts(
     supabase: ReturnType<typeof createClient>,
-    csvRows: { phone: string; name?: string }[]
+    csvRows: { phone: string; name?: string }[],
+    countryCode: string
   ): Promise<Contact[]> {
     if (csvRows.length === 0) return [];
 
@@ -163,19 +173,22 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       throw new Error('Your profile is not linked to an account.');
     }
 
+    const phoneKey = (phone: string) => toMetaPhone(phone, countryCode);
+
     // De-duplicate by phone within the CSV (users can paste duplicates).
     const uniqueByPhone = new Map<string, { phone: string; name?: string }>();
     for (const row of csvRows) {
-      if (
-        normalizeKey(row.phone) &&
-        !uniqueByPhone.has(normalizeKey(row.phone))
-      )
-        uniqueByPhone.set(normalizeKey(row.phone), row);
+      if (phoneKey(row.phone) && !uniqueByPhone.has(phoneKey(row.phone)))
+        uniqueByPhone.set(phoneKey(row.phone), row);
     }
     const phones = [...uniqueByPhone.keys()];
 
     const byPhone = new Map<string, Contact>();
-    for (const chunk of chunkIds(phones)) {
+    for (const chunk of chunkIds([
+      ...new Set(
+        phones.flatMap((phone) => phoneLookupKeys(phone, countryCode))
+      ),
+    ])) {
       const { data: existing, error } = await supabase
         .from('contacts')
         .select('*')
@@ -184,7 +197,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       if (error)
         throw new Error(`Failed to look up CSV contacts: ${error.message}`);
       for (const contact of (existing ?? []) as Contact[])
-        byPhone.set(normalizeKey(contact.phone), contact);
+        byPhone.set(phoneKey(contact.phone), contact);
     }
 
     // Insert only missing contacts, in one batch per 200 rows (PostgREST
@@ -194,11 +207,17 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .map((phone) => ({
         user_id: user.id,
         account_id: accountId,
-        phone: uniqueByPhone.get(phone)!.phone,
+        phone,
         name: uniqueByPhone.get(phone)?.name ?? null,
       }));
 
     for (const chunk of chunkRows(missing)) {
+      await prepareContactPhones(
+        supabase,
+        accountId,
+        chunk.map((contact) => contact.phone),
+        countryCode
+      );
       const { data: inserted, error: insertErr } = await supabase
         .from('contacts')
         .insert(chunk)
@@ -207,7 +226,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         throw new Error(`Failed to create CSV contacts: ${insertErr.message}`);
       }
       for (const c of (inserted ?? []) as Contact[]) {
-        if (c.phone) byPhone.set(normalizeKey(c.phone), c);
+        if (c.phone) byPhone.set(phoneKey(c.phone), c);
       }
     }
 

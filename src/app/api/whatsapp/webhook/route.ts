@@ -1,9 +1,10 @@
+import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
 import { NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api';
 import { applyMessageEdit } from '@/lib/whatsapp/inbound-edit';
-import { normalizePhone } from '@/lib/whatsapp/phone-utils';
+import { DEFAULT_COUNTRY_CODE, normalizePhone } from '@/lib/whatsapp/phone-utils';
 import { recordBroadcastReply } from '@/lib/whatsapp/broadcast-engagement';
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
@@ -1594,6 +1595,12 @@ async function findOrCreateContact(
   // user_id is the NOT NULL FK audit column (no inbound message
   // has a single "user who created" it — we attribute to the
   // WhatsApp config owner as a stable default).
+  await prepareContactPhones(
+    supabaseAdmin(),
+    accountId,
+    [phone],
+    DEFAULT_COUNTRY_CODE
+  );
   const { data: newContact, error: createError } = await supabaseAdmin()
     .from('contacts')
     .insert({

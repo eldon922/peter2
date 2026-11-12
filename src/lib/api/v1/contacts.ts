@@ -8,20 +8,23 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
 
 import { chunkIds, chunkRows } from '@/lib/supabase/batching';
 import {
   findExistingContact,
+  matchContactByPhone,
+  phoneMatchSuffix,
   isUniqueViolation,
   type ExistingContact,
 } from '@/lib/contacts/dedupe';
 import { resolveImportTagIds } from '@/lib/contacts/resolve-import-tags';
 import { addContactTagAndDispatch } from '@/lib/contacts/tag-events';
 import {
+  DEFAULT_COUNTRY_CODE,
   sanitizePhoneForMeta,
   isValidE164,
-  normalizePhone,
-  phonesMatch,
+  toMetaPhone,
 } from '@/lib/whatsapp/phone-utils';
 
 /** Row select that embeds the contact's tags for serialization. */
@@ -134,6 +137,7 @@ export async function findOrCreateContact(
   const existing = await findExistingContact(db, accountId, sanitized);
   if (existing) return { id: existing.id, created: false };
 
+  await prepareContactPhones(db, accountId, [sanitized], DEFAULT_COUNTRY_CODE);
   const { data: created, error } = await db
     .from('contacts')
     .insert({
@@ -173,7 +177,7 @@ export async function findOrCreateContact(
  *
  * Matching semantics are identical to the single-row helper, because
  * they are the same two steps: pre-filter in SQL on the last-8-digit
- * suffix, then apply the strict `phonesMatch` in JS. Here the suffixes
+ * suffix, then apply the shared full-phone matcher in JS. Here the suffixes
  * are OR'd into one query per chunk and candidates are bucketed by
  * suffix, so matching stays O(n) rather than O(n×m).
  *
@@ -189,26 +193,24 @@ export async function findOrCreateContactsBulk(
   db: SupabaseClient,
   accountId: string,
   auditUserId: string,
-  phones: string[],
+  phones: string[]
 ): Promise<Map<string, string>> {
   const resolved = new Map<string, string>();
   const unique = [...new Set(phones)];
   if (unique.length === 0) return resolved;
 
-  // Two phones can only match if they share this key: `phonesMatch` is
-  // either an exact normalized equality or a last-8-digit equality, and
-  // both imply the same bucket.
-  const bucketKey = (phone: string): string => {
-    const n = normalizePhone(phone);
-    return n.length >= 8 ? n.slice(-8) : n;
-  };
+  // Bucket candidates before comparing complete phone identities.
+  const bucketKey = (phone: string) =>
+    phoneMatchSuffix(phone, DEFAULT_COUNTRY_CODE);
 
   // ── 1. One lookup per chunk of suffixes, not per phone ──────────
   const suffixes = [...new Set(unique.map(bucketKey))].filter(Boolean);
   const candidates: ExistingContact[] = [];
   // `chunkIds` bounds the joined filter length, keeping the query string
   // under the ~8KB request-line ceiling proxies impose on PostgREST.
-  for (const chunk of chunkIds(suffixes.map((s) => `phone.like.*${s}`))) {
+  for (const chunk of chunkIds(
+    suffixes.map((s) => `phone_normalized.like.*${s}`)
+  )) {
     const { data, error } = await db
       .from('contacts')
       .select('*')
@@ -231,8 +233,10 @@ export async function findOrCreateContactsBulk(
 
   const missing: string[] = [];
   for (const phone of unique) {
-    const hit = (byBucket.get(bucketKey(phone)) ?? []).find((c) =>
-      phonesMatch(c.phone, phone),
+    const hit = matchContactByPhone(
+      byBucket.get(bucketKey(phone)) ?? [],
+      phone,
+      DEFAULT_COUNTRY_CODE
     );
     if (hit) resolved.set(phone, hit.id);
     else missing.push(phone);
@@ -246,7 +250,7 @@ export async function findOrCreateContactsBulk(
   // from migration 022 and fail the whole statement.
   const newByKey = new Map<string, string>();
   for (const phone of missing) {
-    const key = normalizePhone(phone);
+    const key = toMetaPhone(phone);
     if (!newByKey.has(key)) newByKey.set(key, phone);
   }
 
@@ -254,17 +258,18 @@ export async function findOrCreateContactsBulk(
   const pending = [...newByKey.values()];
 
   for (const batch of chunkRows(pending)) {
+    await prepareContactPhones(db, accountId, batch, DEFAULT_COUNTRY_CODE);
     const { data, error } = await db
       .from('contacts')
       .insert(
         batch.map((phone) => ({
           account_id: accountId,
           user_id: auditUserId,
-          phone,
+          phone: toMetaPhone(phone),
           name: phone,
           email: null,
           company: null,
-        })),
+        }))
       )
       .select('id, phone');
 
@@ -278,7 +283,7 @@ export async function findOrCreateContactsBulk(
           const { id } = await findOrCreateContact(db, accountId, auditUserId, {
             phone,
           });
-          idByKey.set(normalizePhone(phone), id);
+          idByKey.set(toMetaPhone(phone), id);
         }
         continue;
       }
@@ -287,12 +292,12 @@ export async function findOrCreateContactsBulk(
     }
 
     for (const row of data as { id: string; phone: string }[]) {
-      idByKey.set(normalizePhone(row.phone), row.id);
+      idByKey.set(toMetaPhone(row.phone), row.id);
     }
   }
 
   for (const phone of missing) {
-    const id = idByKey.get(normalizePhone(phone));
+    const id = idByKey.get(toMetaPhone(phone));
     if (id) resolved.set(phone, id);
   }
 
@@ -343,9 +348,7 @@ export async function setContactTags(
   if (readErr) {
     throw new ContactError('Failed to read contact tags', 500);
   }
-  const existing = new Set(
-    (current ?? []).map((r) => r.tag_id as string)
-  );
+  const existing = new Set((current ?? []).map((r) => r.tag_id as string));
 
   const toAdd = [...desired].filter((id) => !existing.has(id));
   const toRemove = [...existing].filter((id) => !desired.has(id));

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveAudience } from './audience';
 import { UNTAGGED } from '@/lib/contacts/tag-filter';
+import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 
 const contacts = [
   { id: 'a', phone: '+628111111111' },
@@ -13,6 +14,32 @@ const assignments = [
   { id: '2', contact_id: 'a', tag_id: 'exclude' },
   { id: '3', contact_id: 'b', tag_id: 'vip' },
 ];
+
+it('applies excluded tags and untagged rules to local/international aliases', async () => {
+  const csvContacts = [{ phone: '08111111111' }, { phone: '08222222222' }];
+  expect(
+    await resolveAudience(
+      database(),
+      { type: 'csv', csvContacts, excludeTagIds: ['exclude'] },
+      (phone) => toMetaPhone(phone, '62')
+    )
+  ).toEqual({
+    kind: 'csv',
+    contacts: [{ phone: '08222222222' }],
+    excludedCount: 1,
+  });
+  expect(
+    await resolveAudience(
+      database(),
+      {
+        type: 'csv',
+        csvContacts: [{ phone: '08333333333' }],
+        excludeTagIds: [UNTAGGED],
+      },
+      (phone) => toMetaPhone(phone, '62')
+    )
+  ).toEqual({ kind: 'csv', contacts: [], excludedCount: 1 });
+});
 function database() {
   return {
     from(table: string) {
