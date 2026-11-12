@@ -40,6 +40,13 @@ export default function NewBroadcastPage() {
     useBroadcastSending();
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [highestStep, setHighestStep] = useState(0);
+  const [audienceValid, setAudienceValid] = useState(false);
+  const [personalizationValid, setPersonalizationValid] = useState(false);
+  function nextStep(index: number) {
+    setHighestStep((previous) => Math.max(previous, index));
+    setCurrentStep(index);
+  }
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
   const [audience, setAudience] = useState<{
     type: 'all' | 'tags' | 'custom_field' | 'csv';
@@ -82,6 +89,8 @@ export default function NewBroadcastPage() {
         !window.confirm(t('changeTemplateConfirm', { items: clears }))
       )
         return;
+      setHighestStep((previous) => Math.min(previous, 1));
+      setPersonalizationValid(false);
       setVariables({});
       setHeaderMedia(defaultHeaderMedia(next));
     }
@@ -222,10 +231,23 @@ export default function NewBroadcastPage() {
           return (
             <li
               key={step.key}
-              aria-current={isActive ? 'step' : undefined}
               className={`flex min-w-0 flex-col gap-2 border-b-2 pb-3 ${isActive || isCompleted ? 'border-primary' : 'border-border'}`}
             >
-              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                aria-current={isActive ? 'step' : undefined}
+                disabled={
+                  isProcessing ||
+                  Boolean(savedId) ||
+                  index > highestStep ||
+                  (index > currentStep &&
+                    (!template ||
+                      (index > 1 && !audienceValid) ||
+                      (index > 2 && !personalizationValid)))
+                }
+                onClick={() => setCurrentStep(index)}
+                className="focus-visible:ring-ring flex w-full flex-col items-start gap-2 rounded-md text-left outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center"
+              >
                 <span
                   className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${isCompleted ? 'bg-primary text-primary-foreground' : isActive ? 'bg-primary-soft text-primary' : 'bg-muted text-muted-foreground'}`}
                 >
@@ -236,7 +258,7 @@ export default function NewBroadcastPage() {
                 >
                   {t(`steps.${step.label}`)}
                 </span>
-              </div>
+              </button>
             </li>
           );
         })}
@@ -255,15 +277,19 @@ export default function NewBroadcastPage() {
             <Step1ChooseTemplate
               selectedTemplate={template}
               onSelect={selectTemplate}
-              onNext={() => setCurrentStep(1)}
+              onNext={() => nextStep(1)}
               onBack={handleLeave}
             />
           )}
           {currentStep === 1 && (
             <Step2SelectAudience
               audience={audience}
-              onUpdate={setAudience}
-              onNext={() => setCurrentStep(2)}
+              onUpdate={(next) => {
+                setAudienceValid(false);
+                setAudience(next);
+              }}
+              onValidationChange={setAudienceValid}
+              onNext={() => nextStep(2)}
               onBack={() => setCurrentStep(0)}
             />
           )}
@@ -271,10 +297,17 @@ export default function NewBroadcastPage() {
             <Step3Personalize
               template={template}
               variables={variables}
-              onUpdate={setVariables}
+              onUpdate={(next) => {
+                setPersonalizationValid(false);
+                setVariables(next);
+              }}
+              onValidationChange={setPersonalizationValid}
               headerMedia={headerMedia}
-              onHeaderMediaChange={setHeaderMedia}
-              onNext={() => setCurrentStep(3)}
+              onHeaderMediaChange={(next) => {
+                setPersonalizationValid(false);
+                setHeaderMedia(next);
+              }}
+              onNext={() => nextStep(3)}
               onBack={() => setCurrentStep(1)}
             />
           )}

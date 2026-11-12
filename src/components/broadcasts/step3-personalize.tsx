@@ -45,6 +45,7 @@ interface Step3Props {
   onHeaderMediaChange: (media: HeaderMedia) => void;
   onNext: () => void;
   onBack: () => void;
+  onValidationChange?: (valid: boolean) => void;
 }
 
 const contactFields = [
@@ -73,6 +74,7 @@ export function Step3Personalize({
   onHeaderMediaChange,
   onNext,
   onBack,
+  onValidationChange,
 }: Step3Props) {
   const t = useTranslations('Broadcasts.wizard');
   const formId = useId();
@@ -181,6 +183,10 @@ export function Step3Personalize({
     }
     return missing;
   }, [placeholders, variables, customFields, loadingFields]);
+
+  useEffect(() => {
+    onValidationChange?.(unmappedKeys.length === 0 && mediaError === null);
+  }, [variables, headerMedia, unmappedKeys, mediaError, onValidationChange]);
 
   function updateVariable(key: string, patch: Partial<VariableMapping>) {
     const current = variables[key] ?? {

@@ -37,6 +37,7 @@ interface Step2Props {
   onUpdate: (audience: AudienceConfig) => void;
   onNext: () => void;
   onBack: () => void;
+  onValidationChange?: (valid: boolean) => void;
 }
 
 export function Step2SelectAudience({
@@ -44,6 +45,7 @@ export function Step2SelectAudience({
   onUpdate,
   onNext,
   onBack,
+  onValidationChange,
 }: Step2Props) {
   const t = useTranslations('Broadcasts.wizard');
   const importT = useTranslations('Contacts.importModal');
@@ -206,6 +208,9 @@ export function Step2SelectAudience({
   // The estimate is the source of truth: it already covers partially
   // configured audiences (null) and exclusions that empty the list (0).
   const isValid = !loadingCount && (estimatedCount ?? 0) > 0;
+  useEffect(() => {
+    onValidationChange?.(isValid);
+  }, [audience, isValid, onValidationChange]);
 
   return (
     <div className="flex flex-1 flex-col gap-6">
