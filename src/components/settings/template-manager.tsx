@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { SettingsPanelHead } from './settings-panel-head';
 import {
@@ -116,6 +116,7 @@ function emptyButton(type: TemplateButton['type']): TemplateButton {
 
 export function TemplateManager() {
   const t = useTranslations('Settings.templates');
+  const locale = useLocale();
   const supabase = createClient();
   const { user, accountId, profileLoading, loading: authLoading } = useAuth();
   // Templates are settings-class data: the APIs require admin+.
@@ -254,7 +255,12 @@ export function TemplateManager() {
 
   function openCreate() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      language: TEMPLATE_LANGUAGES.some((language) => language.code === locale)
+        ? locale
+        : 'en_US',
+    });
     setDialogOpen(true);
   }
 
