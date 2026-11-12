@@ -1,4 +1,5 @@
 'use client';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -934,9 +935,6 @@ export function MessageThread({
       <span className="text-foreground block truncate text-sm font-semibold">
         {displayName}
       </span>
-      <span className="text-muted-foreground block truncate text-xs">
-        {contact.phone}
-      </span>
     </>
   );
   const messageGroups = groupMessagesByDate(messages);
@@ -1003,6 +1001,12 @@ export function MessageThread({
             >
               {contactIdentity}
             </button>
+            <div className="flex min-w-0 items-center gap-1">
+              <span className="text-muted-foreground truncate text-xs">
+                {contact.phone}
+              </span>
+              <PhoneCountryWarning phone={contact.phone} tooltip />
+            </div>
             <button
               type="button"
               onClick={onShowContactPanel}

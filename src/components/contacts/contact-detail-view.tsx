@@ -1,4 +1,5 @@
 'use client';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { findExistingContact, isExactMatch, isUniqueViolation } from '@/lib/contacts/dedupe';
 import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
@@ -488,6 +489,7 @@ export function ContactDetailView({
                         <Copy className="size-3" />
                       )}
                     </button>
+                    <PhoneCountryWarning phone={contact.phone} />
                     {contact.email && (
                       <span className="flex items-center gap-1">
                         <Mail className="size-3" />

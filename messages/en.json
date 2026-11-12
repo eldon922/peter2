@@ -2018,7 +2018,10 @@
   },
   "PhoneFormat": {
     "warning": "Local numbers starting with 0 use +{code} by default. Include a country code for numbers from other countries.",
-    "fallback": "Use full international phone numbers. Local numbers starting with 0 use your default country code."
+    "fallback": "Use full international phone numbers. Local numbers starting with 0 use your default country code.",
+    "converted": "{phone} is sent as {number}, using the default country code +{code}. Include a country code for numbers from other countries.",
+    "convertedCount": "{count, plural, one {# local number is} other {# local numbers are}} converted using the default country code +{code} when sending.",
+    "details": "Phone number conversion"
   },
   "Pagination": {
     "range": "{from}–{to} of {total}",

@@ -1,5 +1,4 @@
 'use client';
-import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
 import {
@@ -1050,7 +1049,6 @@ export function MessageComposer({
 
       {!readOnly && (
         <div className="mt-3 space-y-2">
-          <PhoneCountryWarning />
           {!draft && !recording && canManageReplies && (
             <p className="text-muted-foreground text-xs leading-relaxed">
               {t('draftHint')}

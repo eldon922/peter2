@@ -312,7 +312,7 @@ export function Step4ScheduleSend({
             </div>
           )}
 
-          <PhoneCountryWarning />
+          <PhoneCountryWarning resolved={resolved} />
         </div>
         {/* Message preview */}
         <section

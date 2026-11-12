@@ -1,4 +1,5 @@
 "use client";
+import { PhoneCountryWarning } from "@/components/phone-country-warning";
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -197,6 +198,7 @@ export function ContactSidebar({ contact, className, session }: ContactSidebarPr
               )}
             </button>
 
+            <PhoneCountryWarning phone={contact.phone} />
             {contact.email && (
               <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-muted-foreground" />

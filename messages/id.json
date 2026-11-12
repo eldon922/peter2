@@ -2018,7 +2018,10 @@
   },
   "PhoneFormat": {
     "warning": "Nomor lokal yang diawali 0 menggunakan +{code} secara default. Sertakan kode negara untuk nomor dari negara lain.",
-    "fallback": "Gunakan nomor telepon internasional lengkap. Nomor lokal yang diawali 0 menggunakan kode negara default Anda."
+    "fallback": "Gunakan nomor telepon internasional lengkap. Nomor lokal yang diawali 0 menggunakan kode negara default Anda.",
+    "converted": "{phone} dikirim sebagai {number}, menggunakan kode negara bawaan +{code}. Sertakan kode negara untuk nomor dari negara lain.",
+    "convertedCount": "{count} nomor lokal dikonversi menggunakan kode negara bawaan +{code} saat dikirim.",
+    "details": "Konversi nomor telepon"
   },
   "Pagination": {
     "range": "{from}–{to} dari {total}",

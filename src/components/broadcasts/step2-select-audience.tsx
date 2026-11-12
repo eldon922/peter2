@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 type AudienceType = AudienceConfig['type'];
 
@@ -500,6 +501,10 @@ export function Step2SelectAudience({
               Retry to send the rest.
             </p>
           )}
+      </div>
+
+      <div>
+        <PhoneCountryWarning resolved={resolved} />
       </div>
 
       <div className="border-border bg-background sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t py-4">
