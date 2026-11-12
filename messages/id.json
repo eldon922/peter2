@@ -778,7 +778,8 @@
         "delivered": "Sampai",
         "read": "Dibaca",
         "replied": "Dibalas / direaksi",
-        "failed": "Gagal"
+        "failed": "Gagal",
+        "repliedHint": "Penerima unik yang membalas atau bereaksi. Setiap penerima dihitung sekali. Balasan tanpa kutipan pesan dihitung untuk siaran yang terakhir dikirim."
       },
       "toastFailedDelete": "Gagal menghapus: {error}",
       "toastDeleted": "Blast dihapus",

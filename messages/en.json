@@ -778,7 +778,8 @@
         "delivered": "Delivered",
         "read": "Read",
         "replied": "Replied / reacted",
-        "failed": "Failed"
+        "failed": "Failed",
+        "repliedHint": "Unique recipients who replied or reacted. Each recipient counts once. Replies without a quoted message belong to the most recently sent broadcast."
       },
       "toastFailedDelete": "Failed to delete: {error}",
       "toastDeleted": "Broadcast deleted",

@@ -778,7 +778,8 @@
         "delivered": "전달됨",
         "read": "읽음",
         "replied": "답장 / 반응",
-        "failed": "실패"
+        "failed": "실패",
+        "repliedHint": "답장하거나 반응한 고유 수신자 수입니다. 각 수신자는 한 번만 집계됩니다. 인용 메시지가 없는 답장은 가장 최근에 보낸 브로드캐스트에 집계됩니다."
       },
       "toastFailedDelete": "삭제하지 못했습니다: {error}",
       "toastDeleted": "브로드캐스트가 삭제되었습니다",

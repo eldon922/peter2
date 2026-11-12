@@ -4,6 +4,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useRef,
   useState,
   useTransition,
@@ -68,6 +69,12 @@ import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { SearchInput } from '@/components/ui/search-input';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
@@ -75,14 +82,17 @@ import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
 
 interface StatCardProps {
   label: string;
+  hint?: string;
   value: number;
   total: number;
   icon: React.ReactNode;
   color: string;
 }
 
-function StatCard({ label, value, total, icon, color }: StatCardProps) {
+function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
   const pct = percentOfRecipients(value, total);
+  const hintId = useId();
+  const [hintOpen, setHintOpen] = useState(false);
   return (
     <div className="border-border bg-card rounded-xl border p-4">
       <div className="flex items-center justify-between">
@@ -96,7 +106,27 @@ function StatCard({ label, value, total, icon, color }: StatCardProps) {
       <p className="text-foreground mt-3 text-2xl font-bold">
         {value.toLocaleString()}
       </p>
-      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="text-muted-foreground text-xs">
+        {hint ? (
+          <TooltipProvider>
+            <Tooltip open={hintOpen} onOpenChange={setHintOpen}>
+              <TooltipTrigger
+                closeOnClick={false}
+                onClick={() => setHintOpen(true)}
+                aria-describedby={hintOpen ? hintId : undefined}
+                className="focus-visible:ring-ring rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2"
+              >
+                {label}
+              </TooltipTrigger>
+              <TooltipContent id={hintId} role="tooltip">
+                {hint}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          label
+        )}
+      </p>
     </div>
   );
 }
@@ -1012,6 +1042,7 @@ export default function BroadcastDetailPage() {
         />
         <StatCard
           label={t('stats.replied')}
+          hint={t('stats.repliedHint')}
           value={broadcast.replied_count}
           total={broadcast.total_recipients}
           icon={<MessageCircle className="h-4 w-4" />}
@@ -1068,8 +1099,12 @@ export default function BroadcastDetailPage() {
             <div className="relative col-span-2 min-w-0 sm:w-64">
               <SearchInput
                 value={recipientSearch}
-              onClear={() => setRecipientSearch('')}
-                loading={loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch}
+                onClear={() => setRecipientSearch('')}
+                loading={
+                  loadingRecipients ||
+                  filtering ||
+                  recipientSearch !== deferredRecipientSearch
+                }
                 onChange={(event) => setRecipientSearch(event.target.value)}
                 placeholder={t('searchRecipients')}
                 aria-label={t('searchRecipients')}

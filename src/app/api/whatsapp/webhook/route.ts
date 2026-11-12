@@ -4,6 +4,7 @@ import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api';
 import { applyMessageEdit } from '@/lib/whatsapp/inbound-edit';
 import { normalizePhone } from '@/lib/whatsapp/phone-utils';
+import { recordBroadcastReply } from '@/lib/whatsapp/broadcast-engagement';
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
@@ -361,9 +362,7 @@ export async function POST(request: Request) {
  * but a row created before the constraint, or a race, would still land
  * here. Returns null in every failure case; the caller skips the event.
  */
-async function resolveConfigByPhoneNumberId(
-  phoneNumberId: string
-): Promise<{
+async function resolveConfigByPhoneNumberId(phoneNumberId: string): Promise<{
   account_id: string;
   user_id: string;
   access_token: string;
@@ -661,38 +660,19 @@ async function handleStatusUpdate(status: {
 async function flagBroadcastReplyIfAny(
   accountId: string,
   contactId: string,
-  messageId?: string
+  messageId?: string,
+  receivedAt = new Date().toISOString()
 ) {
   try {
-    // Most recent outbound broadcast in this account that hasn't
-    // been replied to yet. Account-scoped so a shared inbox reply
-    // marks the broadcast as replied regardless of which teammate
-    // sent it.
-    let query = supabaseAdmin()
-      .from('broadcast_recipients')
-      .select('id, status, broadcast_id, broadcasts!inner(account_id)')
-      .eq('contact_id', contactId)
-      .eq('broadcasts.account_id', accountId)
-      .in('status', ['sent', 'delivered', 'read']);
-    if (messageId) query = query.eq('whatsapp_message_id', messageId);
-    const { data: recs, error } = await query
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error || !recs || recs.length === 0) return;
-
-    const row = recs[0];
-    const { error: updErr } = await supabaseAdmin()
-      .from('broadcast_recipients')
-      .update({ status: 'replied', replied_at: new Date().toISOString() })
-      .eq('id', row.id)
-      .in('status', ['sent', 'delivered', 'read']);
-
-    if (updErr) {
-      console.error('Error marking broadcast recipient replied:', updErr);
-    }
-  } catch (err) {
-    console.error('flagBroadcastReplyIfAny failed:', err);
+    await recordBroadcastReply(
+      supabaseAdmin(),
+      accountId,
+      contactId,
+      receivedAt,
+      messageId
+    );
+  } catch (error) {
+    console.error('flagBroadcastReplyIfAny failed:', error);
   }
 }
 
@@ -728,7 +708,8 @@ async function applyReaction(
   reaction: { message_id: string; emoji: string },
   targetInternalId: string,
   conversationId: string,
-  contactId: string
+  contactId: string,
+  receivedAt: string
 ) {
   // Empty emoji = removal (per Meta's Cloud API spec).
   if (!reaction.emoji) {
@@ -768,7 +749,8 @@ async function applyReaction(
       await flagBroadcastReplyIfAny(
         conversation.account_id,
         contactId,
-        reaction.message_id
+        reaction.message_id,
+        receivedAt
       );
   }
 }
@@ -882,7 +864,8 @@ async function handleInboundReaction(
         reaction,
         targetId,
         existingConversation.id,
-        contact.id
+        contact.id,
+        new Date(Number(message.timestamp) * 1000).toISOString()
       );
       return;
     }
@@ -960,7 +943,13 @@ async function handleInboundReaction(
     );
   }
 
-  await applyReaction(reaction, targetId, conversationId, contact.id);
+  await applyReaction(
+    reaction,
+    targetId,
+    conversationId,
+    contact.id,
+    new Date(Number(message.timestamp) * 1000).toISOString()
+  );
 }
 
 /**
@@ -1278,7 +1267,12 @@ async function processMessage(
   // If this contact was a recent broadcast recipient, flag the reply
   // so the broadcast's `replied_count` advances (via the aggregate
   // trigger installed in migration 003).
-  await flagBroadcastReplyIfAny(accountId, contactRecord.id);
+  await flagBroadcastReplyIfAny(
+    accountId,
+    contactRecord.id,
+    message.context?.id,
+    new Date(Number(message.timestamp) * 1000).toISOString()
+  );
 
   // ============================================================
   // Flow runner dispatch.
