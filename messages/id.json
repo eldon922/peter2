@@ -201,7 +201,7 @@
       "noCustomerMessages": "Tidak ada pesan pelanggan"
     },
     "composer": {
-      "draftHint": "Gunakan AI untuk membuat draf balasan, lalu tinjau sebelum mengirim.",
+      "draftHint": "Ketuk ✨ untuk menyusun balasan dengan AI — Anda bisa menyuntingnya sebelum mengirim",
       "sessionExpiredHint": "Sesi 24 jam telah berakhir. Gunakan template untuk menghubungi kembali.",
       "templates": "Template",
       "readOnlyPlaceholder": "Hanya baca — pengamat dapat melihat tetapi tidak dapat membalas",
