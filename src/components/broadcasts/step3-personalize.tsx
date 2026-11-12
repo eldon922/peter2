@@ -225,7 +225,7 @@ export function Step3Personalize({
     : t('personalize.previewSample');
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-6">
       <div>
         <h2 className="text-foreground text-xl font-semibold tracking-tight">
           {t('personalize.title')}
@@ -505,7 +505,7 @@ export function Step3Personalize({
         </section>
       </div>
 
-      <div className="border-border bg-background sticky bottom-0 z-10 space-y-3 border-t py-4">
+      <div className="border-border bg-background sticky bottom-0 z-10 mt-auto space-y-3 border-t py-4">
         {unmappedKeys.length > 0 && (
           <p
             role="status"

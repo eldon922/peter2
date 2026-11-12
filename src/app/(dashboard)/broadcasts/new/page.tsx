@@ -206,7 +206,7 @@ export default function NewBroadcastPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
+    <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col gap-6 sm:gap-8">
       {/* Header */}
       <div>
         <h1 className="text-foreground text-2xl font-bold">{t('title')}</h1>
@@ -243,9 +243,9 @@ export default function NewBroadcastPage() {
       </ol>
 
       {/* Step Content */}
-      <div className="relative min-h-[400px]">
+      <div className="relative flex flex-1 flex-col">
         <div
-          className="transition-all duration-300 ease-in-out"
+          className="flex flex-1 flex-col transition-opacity duration-300 ease-in-out"
           style={{
             opacity: isProcessing ? 0.6 : 1,
             pointerEvents: isProcessing ? 'none' : 'auto',

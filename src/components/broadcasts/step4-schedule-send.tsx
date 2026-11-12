@@ -209,7 +209,7 @@ export function Step4ScheduleSend({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-6">
       <div>
         <h2 className="text-foreground text-xl font-semibold tracking-tight">
           {t('scheduleSend.title')}
@@ -394,7 +394,7 @@ export function Step4ScheduleSend({
         </div>
       )}
 
-      <div className="border-border bg-background sticky bottom-0 z-10 flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-border bg-background sticky bottom-0 z-10 mt-auto flex flex-col gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="outline"
           onClick={onBack}

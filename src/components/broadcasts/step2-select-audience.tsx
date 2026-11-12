@@ -208,7 +208,7 @@ export function Step2SelectAudience({
   const isValid = !loadingCount && (estimatedCount ?? 0) > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-6">
       <div>
         <h2 className="text-foreground text-lg font-semibold">
           {t('selectAudience.title')}
@@ -507,7 +507,7 @@ export function Step2SelectAudience({
         <PhoneCountryWarning resolved={resolved} />
       </div>
 
-      <div className="border-border bg-background sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t py-4">
+      <div className="border-border bg-background sticky bottom-0 z-10 mt-auto flex items-center justify-between gap-4 border-t py-4">
         <Button variant="outline" onClick={onBack} className="h-10 px-4">
           <ArrowLeft className="h-4 w-4" />
           {t('back')}
