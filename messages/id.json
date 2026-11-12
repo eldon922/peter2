@@ -371,7 +371,12 @@
       "fieldsAndTagsBtn": "Kolom & tag",
       "excludeTags": "Kecualikan tag",
       "exportBtn": "Ekspor kontak",
-      "exportHint": "Ekspor semua kontak yang cocok dengan pencarian dan filter tag, beserta semua tagnya. Hapus filter untuk mengekspor semua kontak."
+      "exportHint": "Pilih semua kontak, tag tertentu, atau kontak tanpa tag untuk diekspor.",
+      "exportTitle": "Ekspor kontak",
+      "exportDescription": "Pilih kontak untuk diunduh. CSV menyertakan semua tag pada setiap kontak, meskipun Anda hanya memilih satu tag.",
+      "exportAll": "Semua kontak",
+      "exportTags": "Kontak dengan tag yang dipilih",
+      "exportUntagged": "Kontak tanpa tag"
     },
     "form": {
       "addTitle": "Tambah Kontak",

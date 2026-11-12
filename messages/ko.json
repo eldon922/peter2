@@ -371,7 +371,12 @@
       "fieldsAndTagsBtn": "필드 및 태그",
       "excludeTags": "제외할 태그",
       "exportBtn": "연락처 내보내기",
-      "exportHint": "현재 검색 및 태그 필터에 맞는 연락처와 모든 태그를 내보냅니다. 전체를 내보내려면 필터를 지우세요."
+      "exportHint": "모든 연락처, 선택한 태그 또는 태그 없는 연락처를 선택하여 내보내세요.",
+      "exportTitle": "연락처 내보내기",
+      "exportDescription": "다운로드할 연락처를 선택하세요. 태그를 하나만 선택해도 CSV에는 각 연락처의 모든 태그가 포함됩니다.",
+      "exportAll": "모든 연락처",
+      "exportTags": "선택한 태그가 있는 연락처",
+      "exportUntagged": "태그 없는 연락처"
     },
     "form": {
       "addTitle": "연락처 추가",

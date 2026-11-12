@@ -201,6 +201,11 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<'all' | 'tags' | 'untagged'>(
+    'all'
+  );
+  const [exportTagIds, setExportTagIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -436,7 +441,8 @@ export default function ContactsPage() {
   }
 
   async function exportContacts() {
-    if (exporting) return;
+    if (exporting || (exportScope === 'tags' && exportTagIds.length === 0))
+      return;
     setExporting(true);
     try {
       const result = await fetchAllRows<{
@@ -445,6 +451,11 @@ export default function ContactsPage() {
       }>((from, to) =>
         supabase.rpc('filter_contacts_by_tags', {
           ...contactFilterArgs,
+          p_tag_ids: exportScope === 'tags' ? exportTagIds : [],
+          p_include_untagged: exportScope === 'untagged',
+          p_exclude_tag_ids: [],
+          p_exclude_untagged: false,
+          p_search: null,
           p_limit: to - from + 1,
           p_offset: from,
         })
@@ -486,6 +497,7 @@ export default function ContactsPage() {
       link.download = 'contacts.csv';
       link.click();
       URL.revokeObjectURL(url);
+      setExportOpen(false);
     } catch {
       toast.error(t('toastFailedLoad'));
     } finally {
@@ -708,7 +720,11 @@ export default function ContactsPage() {
           <Button
             variant="outline"
             disabled={exporting}
-            onClick={exportContacts}
+            onClick={() => {
+              setExportScope('all');
+              setExportTagIds([]);
+              setExportOpen(true);
+            }}
             title={t('exportHint')}
           >
             {exporting ? (
@@ -1236,6 +1252,87 @@ export default function ContactsPage() {
             >
               {deleting && <Loader2 className="size-4 animate-spin" />}
               {t('deleteBtn')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={exportOpen}
+        onOpenChange={(open) => {
+          if (!exporting) setExportOpen(open);
+        }}
+      >
+        <DialogContent
+          className="flex max-h-[90dvh] flex-col overflow-hidden p-0 sm:max-w-md"
+          showCloseButton={!exporting}
+        >
+          <DialogHeader className="border-border shrink-0 border-b p-5 pr-14">
+            <DialogTitle>{t('exportTitle')}</DialogTitle>
+            <DialogDescription>{t('exportDescription')}</DialogDescription>
+          </DialogHeader>
+          <fieldset
+            disabled={exporting}
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5"
+          >
+            <legend className="sr-only">{t('exportTitle')}</legend>
+            {(['all', 'tags', 'untagged'] as const).map((scope) => (
+              <label
+                key={scope}
+                className="border-border hover:bg-muted/50 flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2"
+              >
+                <input
+                  type="radio"
+                  name="contact-export-scope"
+                  value={scope}
+                  checked={exportScope === scope}
+                  onChange={() => setExportScope(scope)}
+                  className="accent-primary size-4"
+                />
+                <span className="text-sm">
+                  {t(
+                    scope === 'all'
+                      ? 'exportAll'
+                      : scope === 'tags'
+                        ? 'exportTags'
+                        : 'exportUntagged'
+                  )}
+                </span>
+              </label>
+            ))}
+            {exportScope === 'tags' && (
+              <div className="border-border rounded-lg border">
+                <TagPickerList
+                  tags={allTags}
+                  value={exportTagIds}
+                  onToggle={(id) =>
+                    setExportTagIds((prev) =>
+                      prev.includes(id)
+                        ? prev.filter((tagId) => tagId !== id)
+                        : [...prev, id]
+                    )
+                  }
+                />
+              </div>
+            )}
+          </fieldset>
+          <DialogFooter className="border-border shrink-0 border-t p-5">
+            <Button
+              variant="outline"
+              disabled={exporting}
+              onClick={() => setExportOpen(false)}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              disabled={
+                exporting ||
+                (exportScope === 'tags' && exportTagIds.length === 0)
+              }
+              onClick={exportContacts}
+            >
+              {exporting && <Loader2 className="size-4 animate-spin" />}
+              {t('exportBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>

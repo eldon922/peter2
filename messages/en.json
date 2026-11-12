@@ -371,7 +371,12 @@
       "fieldsAndTagsBtn": "Fields & tags",
       "excludeTags": "Exclude tags",
       "exportBtn": "Export contacts",
-      "exportHint": "Exports all contacts matching the current search and tag filters, including all their tags. Clear filters to export everyone."
+      "exportHint": "Choose all contacts, selected tags, or untagged contacts to export.",
+      "exportTitle": "Export contacts",
+      "exportDescription": "Choose the contacts to download. The CSV includes all tags on each contact, even when you select just one tag.",
+      "exportAll": "All contacts",
+      "exportTags": "Contacts with selected tags",
+      "exportUntagged": "Untagged contacts"
     },
     "form": {
       "addTitle": "Add Contact",
