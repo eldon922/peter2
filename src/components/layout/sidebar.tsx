@@ -226,13 +226,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 pathname === item.href ||
                 (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
-              const showUnreadDot =
-                item.href === '/inbox' && totalUnread > 0 && !isActive;
+              const showUnreadBadge = item.href === '/inbox' && totalUnread > 0;
 
-              // Unlike the inbox dot, the notifications count stays visible
-              // even while the page is active — it reflects unread state
-              // (cleared by marking notifications read), not "currently
-              // viewing this section".
               const showNotificationBadge =
                 item.href === '/notifications' && unreadNotifications > 0;
 
@@ -264,15 +259,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                         {t('beta')}
                       </span>
                     )}
-                    {showUnreadDot && (
+                    {showUnreadBadge && (
                       <span
-                        aria-label={t('unreadConversations', {
+                        aria-label={t('unreadMessages', {
                           count: totalUnread,
                         })}
-                        className="relative flex h-2 w-2"
+                        className="bg-primary text-primary-foreground flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold"
                       >
-                        <span className="bg-primary absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
-                        <span className="bg-primary relative inline-flex h-2 w-2 rounded-full" />
+                        {totalUnread > 99 ? '99+' : totalUnread}
                       </span>
                     )}
                     {showNotificationBadge && (

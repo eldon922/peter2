@@ -42,7 +42,8 @@
     "menuSignOut": "Keluar",
     "supportHint": "Butuh bantuan? Hubungi tim dukungan TI kami",
     "supportLabel": "Dukungan WhatsApp",
-    "roleReplier": "Pembalas"
+    "roleReplier": "Pembalas",
+    "unreadMessages": "{count} pesan belum dibaca"
   },
   "Header": {
     "dashboard": "Dasbor",

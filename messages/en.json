@@ -42,7 +42,8 @@
     "menuSignOut": "Sign out",
     "supportHint": "Need help? Contact our IT support team",
     "supportLabel": "WhatsApp support",
-    "roleReplier": "Replier"
+    "roleReplier": "Replier",
+    "unreadMessages": "{count} unread {count, plural, one {message} other {messages}}"
   },
   "Header": {
     "dashboard": "Dashboard",

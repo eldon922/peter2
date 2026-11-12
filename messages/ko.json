@@ -42,7 +42,8 @@
     "menuSignOut": "로그아웃",
     "supportHint": "도움이 필요하신가요? IT 지원팀에 문의하세요",
     "supportLabel": "WhatsApp 지원",
-    "roleReplier": "답장 담당자"
+    "roleReplier": "답장 담당자",
+    "unreadMessages": "읽지 않은 메시지 {count}개"
   },
   "Header": {
     "dashboard": "대시보드",
