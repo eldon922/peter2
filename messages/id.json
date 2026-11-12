@@ -1690,7 +1690,8 @@
       "dialogViewTitle": "Template yang Dihapus",
       "dialogViewDesc": "Template ini dihapus di Meta sehingga tidak dapat diedit atau digunakan. Ini adalah versi terakhir yang disinkronkan.",
       "close": "Tutup",
-      "toastSyncUnchanged": "Template sudah terbaru. Tidak ada perubahan."
+      "toastSyncUnchanged": "Template sudah terbaru. Tidak ada perubahan.",
+      "namedVariableHint": "Gunakan variabel bernomor seperti '{{1}}' atau bernama seperti '{{first_name}}'. Gunakan satu gaya per template dan isi contoh untuk setiap variabel."
     },
     "roles": {
       "admin": "Admin",

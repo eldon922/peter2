@@ -974,6 +974,9 @@ export function TemplateManager() {
                 maxLength={TEMPLATE_LIMITS.bodyMaxLength}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none"
               />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {t('namedVariableHint')}
+              </p>
               <p className="text-muted-foreground text-[11px]">
                 {t('bodyHint')}
               </p>
