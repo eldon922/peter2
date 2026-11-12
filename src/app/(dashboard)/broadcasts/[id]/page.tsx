@@ -46,7 +46,6 @@ import {
   AlertCircle,
   MessageCircle,
   Filter,
-  Search,
   Download,
   ChevronDown,
   Trash2,
@@ -69,7 +68,7 @@ import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
 import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
@@ -249,7 +248,6 @@ export default function BroadcastDetailPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
-  const tActivity = useTranslations('Activity');
   const tStatus = useTranslations('Broadcasts.status');
   // Shared with the wizard's personalize step — same upload/URL
   // strings, same recommendation, so a retry prompt doesn't teach the
@@ -1068,23 +1066,15 @@ export default function BroadcastDetailPage() {
           </h2>
           <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <div className="relative col-span-2 min-w-0 sm:w-64">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <Input
+              <SearchInput
                 value={recipientSearch}
+              onClear={() => setRecipientSearch('')}
+                loading={loadingRecipients || filtering || recipientSearch !== deferredRecipientSearch}
                 onChange={(event) => setRecipientSearch(event.target.value)}
                 placeholder={t('searchRecipients')}
                 aria-label={t('searchRecipients')}
                 className="bg-background h-10 w-full pr-9 pl-9"
               />
-              {(loadingRecipients ||
-                filtering ||
-                recipientSearch !== deferredRecipientSearch) && (
-                <Loader2
-                  className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin"
-                  role="status"
-                  aria-label={tActivity('loading')}
-                />
-              )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger

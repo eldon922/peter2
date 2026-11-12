@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Label } from '@/components/ui/label';
 import {
   Table,
@@ -37,7 +38,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  Search,
   Plus,
   Upload,
   MoreHorizontal,
@@ -712,9 +712,9 @@ export default function ContactsPage() {
               row empty once the filters sat beside it. Let it take the
               slack instead. */}
           <div className="relative w-full sm:flex-1">
-            <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-            <Input
+            <SearchInput
               value={search}
+              onClear={() => { setSearch(''); setPage(0); }}
               onChange={(e) => {
                 setSearch(e.target.value);
                 // Reset pagination when the query changes — the result

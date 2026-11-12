@@ -2025,5 +2025,9 @@
   },
   "Activity": {
     "loading": "Memuat…"
+  },
+  "Search": {
+    "clear": "Hapus pencarian",
+    "loading": "Memuat hasil"
   }
 }

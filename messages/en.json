@@ -2025,5 +2025,9 @@
   },
   "Activity": {
     "loading": "Loading…"
+  },
+  "Search": {
+    "clear": "Clear search",
+    "loading": "Loading results"
   }
 }

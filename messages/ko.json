@@ -2025,5 +2025,9 @@
   },
   "Activity": {
     "loading": "불러오는 중…"
+  },
+  "Search": {
+    "clear": "검색 지우기",
+    "loading": "결과 불러오는 중"
   }
 }

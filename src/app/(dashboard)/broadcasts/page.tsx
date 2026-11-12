@@ -22,7 +22,7 @@ import {
 } from '@/lib/broadcast-status';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { fetchAllRows } from '@/lib/supabase/batching';
 import {
   BroadcastDuration,
@@ -254,8 +254,9 @@ export default function BroadcastsPage() {
         </GatedButton>
       </div>
 
-      <Input
+      <SearchInput
         value={search}
+        onClear={() => setSearch('')}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={t('searchPlaceholder')}
         aria-label={t('searchPlaceholder')}

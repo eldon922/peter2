@@ -1,11 +1,11 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import {
   Popover,
   PopoverContent,
@@ -40,10 +40,10 @@ export function TagPickerList({
   return (
     <div>
       <div className="border-border relative border-b p-2">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2" />
-        <Input
+        <SearchInput
           autoFocus
           value={query}
+          onClear={() => setQuery('')}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('search')}
           aria-label={t('search')}

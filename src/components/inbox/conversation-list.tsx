@@ -10,10 +10,10 @@ import {
 import { sessionWindow } from '@/lib/inbox/session-window';
 import { cn } from '@/lib/utils';
 import type { Conversation, ConversationStatus, Tag } from '@/types';
-import { Search, ChevronDown, X, Clock } from 'lucide-react';
+import { ChevronDown, X, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -321,9 +321,9 @@ export function ConversationList({
       {/* Search + Filter */}
       <div className="border-border space-y-2 border-b p-3">
         <div className="relative">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
+          <SearchInput
             value={search}
+              onClear={() => setSearch('')}
             onChange={handleSearchChange}
             placeholder={t('searchPlaceholder')}
             aria-label={t('searchPlaceholder')}
