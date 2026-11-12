@@ -1,4 +1,6 @@
-import type { CustomField } from '@/types';
+import type { CustomField, PhoneConversion } from '@/types';
+import { normalizePhoneInput } from '@/lib/whatsapp/international-phone';
+import { DEFAULT_COUNTRY_CODE } from '@/lib/whatsapp/phone-utils';
 
 /**
  * CSV parsing for the contacts import modal. Shared + unit-tested so
@@ -7,6 +9,7 @@ import type { CustomField } from '@/types';
 
 export interface ParsedContactRow {
   phone: string;
+  phone_conversion?: PhoneConversion | null;
   name?: string;
   email?: string;
   company?: string;
@@ -45,7 +48,8 @@ export interface ParseContactCsvResult {
 
 export function parseContactCsv(
   text: string,
-  customFields: Pick<CustomField, 'id' | 'field_name'>[] = []
+  customFields: Pick<CustomField, 'id' | 'field_name'>[] = [],
+  countryCode = DEFAULT_COUNTRY_CODE
 ): ParseContactCsvResult {
   const records = parseCsv(text);
   const empty = { rows: [], hasTagsColumn: false, hasCompanyColumn: false };
@@ -84,8 +88,10 @@ export function parseContactCsv(
         return value ? [[id, value]] : [];
       })
     );
+    const normalized = normalizePhoneInput(phone, countryCode);
     rows.push({
-      phone,
+      phone: normalized.phone,
+      ...(normalized.phone_conversion ? { phone_conversion: normalized.phone_conversion } : {}),
       ...(Object.keys(customValues).length ? { customValues } : {}),
       name: cell(values, nameIdx),
       email: cell(values, emailIdx),

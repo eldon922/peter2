@@ -1,4 +1,5 @@
 'use client';
+import type { CsvAudienceContact } from '@/lib/broadcasts/audience';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -56,7 +57,7 @@ export default function NewBroadcastPage() {
       operator: 'is' | 'is_not' | 'contains';
       value: string;
     };
-    csvContacts?: { phone: string; name?: string }[];
+    csvContacts?: CsvAudienceContact[];
     excludeTagIds?: string[];
   }>({ type: 'tags' });
   const [variables, setVariables] = useState<

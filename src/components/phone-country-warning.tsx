@@ -5,11 +5,9 @@ import { useTranslations } from 'next-intl';
 import { Info } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
-import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
-import {
-  countLocalAudiencePhones,
-  isLocalPhone,
-} from '@/lib/whatsapp/local-phones';
+import { normalizePhoneInput } from '@/lib/whatsapp/international-phone';
+import type { PhoneConversion } from '@/types';
+import { countConvertedAudiencePhones } from '@/lib/whatsapp/local-phones';
 import type { ResolvedAudience } from '@/lib/broadcasts/audience';
 import {
   Tooltip,
@@ -20,6 +18,7 @@ import {
 
 export function PhoneCountryWarning({
   phone,
+  conversion,
   resolved,
   broadcastId,
   recipientId,
@@ -27,6 +26,7 @@ export function PhoneCountryWarning({
   tooltip = false,
 }: {
   phone?: string;
+  conversion?: PhoneConversion | null;
   resolved?: ResolvedAudience;
   broadcastId?: string;
   recipientId?: string;
@@ -37,6 +37,7 @@ export function PhoneCountryWarning({
   const tooltipId = useId();
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const source =
+    conversion ??
     phone ??
     resolved ??
     (broadcastId ? `${broadcastId}:${recipientId ?? ''}:${retry}` : null);
@@ -46,50 +47,58 @@ export function PhoneCountryWarning({
     count: number;
   } | null>(null);
   useEffect(() => {
-    if (!source || (phone !== undefined && !isLocalPhone(phone))) return;
+    if (
+      !source ||
+      (phone !== undefined && !conversion && /^\s*(\+|00)/.test(phone))
+    )
+      return;
     const controller = new AbortController();
     (async () => {
       const db = createClient();
       let count = phone
         ? 1
         : resolved
-          ? await countLocalAudiencePhones(db, resolved)
+          ? await countConvertedAudiencePhones(db, resolved)
           : 0;
       if (broadcastId) {
         let query = db
           .from('broadcast_recipients')
-          .select('id, contact:contacts!inner(phone_normalized)', {
+          .select('id, contact:contacts!inner(phone_conversion)', {
             count: 'exact',
             head: true,
           })
           .eq('broadcast_id', broadcastId)
           .eq('status', retry ? 'failed' : 'pending')
-          .like('contact.phone_normalized', '0%')
-          .not('contact.phone_normalized', 'like', '00%');
+          .not('contact.phone_conversion', 'is', null);
         if (recipientId) query = query.eq('id', recipientId);
         const response = await query;
         if (response.error) throw response.error;
         count = response.count ?? 0;
       }
       if (count === 0) return;
-      const code = await fetchDefaultCountryCode(controller.signal);
+      const code =
+        conversion?.countryCode ??
+        (phone ? await fetchDefaultCountryCode(controller.signal) : '');
+      if (
+        phone &&
+        !conversion &&
+        !normalizePhoneInput(phone, code).phone_conversion
+      )
+        return;
       if (!controller.signal.aborted) setResult({ source, count, code });
     })().catch(() => {});
     return () => controller.abort();
-  }, [source, phone, resolved, broadcastId, recipientId, retry]);
-  if (
-    !result ||
-    result.source !== source ||
-    (phone !== undefined && !isLocalPhone(phone))
-  )
-    return null;
+  }, [source, phone, conversion, resolved, broadcastId, recipientId, retry]);
+  if (!result || result.source !== source) return null;
   const description = phone
     ? t('converted', {
-        phone,
-        number: `+${toMetaPhone(phone, result.code)}`,
+        phone: conversion?.input ?? phone,
+        number: conversion
+          ? phone
+          : normalizePhoneInput(phone, result.code).phone,
         code: result.code,
       })
-    : t('convertedCount', { count: result.count, code: result.code });
+    : t('convertedCount', { count: result.count });
   if (tooltip)
     return (
       <TooltipProvider>

@@ -15,6 +15,8 @@
  * ("button #3 has no `text`" beats "constraint violated").
  */
 
+import { isValidE164 } from './phone-utils';
+
 import type {
   MessageTemplate,
   TemplateButton,
@@ -320,6 +322,9 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
           throw new Error(
             `PHONE_NUMBER button #${i + 1} is missing phone_number.`
           );
+        }
+        if (!b.phone_number.startsWith('+') || !isValidE164(b.phone_number)) {
+          throw new Error(`PHONE_NUMBER button #${i + 1} needs a valid international phone number.`);
         }
         break;
       case 'COPY_CODE':

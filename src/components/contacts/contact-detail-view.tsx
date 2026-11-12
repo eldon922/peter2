@@ -2,7 +2,8 @@
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { findExistingContact, isExactMatch, isUniqueViolation } from '@/lib/contacts/dedupe';
-import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
+import { toMetaPhone, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import { normalizePhoneInput } from '@/lib/whatsapp/international-phone';
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -249,6 +250,8 @@ export function ContactDetailView({
     setSavingDetails(true);
     try {
       const countryCode = await fetchDefaultCountryCode();
+      const normalized = normalizePhoneInput(editPhone, countryCode);
+      if (!isValidE164(normalized.phone)) throw new Error(tForm('phoneInvalid'));
       if (
         accountId &&
         contact &&
@@ -270,7 +273,11 @@ export function ContactDetailView({
       const { error } = await supabase.rpc('update_contact_details', {
         p_contact_id: contactId,
         p_default_country_code: countryCode,
-        p_phone: editPhone,
+        p_phone: normalized.phone,
+        p_phone_conversion:
+          editPhone === contact?.phone
+            ? contact?.phone_conversion ?? null
+            : normalized.phone_conversion,
         p_name: editName.trim() || null,
         p_email: editEmail.trim() || null,
         p_company: editCompany.trim() || null,
@@ -489,7 +496,7 @@ export function ContactDetailView({
                         <Copy className="size-3" />
                       )}
                     </button>
-                    <PhoneCountryWarning phone={contact.phone} />
+                    <PhoneCountryWarning phone={contact.phone} conversion={contact.phone_conversion} />
                     {contact.email && (
                       <span className="flex items-center gap-1">
                         <Mail className="size-3" />

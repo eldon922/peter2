@@ -1,4 +1,5 @@
 'use client';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -1136,14 +1137,18 @@ export function TemplateManager() {
                         </div>
                       )}
                       {btn.type === 'PHONE_NUMBER' && (
-                        <Input
-                          placeholder={t('phonePlaceholder')}
-                          value={btn.phone_number}
-                          onChange={(e) =>
-                            updateButton(i, { phone_number: e.target.value })
-                          }
-                          className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 text-xs"
-                        />
+                        <div className="space-y-2">
+                          <Input
+                            type="tel"
+                            placeholder={t('phonePlaceholder')}
+                            value={btn.phone_number}
+                            onChange={(e) =>
+                              updateButton(i, { phone_number: e.target.value })
+                            }
+                            className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 text-xs"
+                          />
+                          <PhoneCountryWarning phone={btn.phone_number} />
+                        </div>
                       )}
                       {btn.type === 'COPY_CODE' && (
                         <Input

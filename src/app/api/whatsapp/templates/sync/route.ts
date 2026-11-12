@@ -1,3 +1,4 @@
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import { NextResponse } from 'next/server';
 import {
   ForbiddenError,
@@ -102,7 +103,7 @@ function parseButtons(metaButtons: MetaButton[] | undefined): TemplateButton[] {
         out.push({
           type: 'PHONE_NUMBER',
           text: b.text,
-          phone_number: b.phone_number ?? '',
+          phone_number: internationalPhone(b.phone_number ?? ''),
         });
         break;
       case 'COPY_CODE':

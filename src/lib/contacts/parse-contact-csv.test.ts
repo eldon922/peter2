@@ -127,3 +127,10 @@ it('keeps built-in columns separate when a custom field has the same name', () =
   expect(result.rows[0].name).toBe('Dewi');
   expect(result.rows[0].customValues).toBeUndefined();
 });
+
+it('normalizes CSV previews with the configured country and retains conversion evidence', () => {
+  const { rows } = parseContactCsv('phone,name\n07700 900123,Local\n+44 7700 900123,International', [], '44');
+  expect(rows.map((row) => row.phone)).toEqual(['+447700900123', '+447700900123']);
+  expect(rows[0].phone_conversion).toEqual({ input: '07700 900123', countryCode: '44' });
+  expect(rows[1].phone_conversion).toBeUndefined();
+});

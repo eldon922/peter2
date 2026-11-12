@@ -206,7 +206,7 @@ export function ContactSidebar({ contact, className, session, onDeleteChat }: Co
               )}
             </button>
 
-            <PhoneCountryWarning phone={contact.phone} />
+            <PhoneCountryWarning phone={contact.phone} conversion={contact.phone_conversion} />
             {contact.email && (
               <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-muted-foreground" />

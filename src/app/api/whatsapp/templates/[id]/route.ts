@@ -1,3 +1,4 @@
+import { normalizePhoneButtons } from '@/lib/whatsapp/international-phone'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
@@ -136,6 +137,7 @@ export async function PATCH(
     }
 
     try {
+      if (Array.isArray(payload.buttons)) payload.buttons = normalizePhoneButtons(payload.buttons)
       validateTemplatePayload(payload)
     } catch (e) {
       return NextResponse.json(

@@ -399,7 +399,7 @@ export function Step2SelectAudience({
                       file.text(),
                       fetchDefaultCountryCode(),
                     ]);
-                    const { rows } = parseContactCsv(text);
+                    const { rows } = parseContactCsv(text, [], countryCode);
                     const { unique } = dedupeByPhone(rows, undefined, (phone) =>
                       toMetaPhone(phone, countryCode)
                     );
@@ -408,9 +408,8 @@ export function Step2SelectAudience({
                       setCsvError(importT('toastNoValidRows'));
                     onUpdate({
                       ...audience,
-                      csvContacts: unique.map(({ phone, name }) => ({
-                        phone,
-                        name,
+                      csvContacts: unique.map(({ phone, name, phone_conversion }) => ({
+                        phone, name, phone_conversion,
                       })),
                     });
                   } catch {

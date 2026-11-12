@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
 import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -290,7 +291,7 @@ export function ImportModal({
         hasTagsColumn: csvHasTags,
         hasCompanyColumn: csvHasCompany,
         customFieldIds = [],
-      } = parseContactCsv(text, fields.rows);
+      } = parseContactCsv(text, fields.rows, code);
       setCountryCode(code);
       setCustomFields(fields.rows);
       setCsvCustomFieldIds(customFieldIds);
@@ -540,7 +541,8 @@ export function ImportModal({
       const chunkSize = INSERT_BATCH_SIZE;
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
-        const chunk = toInsert.slice(i, i + chunkSize);
+        const chunk = toInsert.slice(i, i + chunkSize)
+          .sort((a, b) => a.phone.localeCompare(b.phone));
         await prepareContactPhones(
           supabase,
           accountId,
@@ -550,7 +552,8 @@ export function ImportModal({
         const rows = chunk.map((row) => ({
           user_id: user.id,
           account_id: accountId,
-          phone: toMetaPhone(row.phone, countryCode),
+          phone: row.phone,
+          phone_conversion: row.phone_conversion ?? null,
           name: row.name || null,
           email: row.email || null,
           company: row.company || null,
@@ -983,6 +986,9 @@ export function ImportModal({
                   role="region"
                   aria-label={t('preview', { count: preview.length })}
                 >
+                  <div className="px-3 py-2">
+                    <PhoneCountryWarning resolved={{ kind: 'csv', contacts: importRows }} />
+                  </div>
                   <table className="w-full min-w-[32rem] text-sm">
                     <thead>
                       <tr className="border-border bg-background/60 border-b">

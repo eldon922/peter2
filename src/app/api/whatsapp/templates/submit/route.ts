@@ -1,3 +1,4 @@
+import { normalizePhoneButtons } from '@/lib/whatsapp/international-phone'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
     }
 
     try {
+      if (Array.isArray(payload.buttons)) payload.buttons = normalizePhoneButtons(payload.buttons)
       validateTemplatePayload(payload)
     } catch (e) {
       return NextResponse.json(

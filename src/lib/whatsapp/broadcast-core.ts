@@ -29,7 +29,6 @@ import {
   getSendPacing,
 } from '@/lib/whatsapp/broadcast-limits';
 import {
-  sanitizePhoneForMeta,
   toMetaPhone,
   isValidE164,
   phoneVariants,
@@ -39,6 +38,7 @@ import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import type { SendTimeParams } from '@/lib/whatsapp/template-send-builder';
 import type { Contact, MessageTemplate, WhatsAppConnectionType } from '@/types';
 import { findOrCreateContactsBulk } from '@/lib/api/v1/contacts';
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import {
   bodyPlaceholderKeys,
   buttonVariables,
@@ -365,14 +365,15 @@ export async function createBroadcast(
   let rejected = 0;
   // Sanitize and validate first — pure, no I/O — so the contact lookup
   // sees only phones worth resolving.
-  const prepared: { phone: string; params: string[] }[] = [];
+  const prepared: { input: string; phone: string; params: string[] }[] = [];
   for (const r of recipients) {
-    const sanitized = sanitizePhoneForMeta(typeof r.to === 'string' ? r.to : '');
+    const sanitized = internationalPhone(typeof r.to === 'string' ? r.to : '');
     if (!isValidE164(sanitized)) {
       rejected++;
       continue;
     }
     prepared.push({
+      input: r.to,
       phone: sanitized,
       params: Array.isArray(r.params)
         ? r.params.filter((p): p is string => typeof p === 'string')
@@ -389,11 +390,11 @@ export async function createBroadcast(
     db,
     accountId,
     auditUserId,
-    prepared.map((p) => p.phone)
+    prepared.map((p) => p.input)
   );
 
   for (const p of prepared) {
-    const contactId = contactIdByPhone.get(p.phone);
+    const contactId = contactIdByPhone.get(p.input);
     if (!contactId) {
       // The resolver throws on any real failure, so a gap here would
       // mean a silently dropped recipient — louder is better.
@@ -1202,7 +1203,7 @@ export async function deliverBroadcast(
           .update({
             status: 'failed',
             error_message: 'Send window elapsed — retry again',
-            phone_attempted: pending.phone,
+            phone_attempted: internationalPhone(`+${toMetaPhone(pending.phone)}`),
             template_params: pending.params,
           })
           .eq('id', pending.recipientRowId);
@@ -1246,7 +1247,7 @@ export async function deliverBroadcast(
         .update({
           status: 'failed',
           error_message: `Could not check the message before sending: ${ownedError.message}`,
-          phone_attempted: recipient.phone,
+          phone_attempted: internationalPhone(`+${toMetaPhone(recipient.phone)}`),
           template_params: recipient.params,
         })
         .eq('id', recipient.recipientRowId);
@@ -1307,7 +1308,7 @@ export async function deliverBroadcast(
           sent_at: new Date().toISOString(),
           whatsapp_message_id: sentMessageId,
           error_message: null,
-          phone_attempted: attemptedPhone,
+          phone_attempted: internationalPhone(`+${toMetaPhone(attemptedPhone)}`),
           template_params: recipient.params,
         })
         .eq('id', recipient.recipientRowId);
@@ -1317,7 +1318,7 @@ export async function deliverBroadcast(
         .update({
           status: 'failed',
           error_message: lastError || 'Unknown error',
-          phone_attempted: attemptedPhone,
+          phone_attempted: internationalPhone(`+${toMetaPhone(attemptedPhone)}`),
           template_params: recipient.params,
         })
         .eq('id', recipient.recipientRowId);

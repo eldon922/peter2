@@ -387,7 +387,7 @@
       "namePlaceholder": "Budi Santoso",
       "phoneLabel": "Nomor Telepon",
       "phonePlaceholder": "+6281234567890",
-      "phoneHint": "Sertakan kode negara, mis. +62 untuk Indonesia",
+      "phoneHint": "Nomor disimpan dengan + dan kode negara. Nomor lokal menggunakan kode negara default; sertakan + dan kode negara untuk nomor luar negeri.",
       "emailLabel": "Email",
       "emailPlaceholder": "budi@contoh.com",
       "companyLabel": "Perusahaan",
@@ -410,7 +410,8 @@
       "loadingTags": "Memuat tag...",
       "noTagsAvailable": "Tidak ada tag tersedia. Buat tag di Pengaturan.",
       "phoneRequired": "Nomor telepon wajib diisi",
-      "phoneCheckFailed": "Nomor telepon ini belum dapat diperiksa. Coba lagi sebelum menyimpan."
+      "phoneCheckFailed": "Nomor telepon ini belum dapat diperiksa. Coba lagi sebelum menyimpan.",
+      "phoneInvalid": "Masukkan nomor telepon yang valid, termasuk kode negara untuk nomor luar negeri."
     },
     "detailView": {
       "tabs": {
@@ -2025,8 +2026,8 @@
   "PhoneFormat": {
     "warning": "Nomor lokal yang diawali 0 menggunakan +{code} secara default. Sertakan kode negara untuk nomor dari negara lain.",
     "fallback": "Gunakan nomor telepon internasional lengkap. Nomor lokal yang diawali 0 menggunakan kode negara default Anda.",
-    "converted": "{phone} dikirim sebagai {number}, menggunakan kode negara bawaan +{code}. Sertakan kode negara untuk nomor dari negara lain.",
-    "convertedCount": "{count} nomor lokal dikonversi menggunakan kode negara bawaan +{code} saat dikirim.",
+    "converted": "{phone} dikonversi menjadi {number} menggunakan kode negara default +{code}.",
+    "convertedCount": "Kode negara default ditambahkan ke {count} penerima. Periksa kode negara sebelum mengirim.",
     "details": "Konversi nomor telepon"
   },
   "Pagination": {

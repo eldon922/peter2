@@ -1,4 +1,5 @@
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import { NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
@@ -1606,8 +1607,8 @@ async function findOrCreateContact(
     .insert({
       account_id: accountId,
       user_id: configOwnerUserId,
-      phone,
-      name: name || phone,
+      phone: internationalPhone(`+${phone}`),
+      name: name || internationalPhone(`+${phone}`),
       profile_name: name || null,
     })
     .select()

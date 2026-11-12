@@ -20,11 +20,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { normalizePhoneInput } from '@/lib/whatsapp/international-phone';
 
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
 import {
   DEFAULT_COUNTRY_CODE,
-  sanitizePhoneForMeta,
   isValidE164,
 } from '@/lib/whatsapp/phone-utils';
 import { SendMessageError } from '@/lib/whatsapp/send-message';
@@ -49,7 +49,8 @@ export async function resolveConversationByPhone(
   phone: string,
   name?: string | null
 ): Promise<ResolvedConversation> {
-  const sanitized = sanitizePhoneForMeta(phone);
+  const normalized = normalizePhoneInput(phone);
+  const sanitized = normalized.phone;
   if (!isValidE164(sanitized)) {
     throw new SendMessageError(
       'bad_request',
@@ -114,7 +115,7 @@ export async function resolveConversationByPhone(
       .insert({
         account_id: accountId,
         user_id: ownerUserId,
-        phone: sanitized,
+        ...normalized,
         name: name || sanitized,
       })
       .select('id')

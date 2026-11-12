@@ -1,3 +1,4 @@
+import { internationalPhone } from '@/lib/whatsapp/international-phone'
 import { sendTextMessage, sendTemplateMessage } from '@/lib/whatsapp/meta-api'
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive'
 import {
@@ -185,7 +186,7 @@ async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: str
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db.from('contacts').update({ phone: internationalPhone(`+${workingPhone}`) }).eq('id', contact.id)
   }
 
   // Persist the sent message so it appears in the inbox with a real

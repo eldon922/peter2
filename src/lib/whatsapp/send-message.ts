@@ -36,6 +36,7 @@ import {
 } from '@/lib/whatsapp/interactive';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import {
   toMetaPhone,
   isValidE164,
@@ -445,7 +446,7 @@ export async function sendMessageToConversation(
     });
     await db
       .from('contacts')
-      .update({ phone: workingPhone })
+      .update({ phone: internationalPhone(`+${workingPhone}`) })
       .eq('id', contact.id);
   }
 

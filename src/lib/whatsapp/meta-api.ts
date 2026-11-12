@@ -1,3 +1,5 @@
+import { internationalPhone } from './international-phone';
+import { normalizePhone } from './phone-utils';
 /**
  * Meta WhatsApp Cloud API helpers.
  *
@@ -108,7 +110,8 @@ export async function verifyPhoneNumber(
   if (!response.ok) {
     await throwMetaError(response, `Meta API error: ${response.status}`)
   }
-  return response.json()
+  const info: MetaPhoneInfo = await response.json()
+  return { ...info, display_phone_number: internationalPhone(`+${normalizePhone(info.display_phone_number)}`) }
 }
 
 /**

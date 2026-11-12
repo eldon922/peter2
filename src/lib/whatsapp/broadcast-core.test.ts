@@ -312,6 +312,17 @@ describe('createBroadcast validation', () => {
 });
 
 describe('createBroadcast contact resolution', () => {
+  it.each(['081234567890', '81234567890'])('standardizes local recipient %s before persisting', async (phone) => {
+    const { db, writes } = contactsDb([]);
+    const plan = await createBroadcast(db, 'acc', 'user', {
+      templateName: 'promo', recipients: [{ to: phone }],
+    });
+    const contact = writes.find((write) => write.table === 'contacts' && write.op === 'insert');
+    expect(contact?.values.batch).toEqual([expect.objectContaining({
+      phone: '+6281234567890', phone_conversion: { input: phone, countryCode: '62' },
+    })]);
+    expect(plan.planned[0].phone).toBe('+6281234567890');
+  });
   function contactsDb(existing: Record<string, unknown>[] = []) {
     return makeDb({
       contacts: { rows: existing },
@@ -1634,7 +1645,7 @@ describe('deliverBroadcast', () => {
     expect(sendTemplateMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({ to: accepted })
     );
-    expect(stamp!.values.phone_attempted).toBe(accepted);
+    expect(stamp!.values.phone_attempted).toBe(`+${accepted}`);
     expect(stamp!.values.phone_attempted).not.toBe(input);
   });
 
@@ -1663,7 +1674,7 @@ describe('deliverBroadcast', () => {
 
     const variants = phoneVariants(input);
     const stamp = writes.find((w) => w.values.status === 'failed');
-    expect(stamp!.values.phone_attempted).toBe(variants[variants.length - 1]);
+    expect(stamp!.values.phone_attempted).toBe(`+${variants[variants.length - 1]}`);
   });
 
   it('stores the params it sent so a second retry can replay them', async () => {

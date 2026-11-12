@@ -1,3 +1,4 @@
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   DEFAULT_COUNTRY_CODE,
@@ -23,7 +24,7 @@ export function normalizeKey(phone: string): string {
 }
 
 export function phoneLookupKeys(phone: string, countryCode: string): string[] {
-  const canonical = toMetaPhone(phone, countryCode);
+  const canonical = normalizePhone(internationalPhone(phone, countryCode));
   if (!canonical) return [];
   return [
     ...new Set([
@@ -49,7 +50,7 @@ export function phoneMatchSuffix(
   phone: string,
   countryCode = DEFAULT_COUNTRY_CODE
 ): string {
-  const canonical = toMetaPhone(phone, countryCode);
+  const canonical = normalizePhone(internationalPhone(phone, countryCode));
   return (
     canonical.startsWith(countryCode)
       ? canonical.slice(countryCode.length)
@@ -66,7 +67,7 @@ export function matchContactByPhone(
     isExactMatch(candidate, phone, countryCode)
   );
   if (exact) return exact;
-  const variants = new Set(phoneVariants(toMetaPhone(phone, countryCode)));
+  const variants = new Set(phoneVariants(normalizePhone(internationalPhone(phone, countryCode))));
   return (
     candidates.find((candidate) =>
       variants.has(toMetaPhone(candidate.phone, countryCode))
@@ -115,7 +116,8 @@ export function isExactMatch(
   countryCode?: string
 ): boolean {
   return (
-    toMetaPhone(existing.phone, countryCode) === toMetaPhone(phone, countryCode)
+    toMetaPhone(existing.phone, countryCode) === toMetaPhone(phone, countryCode) ||
+    toMetaPhone(existing.phone, countryCode) === normalizePhone(internationalPhone(phone, countryCode))
   );
 }
 

@@ -29,7 +29,9 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
-import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
+import { toMetaPhone, isValidE164 } from '@/lib/whatsapp/phone-utils';
+import { normalizePhoneInput } from '@/lib/whatsapp/international-phone';
+import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 interface ContactFormProps {
   open: boolean;
@@ -194,6 +196,8 @@ export function ContactForm({
 
     try {
       countryCode.current ??= await fetchDefaultCountryCode();
+      const normalized = normalizePhoneInput(phone, countryCode.current);
+      if (!isValidE164(normalized.phone)) throw new Error(t('phoneInvalid'));
       const phoneChanged =
         !contact ||
         toMetaPhone(contact.phone, countryCode.current) !==
@@ -223,7 +227,11 @@ export function ContactForm({
         const { error } = await supabase.rpc('update_contact_details', {
           p_contact_id: contactId,
           p_default_country_code: countryCode.current,
-          p_phone: phone,
+          p_phone: normalized.phone,
+          p_phone_conversion:
+            phone === contact?.phone
+              ? contact?.phone_conversion ?? null
+              : normalized.phone_conversion,
           p_name: name.trim() || null,
           p_email: email.trim() || null,
           p_company: company.trim() || null,
@@ -242,7 +250,7 @@ export function ContactForm({
             user_id: user.id,
             account_id: accountId,
             name: name.trim() || null,
-            phone: toMetaPhone(phone.trim(), countryCode.current),
+            ...normalized,
             email: email.trim() || null,
             company: company.trim() || null,
           })
@@ -336,8 +344,14 @@ export function ContactForm({
                 if (dupMatch) setDupMatch(null);
               }}
               onBlur={checkDuplicate}
+              type="tel"
+              autoComplete="tel"
               placeholder={t('phonePlaceholder')}
               className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+            />
+            <PhoneCountryWarning
+              phone={phone}
+              conversion={phone === contact?.phone ? contact?.phone_conversion : undefined}
             />
             {dupMatch ? (
               <div

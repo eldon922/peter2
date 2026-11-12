@@ -13,7 +13,7 @@ WHERE user_id IN (md5('identity-viewer')::uuid, md5('identity-replier')::uuid);
 INSERT INTO contacts (id, user_id, account_id, phone, name) VALUES
   (md5('identity-local')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '081234567890', 'Local'),
   (md5('identity-edit')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '629999999999', 'Edit'),
-  (md5('identity-uk')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '07700900123', 'UK');
+  (md5('identity-uk')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '+447700900123', 'UK');
 SELECT set_config('request.jwt.claim.sub', md5('identity-owner')::uuid::text, true);
 SET LOCAL ROLE authenticated;
 DO $$
@@ -29,14 +29,18 @@ BEGIN
   EXCEPTION WHEN unique_violation THEN NULL; END;
 END $$;
 RESET ROLE;
--- A legacy alias pair must not prevent an unrelated name/email edit.
-INSERT INTO contacts (user_id, account_id, phone)
-VALUES (md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '6281234567890');
+-- Canonical uniqueness also rejects direct local-format inserts.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO contacts (user_id, account_id, phone) VALUES (md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '081234567890');
+    RAISE EXCEPTION 'Local alias insert succeeded';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+END $$;
 SET LOCAL ROLE authenticated;
 SELECT update_contact_details(md5('identity-local')::uuid, '62', '081234567890', 'Name updated', 'updated@example.test');
 DO $$ BEGIN
-  ASSERT (SELECT phone = '081234567890' AND name = 'Name updated' AND email = 'updated@example.test'
-    FROM contacts WHERE id = md5('identity-local')::uuid), 'unchanged phone fields must preserve old alias records without rewriting them';
+  ASSERT (SELECT phone = '+6281234567890' AND name = 'Name updated' AND email = 'updated@example.test'
+    FROM contacts WHERE id = md5('identity-local')::uuid), 'profile edits must preserve the canonical phone';
 END $$;
 SELECT update_contact_details(md5('identity-uk')::uuid, '44', '+447700900123', 'UK');
 DO $$ BEGIN ASSERT (SELECT phone = '+447700900123' FROM contacts WHERE id = md5('identity-uk')::uuid), 'explicit phone-format edits must retain the international prefix'; END $$;
@@ -66,8 +70,10 @@ END $$;
 RESET ROLE;
 
 -- Simulate a split thread produced by a version deployed before this fix.
+ALTER TABLE contacts DISABLE TRIGGER reattach_saved_contact_chat;
 INSERT INTO contacts (id, user_id, account_id, phone)
 VALUES (md5('identity-split-recreated')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, '6283333333330');
+ALTER TABLE contacts ENABLE TRIGGER reattach_saved_contact_chat;
 INSERT INTO conversations (id, user_id, account_id, contact_id, unread_count, last_message_at, last_message_text)
 VALUES (md5('identity-split-new')::uuid, md5('identity-owner')::uuid, current_setting('test.identity_account')::uuid, md5('identity-split-recreated')::uuid, 2, '2026-11-12 08:00Z', 'New document');
 INSERT INTO messages (id, conversation_id, sender_type, content_type, media_filename, media_url)

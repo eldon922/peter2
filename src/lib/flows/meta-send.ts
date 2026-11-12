@@ -1,3 +1,4 @@
+import { internationalPhone } from '@/lib/whatsapp/international-phone'
 import {
   sendInteractiveButtons,
   sendInteractiveList,
@@ -122,7 +123,7 @@ export async function engineSendText(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db.from('contacts').update({ phone: internationalPhone(`+${workingPhone}`) }).eq('id', contact.id)
   }
 
   const { error: msgErr } = await db.from('messages').insert({
@@ -235,7 +236,7 @@ export async function engineSendMedia(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db.from('contacts').update({ phone: internationalPhone(`+${workingPhone}`) }).eq('id', contact.id)
   }
 
   // content_type='image'|'video'|'document' — these are already in the
@@ -403,7 +404,7 @@ async function sendInteractiveViaMeta(
   if (lastError) throw lastError
 
   if (workingPhone !== sanitized) {
-    await db.from('contacts').update({ phone: workingPhone }).eq('id', contact.id)
+    await db.from('contacts').update({ phone: internationalPhone(`+${workingPhone}`) }).eq('id', contact.id)
   }
 
   // Persist the bot's prompt to the messages table so it appears in

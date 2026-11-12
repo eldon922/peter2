@@ -19,10 +19,11 @@ Apply these migrations **before deploying the application changes**:
 1. `067_recover_broadcast_engagement.sql` repairs engagement from resolved quotations, customer reactions and persisted reply timestamps, then refreshes counters.
 2. `068_contact_phone_identity.sql` adds canonical phone preparation and atomic editing, and updates removed-contact restoration to preserve chat history while reusing the same identity. New application callers require these functions.
 3. `069_contact_international_phone_prefix.sql` retains `+` on saved international numbers across all write paths and adds missing prefixes to existing international records. Digits-only matching and WhatsApp sending remain unchanged; legacy local numbers are preserved.
+4. `070_standardize_phone_numbers.sql` supersedes that partial behavior: all saved phone fields use `+countrycode`, local records are converted and aliases merge with their history retained. See [phone standardization](phone-number-standardization.md) for the configured backfill default and current validation.
 
 Historical messages with missing quotation context cannot establish which broadcast received a reply. Migration 067 does not guess those assignments or erase existing positive engagement. Counts represent unique recipients, not the number of replies or reactions.
 
-Existing duplicate contact records are not automatically removed. New writes and explicit phone edits prevent canonical aliases; recreating or restoring a removed contact reattaches its history. Existing split conversations can be combined during restoration while preserving their children and state.
+Migration 070 now merges existing local/international aliases within each account while preserving their dependent records and conversation state. The original follow-up implementation below predates this complete standardization.
 
 These migrations were not applied to the hosted database. No real WhatsApp messages were sent.
 

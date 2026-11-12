@@ -228,6 +228,7 @@ export function MessageThread({
     (conversation?.contact_phone
       ? ({
           phone: conversation.contact_phone,
+          phone_conversion: conversation.contact_phone_conversion,
           name: conversation.contact_name ?? undefined,
         } as Contact)
       : null);
@@ -1010,7 +1011,7 @@ export function MessageThread({
               <span className="text-muted-foreground truncate text-xs">
                 {contact.phone}
               </span>
-              <PhoneCountryWarning phone={contact.phone} tooltip />
+              <PhoneCountryWarning phone={contact.phone} conversion={contact.phone_conversion} tooltip />
             </div>
           </div>
           {/* Session timer badge. Shown only where the header actually

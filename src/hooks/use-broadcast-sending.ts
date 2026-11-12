@@ -1,4 +1,5 @@
 'use client';
+import type { CsvAudienceContact } from '@/lib/broadcasts/audience';
 
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import {
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
 import { phoneLookupKeys } from '@/lib/contacts/dedupe';
 import { toMetaPhone } from '@/lib/whatsapp/phone-utils';
+import { internationalPhone } from '@/lib/whatsapp/international-phone';
 import { fetchDefaultCountryCode } from '@/lib/whatsapp/phone-format';
 import { chunkIds, chunkRows, fetchAllRows } from '@/lib/supabase/batching';
 import { isHeaderMediaKind } from '@/lib/media-specs';
@@ -157,7 +159,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
    */
   async function upsertCsvContacts(
     supabase: ReturnType<typeof createClient>,
-    csvRows: { phone: string; name?: string }[],
+    csvRows: CsvAudienceContact[],
     countryCode: string
   ): Promise<Contact[]> {
     if (csvRows.length === 0) return [];
@@ -176,7 +178,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     const phoneKey = (phone: string) => toMetaPhone(phone, countryCode);
 
     // De-duplicate by phone within the CSV (users can paste duplicates).
-    const uniqueByPhone = new Map<string, { phone: string; name?: string }>();
+    const uniqueByPhone = new Map<string, CsvAudienceContact>();
     for (const row of csvRows) {
       if (phoneKey(row.phone) && !uniqueByPhone.has(phoneKey(row.phone)))
         uniqueByPhone.set(phoneKey(row.phone), row);
@@ -207,9 +209,10 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       .map((phone) => ({
         user_id: user.id,
         account_id: accountId,
-        phone,
+        phone: internationalPhone(phone, countryCode),
+        phone_conversion: uniqueByPhone.get(phone)?.phone_conversion ?? null,
         name: uniqueByPhone.get(phone)?.name ?? null,
-      }));
+      })).sort((a, b) => a.phone.localeCompare(b.phone));
 
     for (const chunk of chunkRows(missing)) {
       await prepareContactPhones(

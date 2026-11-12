@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { prepareContactPhones } from '@/lib/contacts/prepare-phones';
+import { internationalPhone, normalizePhoneInput } from '@/lib/whatsapp/international-phone';
 
 import { chunkIds, chunkRows } from '@/lib/supabase/batching';
 import {
@@ -22,9 +23,8 @@ import { resolveImportTagIds } from '@/lib/contacts/resolve-import-tags';
 import { addContactTagAndDispatch } from '@/lib/contacts/tag-events';
 import {
   DEFAULT_COUNTRY_CODE,
-  sanitizePhoneForMeta,
   isValidE164,
-  toMetaPhone,
+  normalizePhone,
 } from '@/lib/whatsapp/phone-utils';
 
 /** Row select that embeds the contact's tags for serialization. */
@@ -126,7 +126,8 @@ export async function findOrCreateContact(
   auditUserId: string,
   input: ContactInput
 ): Promise<{ id: string; created: boolean }> {
-  const sanitized = sanitizePhoneForMeta(input.phone);
+  const normalized = normalizePhoneInput(input.phone);
+  const sanitized = normalized.phone;
   if (!isValidE164(sanitized)) {
     throw new ContactError(
       "'phone' must be a valid phone number in E.164 format (e.g. +14155550123)",
@@ -143,7 +144,7 @@ export async function findOrCreateContact(
     .insert({
       account_id: accountId,
       user_id: auditUserId,
-      phone: sanitized,
+      ...normalized,
       name: input.name ?? sanitized,
       email: input.email ?? null,
       company: input.company ?? null,
@@ -250,12 +251,14 @@ export async function findOrCreateContactsBulk(
   // from migration 022 and fail the whole statement.
   const newByKey = new Map<string, string>();
   for (const phone of missing) {
-    const key = toMetaPhone(phone);
+    const key = normalizePhone(internationalPhone(phone));
     if (!newByKey.has(key)) newByKey.set(key, phone);
   }
 
   const idByKey = new Map<string, string>();
-  const pending = [...newByKey.values()];
+  const pending = [...newByKey.values()].sort((a, b) =>
+    internationalPhone(a).localeCompare(internationalPhone(b))
+  );
 
   for (const batch of chunkRows(pending)) {
     await prepareContactPhones(db, accountId, batch, DEFAULT_COUNTRY_CODE);
@@ -265,7 +268,7 @@ export async function findOrCreateContactsBulk(
         batch.map((phone) => ({
           account_id: accountId,
           user_id: auditUserId,
-          phone: toMetaPhone(phone),
+          ...normalizePhoneInput(phone),
           name: phone,
           email: null,
           company: null,
@@ -283,7 +286,7 @@ export async function findOrCreateContactsBulk(
           const { id } = await findOrCreateContact(db, accountId, auditUserId, {
             phone,
           });
-          idByKey.set(toMetaPhone(phone), id);
+          idByKey.set(normalizePhone(internationalPhone(phone)), id);
         }
         continue;
       }
@@ -292,12 +295,12 @@ export async function findOrCreateContactsBulk(
     }
 
     for (const row of data as { id: string; phone: string }[]) {
-      idByKey.set(toMetaPhone(row.phone), row.id);
+      idByKey.set(normalizePhone(internationalPhone(row.phone)), row.id);
     }
   }
 
   for (const phone of missing) {
-    const id = idByKey.get(toMetaPhone(phone));
+    const id = idByKey.get(normalizePhone(internationalPhone(phone)));
     if (id) resolved.set(phone, id);
   }
 
