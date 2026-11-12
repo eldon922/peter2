@@ -323,7 +323,7 @@ export function ConversationList({
         <div className="relative">
           <SearchInput
             value={search}
-              onClear={() => setSearch('')}
+            onClear={() => setSearch('')}
             onChange={handleSearchChange}
             placeholder={t('searchPlaceholder')}
             aria-label={t('searchPlaceholder')}
@@ -655,8 +655,9 @@ function ConversationItem({
       onClick={handleClick}
       aria-pressed={isActive}
       className={cn(
-        'hover:bg-muted/50 focus-visible:ring-ring flex w-full items-start gap-3 px-3 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset',
-        isActive && 'bg-primary-soft hover:bg-primary-soft-2'
+        'hover:bg-muted/50 focus-visible:ring-ring relative flex w-full items-start gap-3 px-3 py-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset',
+        isActive &&
+          'bg-primary-soft hover:bg-primary-soft-2 before:bg-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full'
       )}
     >
       {/* Avatar */}
