@@ -223,293 +223,301 @@ export function Step2SelectAudience({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {audienceOptions.map(
-          (option: {
-            type: AudienceType;
-            label: string;
-            description: string;
-            icon: typeof Users;
-          }) => {
-            const isSelected = audience.type === option.type;
-            const Icon = option.icon;
-            return (
-              <button
-                key={option.type}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() =>
-                  onUpdate({
-                    ...audience,
-                    type: option.type,
-                    // Wipe shape fields from other types to avoid stale
-                    // config leaking across selections.
-                    tagIds:
-                      option.type === 'tags' ? audience.tagIds : undefined,
-                    customField:
-                      option.type === 'custom_field'
-                        ? audience.customField
-                        : undefined,
-                    csvContacts:
-                      option.type === 'csv' ? audience.csvContacts : undefined,
-                  })
-                }
-                className={`focus-visible:ring-ring flex scroll-mb-48 items-start gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
-                  isSelected
-                    ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
-                    : 'border-border bg-card/50 hover:border-border'
-                }`}
-              >
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    isSelected
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-foreground text-sm font-medium">
-                    {option.label}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    {option.description}
-                  </p>
-                </div>
-              </button>
-            );
-          }
-        )}
-      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {audienceOptions.map(
+              (option: {
+                type: AudienceType;
+                label: string;
+                description: string;
+                icon: typeof Users;
+              }) => {
+                const isSelected = audience.type === option.type;
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.type}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      onUpdate({
+                        ...audience,
+                        type: option.type,
+                        // Wipe shape fields from other types to avoid stale
+                        // config leaking across selections.
+                        tagIds:
+                          option.type === 'tags' ? audience.tagIds : undefined,
+                        customField:
+                          option.type === 'custom_field'
+                            ? audience.customField
+                            : undefined,
+                        csvContacts:
+                          option.type === 'csv'
+                            ? audience.csvContacts
+                            : undefined,
+                      })
+                    }
+                    className={`focus-visible:ring-ring flex scroll-mb-48 items-start gap-3 rounded-xl border p-4 text-left transition-colors outline-none focus-visible:ring-2 ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 ring-primary/30 ring-1'
+                        : 'border-border bg-card/50 hover:border-border'
+                    }`}
+                  >
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        isSelected
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-foreground text-sm font-medium">
+                        {option.label}
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        {option.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              }
+            )}
+          </div>
 
-      {audience.type === 'tags' && (
-        <div className="border-border bg-card/50 rounded-xl border p-4">
-          <p className="text-foreground mb-3 text-sm font-medium">
-            {t('selectAudience.selectTags')}
-          </p>
-          {loadingTags ? (
-            <Loader2 className="text-primary h-5 w-5 animate-spin" />
-          ) : tags.length === 0 ? (
-            <p className="text-muted-foreground text-xs">
-              {t('selectAudience.noTagsFound')}
-            </p>
-          ) : (
-            <TagMultiSelect
-              className="[&_button]:scroll-mb-48"
-              tags={tags}
-              value={audience.tagIds ?? []}
-              onToggle={toggleTag}
-              onClear={() => onUpdate({ ...audience, tagIds: [] })}
-            />
-          )}
-        </div>
-      )}
-
-      {audience.type === 'custom_field' && (
-        <div className="border-border bg-card/50 space-y-3 rounded-xl border p-4">
-          <p className="text-foreground text-sm font-medium">
-            {t('selectAudience.method.customField')}
-          </p>
-          {loadingFields ? (
-            <Loader2 className="text-primary h-5 w-5 animate-spin" />
-          ) : customFields.length === 0 ? (
-            <p className="text-muted-foreground text-xs">
-              {t('selectAudience.errorLoadFields')}
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)]">
-              <select
-                aria-label={t('selectAudience.field')}
-                value={audience.customField?.fieldId ?? ''}
-                onChange={(e) => updateCustomField({ fieldId: e.target.value })}
-                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
-              >
-                <option value="">{t('selectAudience.selectField')}</option>
-                {customFields.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.field_name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={t('selectAudience.operator')}
-                value={audience.customField?.operator ?? 'is'}
-                onChange={(e) =>
-                  updateCustomField({
-                    operator: e.target.value as CustomFieldOperator,
-                  })
-                }
-                className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
-              >
-                {OPERATOR_OPTIONS.map(
-                  (op: { value: CustomFieldOperator; label: string }) => (
-                    <option key={op.value} value={op.value}>
-                      {op.label}
-                    </option>
-                  )
-                )}
-              </select>
-              <input
-                type="text"
-                aria-label={t('selectAudience.value')}
-                value={audience.customField?.value ?? ''}
-                onChange={(e) => updateCustomField({ value: e.target.value })}
-                placeholder={t('selectAudience.valuePlaceholder')}
-                className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
-              />
+          {audience.type === 'tags' && (
+            <div className="border-border bg-card/50 rounded-xl border p-4">
+              <p className="text-foreground mb-3 text-sm font-medium">
+                {t('selectAudience.selectTags')}
+              </p>
+              {loadingTags ? (
+                <Loader2 className="text-primary h-5 w-5 animate-spin" />
+              ) : tags.length === 0 ? (
+                <p className="text-muted-foreground text-xs">
+                  {t('selectAudience.noTagsFound')}
+                </p>
+              ) : (
+                <TagMultiSelect
+                  className="[&_button]:scroll-mb-48"
+                  tags={tags}
+                  value={audience.tagIds ?? []}
+                  onToggle={toggleTag}
+                  onClear={() => onUpdate({ ...audience, tagIds: [] })}
+                />
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {audience.type === 'csv' && (
-        <div
-          className="border-border bg-card/50 space-y-2 rounded-xl border p-4"
-          aria-busy={csvLoading}
-        >
-          <label
-            htmlFor="broadcast-csv"
-            className="text-foreground block text-sm font-medium"
-          >
-            {t('selectAudience.method.csv')}
-          </label>
-          <input
-            id="broadcast-csv"
-            type="file"
-            accept=".csv,text/csv"
-            className="text-muted-foreground file:border-border file:bg-muted file:text-foreground block w-full scroll-mb-48 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-2"
-            onChange={async (event) => {
-              const file = event.target.files?.[0];
-              const request = ++csvRequest.current;
-              setCsvError('');
-              onUpdate({ ...audience, csvContacts: [] });
-              if (!file) return;
-              setCsvLoading(true);
-              try {
-                const [text, countryCode] = await Promise.all([
-                  file.text(),
-                  fetchDefaultCountryCode(),
-                ]);
-                const { rows } = parseContactCsv(text);
-                const { unique } = dedupeByPhone(rows, undefined, (phone) =>
-                  toMetaPhone(phone, countryCode)
-                );
-                if (request !== csvRequest.current) return;
-                if (unique.length === 0)
-                  setCsvError(importT('toastNoValidRows'));
-                onUpdate({
-                  ...audience,
-                  csvContacts: unique.map(({ phone, name }) => ({
-                    phone,
-                    name,
-                  })),
-                });
-              } catch {
-                if (request === csvRequest.current)
-                  setCsvError(importT('toastNoValidRows'));
-              } finally {
-                if (request === csvRequest.current) setCsvLoading(false);
-              }
-            }}
-          />
-          <p className="text-muted-foreground text-xs">
-            {importT('uploadHint')}
+          {audience.type === 'custom_field' && (
+            <div className="border-border bg-card/50 space-y-3 rounded-xl border p-4">
+              <p className="text-foreground text-sm font-medium">
+                {t('selectAudience.method.customField')}
+              </p>
+              {loadingFields ? (
+                <Loader2 className="text-primary h-5 w-5 animate-spin" />
+              ) : customFields.length === 0 ? (
+                <p className="text-muted-foreground text-xs">
+                  {t('selectAudience.errorLoadFields')}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)]">
+                  <select
+                    aria-label={t('selectAudience.field')}
+                    value={audience.customField?.fieldId ?? ''}
+                    onChange={(e) =>
+                      updateCustomField({ fieldId: e.target.value })
+                    }
+                    className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                  >
+                    <option value="">{t('selectAudience.selectField')}</option>
+                    {customFields.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.field_name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={t('selectAudience.operator')}
+                    value={audience.customField?.operator ?? 'is'}
+                    onChange={(e) =>
+                      updateCustomField({
+                        operator: e.target.value as CustomFieldOperator,
+                      })
+                    }
+                    className="border-border bg-muted text-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                  >
+                    {OPERATOR_OPTIONS.map(
+                      (op: { value: CustomFieldOperator; label: string }) => (
+                        <option key={op.value} value={op.value}>
+                          {op.label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  <input
+                    type="text"
+                    aria-label={t('selectAudience.value')}
+                    value={audience.customField?.value ?? ''}
+                    onChange={(e) =>
+                      updateCustomField({ value: e.target.value })
+                    }
+                    placeholder={t('selectAudience.valuePlaceholder')}
+                    className="border-border bg-muted text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary h-10 scroll-mb-48 rounded-lg border px-2.5 text-sm outline-none focus:ring-1"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {audience.type === 'csv' && (
+            <div
+              className="border-border bg-card/50 space-y-2 rounded-xl border p-4"
+              aria-busy={csvLoading}
+            >
+              <label
+                htmlFor="broadcast-csv"
+                className="text-foreground block text-sm font-medium"
+              >
+                {t('selectAudience.method.csv')}
+              </label>
+              <input
+                id="broadcast-csv"
+                type="file"
+                accept=".csv,text/csv"
+                className="text-muted-foreground file:border-border file:bg-muted file:text-foreground block w-full scroll-mb-48 text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-2"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  const request = ++csvRequest.current;
+                  setCsvError('');
+                  onUpdate({ ...audience, csvContacts: [] });
+                  if (!file) return;
+                  setCsvLoading(true);
+                  try {
+                    const [text, countryCode] = await Promise.all([
+                      file.text(),
+                      fetchDefaultCountryCode(),
+                    ]);
+                    const { rows } = parseContactCsv(text);
+                    const { unique } = dedupeByPhone(rows, undefined, (phone) =>
+                      toMetaPhone(phone, countryCode)
+                    );
+                    if (request !== csvRequest.current) return;
+                    if (unique.length === 0)
+                      setCsvError(importT('toastNoValidRows'));
+                    onUpdate({
+                      ...audience,
+                      csvContacts: unique.map(({ phone, name }) => ({
+                        phone,
+                        name,
+                      })),
+                    });
+                  } catch {
+                    if (request === csvRequest.current)
+                      setCsvError(importT('toastNoValidRows'));
+                  } finally {
+                    if (request === csvRequest.current) setCsvLoading(false);
+                  }
+                }}
+              />
+              <p className="text-muted-foreground text-xs">
+                {importT('uploadHint')}
+              </p>
+              {csvLoading && <Loader2 className="size-4 animate-spin" />}
+              {csvError && (
+                <p role="alert" className="text-xs text-red-500">
+                  {csvError}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Exclude list — applies regardless of audience type */}
+          <div className="border-border bg-card/50 rounded-xl border p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <X className="h-4 w-4 text-red-400" />
+              <p className="text-foreground text-sm font-medium">
+                {t('selectAudience.excludeTags')}
+              </p>
+            </div>
+            {tags.length === 0 ? (
+              <p className="text-muted-foreground text-xs">
+                {t('selectAudience.noTagsFound')}
+              </p>
+            ) : (
+              <TagMultiSelect
+                className="[&_button]:scroll-mb-48"
+                tags={tags}
+                value={audience.excludeTagIds ?? []}
+                onToggle={toggleExcludeTag}
+                onClear={() => onUpdate({ ...audience, excludeTagIds: [] })}
+                variant="danger"
+              />
+            )}
+          </div>
+        </div>
+        {/* Audience Summary */}
+        <aside className="border-border bg-card min-w-0 rounded-xl border p-4 lg:sticky lg:top-6">
+          <p className="text-foreground mb-2 text-sm font-medium">
+            {t('selectAudience.summary')}
           </p>
-          {csvLoading && <Loader2 className="size-4 animate-spin" />}
-          {csvError && (
-            <p role="alert" className="text-xs text-red-500">
-              {csvError}
+          {!loadingCount && (
+            <p className="mb-2 text-xs text-red-600 dark:text-red-300">
+              {t('selectAudience.excludedCount', { count: excludedCount })}
             </p>
           )}
-        </div>
-      )}
-
-      {/* Exclude list — applies regardless of audience type */}
-      <div className="border-border bg-card/50 rounded-xl border p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <X className="h-4 w-4 text-red-400" />
-          <p className="text-foreground text-sm font-medium">
-            {t('selectAudience.excludeTags')}
-          </p>
-        </div>
-        {tags.length === 0 ? (
-          <p className="text-muted-foreground text-xs">
-            {t('selectAudience.noTagsFound')}
-          </p>
-        ) : (
-          <TagMultiSelect
-            className="[&_button]:scroll-mb-48"
-            tags={tags}
-            value={audience.excludeTagIds ?? []}
-            onToggle={toggleExcludeTag}
-            onClear={() => onUpdate({ ...audience, excludeTagIds: [] })}
-            variant="danger"
-          />
-        )}
-      </div>
-
-      {/* Audience Summary */}
-      <div className="border-border bg-card/50 rounded-xl border p-4">
-        <p className="text-foreground mb-2 text-sm font-medium">
-          {t('selectAudience.summary')}
-        </p>
-        {!loadingCount && (
-          <p className="mb-2 text-xs text-red-600 dark:text-red-300">
-            {t('selectAudience.excludedCount', { count: excludedCount })}
-          </p>
-        )}
-        {loadingCount ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="text-primary h-4 w-4 animate-spin" />
-            <span className="text-muted-foreground text-xs">
-              {t('selectAudience.calculating')}
-            </span>
-          </div>
-        ) : estimatedCount !== null ? (
-          <div className="flex items-center gap-2">
-            <Users className="text-primary h-4 w-4" />
-            <span className="text-foreground text-sm">
-              {estimatedCount.toLocaleString()}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              {t('selectAudience.estimatedRecipients')}
-            </span>
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            {estimateFailed
-              ? t('selectAudience.estimateFailed')
-              : t('selectAudience.selectToEstimate')}
-          </p>
-        )}
-        {!loadingCount && estimatedCount === 0 && (
-          <p className="mt-2 text-xs text-amber-500">
-            {t('selectAudience.noMatch')}
-          </p>
-        )}
-        {!loadingCount && resolved && (estimatedCount ?? 0) > 0 && (
-          <div className="mt-3 space-y-1.5">
-            <p className="text-muted-foreground text-xs font-medium">
-              {t('contactList.title')}
+          {loadingCount ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="text-primary h-4 w-4 animate-spin" />
+              <span className="text-muted-foreground text-xs">
+                {t('selectAudience.calculating')}
+              </span>
+            </div>
+          ) : estimatedCount !== null ? (
+            <div className="flex items-center gap-2">
+              <Users className="text-primary h-4 w-4" />
+              <span className="text-foreground text-sm">
+                {estimatedCount.toLocaleString()}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {t('selectAudience.estimatedRecipients')}
+              </span>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              {estimateFailed
+                ? t('selectAudience.estimateFailed')
+                : t('selectAudience.selectToEstimate')}
             </p>
-            <AudienceContactList resolved={resolved} />
-          </div>
-        )}
-        {!loadingCount &&
-          estimatedCount !== null &&
-          estimatedCount > recipientLimit && (
+          )}
+          {!loadingCount && estimatedCount === 0 && (
             <p className="mt-2 text-xs text-amber-500">
-              This audience is above this account&apos;s limit of about{' '}
-              {recipientLimit.toLocaleString()} recipients. Some may not be sent
-              the first time — after it finishes, open the broadcast and press
-              Retry to send the rest.
+              {t('selectAudience.noMatch')}
             </p>
           )}
-      </div>
-
-      <div>
-        <PhoneCountryWarning resolved={resolved} />
+          {!loadingCount && resolved && (estimatedCount ?? 0) > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-muted-foreground text-xs font-medium">
+                {t('contactList.title')}
+              </p>
+              <AudienceContactList resolved={resolved} />
+            </div>
+          )}
+          {!loadingCount &&
+            estimatedCount !== null &&
+            estimatedCount > recipientLimit && (
+              <p className="mt-2 text-xs text-amber-500">
+                This audience is above this account&apos;s limit of about{' '}
+                {recipientLimit.toLocaleString()} recipients. Some may not be
+                sent the first time — after it finishes, open the broadcast and
+                press Retry to send the rest.
+              </p>
+            )}
+          <div className="mt-4">
+            <PhoneCountryWarning resolved={resolved} />
+          </div>
+        </aside>
       </div>
 
       <div className="border-border bg-background sticky bottom-0 z-10 mt-auto flex items-center justify-between gap-4 border-t py-4">
