@@ -1095,8 +1095,8 @@ export default function BroadcastDetailPage() {
                 })
               : t('recipientsHeaderAll', { total: broadcast.total_recipients })}
           </h2>
-          <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
-            <div className="relative col-span-2 min-w-0 sm:w-64">
+          <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:flex-1 sm:flex-wrap sm:justify-end">
+            <div className="relative col-span-2 min-w-0 sm:w-80 sm:flex-1 xl:w-full xl:max-w-xl">
               <SearchInput
                 value={recipientSearch}
                 onClear={() => setRecipientSearch('')}
