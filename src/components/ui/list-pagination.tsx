@@ -27,26 +27,28 @@ export function ListPagination({
   total,
   onPageChange,
   busy = false,
+  compact = false,
 }: {
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
   busy?: boolean;
+  compact?: boolean;
 }) {
   const t = useTranslations('Pagination');
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = Array.from(
-    new Set([0, pages - 1, page - 1, page, page + 1])
+    new Set(compact ? [page] : [0, pages - 1, page - 1, page, page + 1])
   )
     .filter((value) => value >= 0 && value < pages)
     .sort((a, b) => a - b);
   return (
     <nav
       aria-label={t('label')}
-      className="border-border text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-3 py-3 text-xs"
+      className={`border-border text-muted-foreground flex min-w-0 shrink-0 items-center gap-2 border-t px-2 py-3 text-xs ${compact ? "flex-nowrap" : "flex-wrap justify-between"}`}
     >
-      <span aria-live="polite" aria-atomic="true" className="tabular-nums">
+      <span aria-live="polite" aria-atomic="true" className={compact ? "sr-only" : "tabular-nums"}>
         {t('range', {
           from: total ? page * pageSize + 1 : 0,
           to: Math.min(total, (page + 1) * pageSize),
