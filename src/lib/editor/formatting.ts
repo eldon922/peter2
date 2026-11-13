@@ -85,38 +85,21 @@ export function clipboardText(data: Pick<DataTransfer, 'getData'>): string {
     if (node.tagName === 'BR') return '\n';
     let value = Array.from(node.childNodes).map(read).join('');
     const style = node.style;
-    const whatsapp = node.getAttribute('data-app-text-template');
     const markers = [
       (['B', 'STRONG'].includes(node.tagName) ||
         Number(style.fontWeight) >= 600 ||
-        style.fontWeight === 'bold' ||
-        whatsapp === '*') &&
+        style.fontWeight === 'bold') &&
         '*',
-      (['I', 'EM'].includes(node.tagName) ||
-        style.fontStyle === 'italic' ||
-        whatsapp === '_') &&
+      (['I', 'EM'].includes(node.tagName) || style.fontStyle === 'italic') &&
         '_',
       (['S', 'STRIKE', 'DEL'].includes(node.tagName) ||
-        style.textDecoration.includes('line-through') ||
-        whatsapp === '~') &&
+        style.textDecoration.includes('line-through')) &&
         '~',
-      (['CODE', 'PRE'].includes(node.tagName) ||
-        whatsapp === '```' ||
-        /monospace/i.test(style.fontFamily)) &&
-        '```',
+      ['CODE', 'PRE'].includes(node.tagName) && '```',
     ].filter(Boolean) as string[];
-    for (const marker of markers) {
-      const content = value.trim();
-      if (!content || (content.startsWith(marker) && content.endsWith(marker)))
-        continue;
-      const start = value.length - value.trimStart().length;
-      value =
-        value.slice(0, start) +
-        marker +
-        content +
-        marker +
-        value.slice(start + content.length);
-    }
+    for (const marker of markers)
+      if (value && !(value.startsWith(marker) && value.endsWith(marker)))
+        value = marker + value + marker;
     if (node.tagName === 'LI') {
       const index =
         Array.from(node.parentElement?.children ?? []).indexOf(node) + 1;
