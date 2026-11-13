@@ -37,6 +37,7 @@ export function ListPagination({
   compact?: boolean;
 }) {
   const t = useTranslations('Pagination');
+  const [jump, setJump] = useState('');
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = Array.from(
     new Set(compact ? [page] : [0, pages - 1, page - 1, page, page + 1])
@@ -46,9 +47,13 @@ export function ListPagination({
   return (
     <nav
       aria-label={t('label')}
-      className={`border-border text-muted-foreground flex min-w-0 shrink-0 items-center gap-2 border-t px-2 py-3 text-xs ${compact ? "flex-nowrap" : "flex-wrap justify-between"}`}
+      className={`border-border text-muted-foreground flex min-w-0 shrink-0 items-center gap-2 border-t px-2 py-3 text-xs ${compact ? 'flex-nowrap' : 'flex-wrap justify-between'}`}
     >
-      <span aria-live="polite" aria-atomic="true" className={compact ? "sr-only" : "tabular-nums"}>
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        className={compact ? 'sr-only' : 'tabular-nums'}
+      >
         {t('range', {
           from: total ? page * pageSize + 1 : 0,
           to: Math.min(total, (page + 1) * pageSize),
@@ -95,6 +100,47 @@ export function ListPagination({
           <ChevronRight className="size-4" />
         </Button>
       </div>
+      <form
+        className="ml-auto flex shrink-0 items-center gap-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const target = Number(jump);
+          if (
+            Number.isInteger(target) &&
+            target >= 1 &&
+            target <= pages &&
+            !busy
+          ) {
+            onPageChange(target - 1);
+            setJump('');
+          }
+        }}
+      >
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={pages}
+          step={1}
+          required
+          value={jump}
+          disabled={busy || !total}
+          onChange={(event) => setJump(event.target.value)}
+          aria-label={t('goToPage')}
+          placeholder={String(page + 1)}
+          className="bg-background h-9 w-12 rounded-md border px-1 text-center tabular-nums"
+        />
+        <span className="whitespace-nowrap tabular-nums">/ {pages}</span>
+        <Button
+          type="submit"
+          variant="ghost"
+          size="sm"
+          disabled={busy || !total}
+          className="h-9 px-2"
+        >
+          {t('go')}
+        </Button>
+      </form>
     </nav>
   );
 }

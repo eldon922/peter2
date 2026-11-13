@@ -235,7 +235,10 @@
       "strike": "Strikethrough",
       "code": "Monospace",
       "message": "Message",
-      "formatPreview": "Formatted preview"
+      "formatPreview": "Formatted preview",
+      "bulletList": "Bulleted list",
+      "numberedList": "Numbered list",
+      "quote": "Quote"
     },
     "bubble": {
       "photo": "Photo",
@@ -1694,7 +1697,8 @@
       "toastSyncUnchanged": "Templates are already up to date. No changes.",
       "namedVariableHint": "Use '{{1}}', '{{2}}'… or '{{first_name}}'. Don’t mix styles. Add an example for each variable.",
       "submitProgressSending": "Sending to Meta for review. Media headers may take longer.",
-      "submitProgressRefreshing": "Submission accepted. Refreshing your templates…"
+      "submitProgressRefreshing": "Submission accepted. Refreshing your templates…",
+      "bodyPreview": "Formatted preview"
     },
     "roles": {
       "admin": "Admin",
@@ -2037,7 +2041,9 @@
     "range": "{from}–{to} of {total}",
     "previous": "Previous page",
     "next": "Next page",
-    "label": "Pagination"
+    "label": "Pagination",
+    "goToPage": "Go to page",
+    "go": "Go"
   },
   "Activity": {
     "loading": "Loading…"

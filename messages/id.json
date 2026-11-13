@@ -235,7 +235,10 @@
       "strike": "Coret",
       "code": "Monospace",
       "message": "Pesan",
-      "formatPreview": "Pratinjau format"
+      "formatPreview": "Pratinjau format",
+      "bulletList": "Daftar berpoin",
+      "numberedList": "Daftar bernomor",
+      "quote": "Kutipan"
     },
     "bubble": {
       "photo": "Foto",
@@ -1694,7 +1697,8 @@
       "toastSyncUnchanged": "Template sudah terbaru. Tidak ada perubahan.",
       "namedVariableHint": "Gunakan '{{1}}', '{{2}}'… atau '{{first_name}}'. Jangan campur format. Isi contoh untuk setiap variabel.",
       "submitProgressSending": "Mengirim ke Meta untuk ditinjau. Header media mungkin memerlukan waktu lebih lama.",
-      "submitProgressRefreshing": "Pengajuan diterima. Memperbarui daftar template…"
+      "submitProgressRefreshing": "Pengajuan diterima. Memperbarui daftar template…",
+      "bodyPreview": "Pratinjau format"
     },
     "roles": {
       "admin": "Admin",
@@ -2037,7 +2041,9 @@
     "range": "{from}–{to} dari {total}",
     "previous": "Halaman sebelumnya",
     "next": "Halaman berikutnya",
-    "label": "Navigasi halaman"
+    "label": "Navigasi halaman",
+    "goToPage": "Ke halaman",
+    "go": "Ke"
   },
   "Activity": {
     "loading": "Memuat…"
