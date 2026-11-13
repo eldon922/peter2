@@ -774,7 +774,7 @@ export function TemplateManager() {
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-muted-foreground text-[11px]">
-                {editingId ? t('nameFixed') : t('nameHint')}
+                {editingRemote ? t('nameFixed') : t('nameHint')}
               </p>
             </div>
 
@@ -828,7 +828,7 @@ export function TemplateManager() {
                   ))}
                 </select>
                 <p className="text-muted-foreground text-[11px]">
-                  {editingId ? (
+                  {editingRemote ? (
                     t('langFixed')
                   ) : (
                     <span>
