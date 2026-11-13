@@ -574,7 +574,6 @@ export function ConversationList({
         )}
       </ScrollArea>
       <ListPagination
-        compact
         page={page}
         pageSize={25}
         total={total}

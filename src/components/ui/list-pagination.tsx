@@ -27,14 +27,12 @@ export function ListPagination({
   total,
   onPageChange,
   busy = false,
-  compact = false,
 }: {
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
   busy?: boolean;
-  compact?: boolean;
 }) {
   const t = useTranslations('Pagination');
   const [jump, setJump] = useState('');
@@ -42,7 +40,7 @@ export function ListPagination({
   const range = useRef<HTMLSpanElement>(null);
   const navigation = useRef<HTMLDivElement>(null);
   const goTo = useRef<HTMLFormElement>(null);
-  const [narrow, setNarrow] = useState(true);
+  const [centered, setCentered] = useState(false);
   const [showGoTo, setShowGoTo] = useState(false);
   useEffect(() => {
     const observer = new ResizeObserver(() => {
@@ -54,8 +52,11 @@ export function ListPagination({
       )
         return;
       const width = container.current.clientWidth - 16;
-      setNarrow(width < 640);
-      const sideWidth = (width - navigation.current.offsetWidth) / 2 - 8;
+      setCentered(
+        width >=
+          navigation.current.scrollWidth + 2 * range.current.scrollWidth + 16
+      );
+      const sideWidth = (width - navigation.current.scrollWidth) / 2 - 8;
       setShowGoTo(
         sideWidth >=
           Math.max(range.current.scrollWidth, goTo.current.scrollWidth)
@@ -78,9 +79,7 @@ export function ListPagination({
   });
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = Array.from(
-    new Set(
-      compact || narrow ? [page] : [0, pages - 1, page - 1, page, page + 1]
-    )
+    new Set([0, pages - 1, page - 1, page, page + 1])
   )
     .filter((value) => value >= 0 && value < pages)
     .sort((a, b) => a - b);
@@ -88,18 +87,26 @@ export function ListPagination({
     <nav
       ref={container}
       aria-label={t('label')}
-      className="border-border text-muted-foreground grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
+      style={{
+        gridTemplateColumns: centered
+          ? 'minmax(0,1fr) auto minmax(0,1fr)'
+          : 'max-content minmax(0,1fr) 0px',
+      }}
+      className="border-border text-muted-foreground relative grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
     >
       <span
         ref={range}
         aria-live="polite"
         aria-atomic="true"
-        className="truncate tabular-nums"
+        className="w-max whitespace-nowrap tabular-nums"
         title={rangeText}
       >
         {rangeText}
       </span>
-      <div ref={navigation} className="flex shrink-0 gap-1">
+      <div
+        ref={navigation}
+        className="flex w-max max-w-full min-w-0 gap-1 justify-self-center overflow-x-auto"
+      >
         <Button
           variant="ghost"
           size="icon-sm"
@@ -111,7 +118,7 @@ export function ListPagination({
           <ChevronLeft className="size-4" />
         </Button>
         {visiblePages.map((value, index) => (
-          <span key={value} className="flex items-center gap-1">
+          <span key={value} className="flex shrink-0 items-center gap-1">
             {index > 0 && value - visiblePages[index - 1] > 1 && (
               <span aria-hidden>…</span>
             )}
@@ -143,7 +150,11 @@ export function ListPagination({
         ref={goTo}
         aria-hidden={!showGoTo}
         inert={!showGoTo}
-        style={{ visibility: showGoTo ? 'visible' : 'hidden' }}
+        style={{
+          visibility: showGoTo ? 'visible' : 'hidden',
+          position: showGoTo ? 'static' : 'absolute',
+          right: 8,
+        }}
         className="flex w-max items-center gap-1 justify-self-end"
         onSubmit={(event) => {
           event.preventDefault();
