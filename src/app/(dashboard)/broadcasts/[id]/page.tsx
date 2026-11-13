@@ -175,7 +175,7 @@ function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
           % of sent
         </span>
       </h3>
-      <div className="space-y-2">
+      <div className="grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-2 gap-y-2 sm:gap-x-3">
         {steps.map((step) => {
           const pct = percentOfRecipients(step.value, sent);
           // Keep a sliver visible for any step that isn't zero — a step
@@ -189,11 +189,8 @@ function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
             </>
           );
           return (
-            // The label column is fixed-width, so on a phone it was
-            // eating the row and leaving the bar a stub — it shrinks
-            // below sm to give the bar room.
-            <div key={step.label} className="flex items-center gap-2 sm:gap-3">
-              <span className="text-muted-foreground w-16 shrink-0 text-xs sm:w-20">
+            <div key={step.label} className="contents">
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
                 {step.label}
               </span>
               <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded-full">
