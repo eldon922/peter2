@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
 
@@ -41,9 +46,7 @@ export function ListPagination({
   const navigation = useRef<HTMLDivElement>(null);
   const goTo = useRef<HTMLFormElement>(null);
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const [pageWindow, setPageWindow] = useState<'full' | 'nearby' | 'current'>(
-    'current'
-  );
+  const [compact, setCompact] = useState(true);
   const [showGoTo, setShowGoTo] = useState(false);
   useEffect(() => {
     const observer = new ResizeObserver(() => {
@@ -58,25 +61,16 @@ export function ListPagination({
       const buttonWidth =
         navigation.current.querySelector('button')?.getBoundingClientRect()
           .width ?? 36;
-      const choices = [
-        [...new Set([0, pages - 1, page - 1, page, page + 1])]
-          .filter((n) => n >= 0 && n < pages)
-          .sort((a, b) => a - b),
-        [page - 1, page, page + 1].filter((n) => n >= 0 && n < pages),
-        [page],
-      ];
-      const needed = (numbers: number[]) =>
+      const numbers = [...new Set([0, pages - 1, page - 1, page, page + 1])]
+        .filter((n) => n >= 0 && n < pages)
+        .sort((a, b) => a - b);
+      const needed =
         (numbers.length + 2) * buttonWidth +
         (numbers.length + 1) * 4 +
         numbers.filter((n, i) => i > 0 && n - numbers[i - 1] > 1).length * 16;
       const available = width - range.current.scrollWidth - 8;
-      const choice = choices.findIndex(
-        (numbers) => needed(numbers) <= available
-      );
-      setPageWindow(
-        choice === 0 ? 'full' : choice === 1 ? 'nearby' : 'current'
-      );
-      const sideWidth = (width - needed(choices[0])) / 2 - 8;
+      setCompact(needed > available);
+      const sideWidth = (width - needed) / 2 - 8;
       setShowGoTo(
         sideWidth >=
           Math.max(range.current.scrollWidth, goTo.current.scrollWidth)
@@ -97,15 +91,7 @@ export function ListPagination({
     to: Math.min(total, (page + 1) * pageSize),
     total,
   });
-  const visiblePages = Array.from(
-    new Set(
-      pageWindow === 'current'
-        ? [page]
-        : pageWindow === 'nearby'
-          ? [page - 1, page, page + 1]
-          : [0, pages - 1, page - 1, page, page + 1]
-    )
-  )
+  const visiblePages = [...new Set([0, pages - 1, page - 1, page, page + 1])]
     .filter((value) => value >= 0 && value < pages)
     .sort((a, b) => a - b);
   return (
@@ -113,11 +99,9 @@ export function ListPagination({
       ref={container}
       aria-label={t('label')}
       style={{
-        gridTemplateColumns: showGoTo
-          ? 'minmax(0,1fr) auto minmax(0,1fr)'
-          : 'max-content minmax(0,1fr)',
+        display: showGoTo ? 'grid' : 'flex',
       }}
-      className="border-border text-muted-foreground relative grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
+      className="border-border text-muted-foreground relative min-w-0 shrink-0 flex-wrap justify-between grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
     >
       <span
         ref={range}
@@ -130,8 +114,20 @@ export function ListPagination({
       </span>
       <div
         ref={navigation}
-        className={`flex w-max gap-1 ${showGoTo ? 'justify-self-center' : 'justify-self-end'}`}
+        className={`flex w-max gap-1 ${showGoTo ? 'justify-self-center' : 'ml-auto'}`}
       >
+        {compact && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-9 pointer-coarse:size-11"
+            disabled={busy || page === 0}
+            aria-label={t('first')}
+            onClick={() => onPageChange(0)}
+          >
+            <ChevronFirst className="size-4" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -142,24 +138,25 @@ export function ListPagination({
         >
           <ChevronLeft className="size-4" />
         </Button>
-        {visiblePages.map((value, index) => (
-          <span key={value} className="flex shrink-0 items-center gap-1">
-            {index > 0 && value - visiblePages[index - 1] > 1 && (
-              <span aria-hidden>…</span>
-            )}
-            <Button
-              type="button"
-              variant={page === value ? 'secondary' : 'ghost'}
-              size="icon-sm"
-              className="size-9 pointer-coarse:size-11"
-              disabled={busy}
-              aria-current={page === value ? 'page' : undefined}
-              onClick={() => onPageChange(value)}
-            >
-              {value + 1}
-            </Button>
-          </span>
-        ))}
+        {!compact &&
+          visiblePages.map((value, index) => (
+            <span key={value} className="flex shrink-0 items-center gap-1">
+              {index > 0 && value - visiblePages[index - 1] > 1 && (
+                <span aria-hidden>…</span>
+              )}
+              <Button
+                type="button"
+                variant={page === value ? 'secondary' : 'ghost'}
+                size="icon-sm"
+                className="size-9 pointer-coarse:size-11"
+                disabled={busy}
+                aria-current={page === value ? 'page' : undefined}
+                onClick={() => onPageChange(value)}
+              >
+                {value + 1}
+              </Button>
+            </span>
+          ))}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -170,6 +167,18 @@ export function ListPagination({
         >
           <ChevronRight className="size-4" />
         </Button>
+        {compact && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-9 pointer-coarse:size-11"
+            disabled={busy || page >= pages - 1}
+            aria-label={t('last')}
+            onClick={() => onPageChange(pages - 1)}
+          >
+            <ChevronLast className="size-4" />
+          </Button>
+        )}
       </div>
       <form
         ref={goTo}

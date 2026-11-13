@@ -2046,6 +2046,8 @@
     "details": "Phone number conversion"
   },
   "Pagination": {
+    "first": "First page",
+    "last": "Last page",
     "range": "{from}–{to} of {total}",
     "previous": "Previous page",
     "next": "Next page",

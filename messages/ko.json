@@ -2046,6 +2046,8 @@
     "details": "전화번호 변환 안내"
   },
   "Pagination": {
+    "first": "첫 페이지",
+    "last": "마지막 페이지",
     "range": "{total}개 중 {from}–{to}",
     "previous": "이전 페이지",
     "next": "다음 페이지",

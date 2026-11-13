@@ -2046,6 +2046,8 @@
     "details": "Konversi nomor telepon"
   },
   "Pagination": {
+    "first": "Halaman pertama",
+    "last": "Halaman terakhir",
     "range": "{from}–{to} dari {total}",
     "previous": "Halaman sebelumnya",
     "next": "Halaman berikutnya",
