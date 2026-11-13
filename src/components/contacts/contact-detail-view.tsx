@@ -689,7 +689,7 @@ export function ContactDetailView({
                   </Button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2">
+                <div className="min-h-0 flex-1 overflow-y-auto space-y-2">
                   {loadingNotes ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -705,7 +705,7 @@ export function ContactDetailView({
                         className="rounded-lg bg-muted/50 border border-border/50 p-3 group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap flex-1">
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words min-w-0 flex-1">
                             {note.note_text}
                           </p>
                           <button

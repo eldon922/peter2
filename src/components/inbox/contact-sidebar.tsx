@@ -153,8 +153,8 @@ export function ContactSidebar({ contact, className, session, onDeleteChat }: Co
   const initials = displayName.charAt(0).toUpperCase();
 
   return (
-    <div className={cn("flex h-full w-70 flex-col border-l border-border bg-card", className)}>
-      <ScrollArea className="flex-1">
+    <div className={cn("flex h-full min-h-0 w-70 flex-col overflow-hidden border-l border-border bg-card", className)}>
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-4">
           {/* Contact Info */}
           <div className="flex flex-col items-center text-center">
