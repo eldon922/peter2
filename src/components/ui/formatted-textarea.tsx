@@ -12,11 +12,7 @@ import {
 } from 'lucide-react';
 import { Textarea } from './textarea';
 import { Button } from './button';
-import {
-  toggleFormat,
-  clipboardText,
-  selectionPosition,
-} from '@/lib/editor/formatting';
+import { toggleFormat, selectionPosition } from '@/lib/editor/formatting';
 
 type Props = Omit<ComponentProps<'textarea'>, 'value' | 'onChange'> & {
   value: string;
@@ -82,29 +78,6 @@ export function FormattedTextarea({ value, onValueChange, ...props }: Props) {
             format(event.key.toLowerCase() === 'b' ? '*' : '_');
           }
           if (event.key === 'Escape') setPosition(null);
-        }}
-        onPaste={(event) => {
-          const text = clipboardText(event.clipboardData);
-          if (!text) return;
-          event.preventDefault();
-          const field = event.currentTarget;
-          const start = field.selectionStart;
-          const capacity = props.maxLength
-            ? Math.max(
-                0,
-                props.maxLength - value.length + field.selectionEnd - start
-              )
-            : text.length;
-          const pasted = text.slice(0, capacity);
-          onValueChange(
-            value.slice(0, start) + pasted + value.slice(field.selectionEnd)
-          );
-          requestAnimationFrame(() =>
-            field.setSelectionRange(
-              start + pasted.length,
-              start + pasted.length
-            )
-          );
         }}
       />
       {position && !props.disabled && !props.readOnly && (
