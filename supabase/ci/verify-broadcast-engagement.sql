@@ -71,4 +71,17 @@ BEGIN
   ASSERT (SELECT status = 'sent' FROM broadcast_recipients WHERE id = md5('eng-r-ambiguous-new')::uuid), 'a NULL quoted-parent FK is not proof of an unquoted reply';
   RAISE NOTICE 'Broadcast engagement recovery and idempotence passed';
 END $$;
+-- The later repair intentionally includes inferred ordinary replies.
+\ir ../migrations/071_recover_plain_broadcast_replies.sql
+\ir ../migrations/071_recover_plain_broadcast_replies.sql
+DO $$
+BEGIN
+  ASSERT (SELECT replied_count = 2 FROM broadcasts WHERE id = md5('eng-new')::uuid), 'ordinary replies must repair existing totals without duplicates';
+  ASSERT (SELECT replied_count = 3 FROM broadcasts WHERE id = md5('eng-old')::uuid), 'explicit older replies and reactions must survive';
+  ASSERT (SELECT replied_count = 0 FROM broadcasts WHERE id = md5('eng-future')::uuid), 'future broadcasts must not receive ordinary replies';
+  ASSERT (SELECT replied_count = 0 FROM broadcasts WHERE id = md5('eng-failed')::uuid), 'failed sends must remain unchanged';
+  ASSERT (SELECT replied_count = 0 FROM broadcasts WHERE id = md5('eng-foreign')::uuid), 'ordinary reply recovery must respect account boundaries';
+  ASSERT NOT EXISTS (SELECT 1 FROM broadcasts WHERE id IN (md5('eng-old')::uuid, md5('eng-new')::uuid) AND status <> 'draft'), 'repair must not start broadcasts';
+  RAISE NOTICE 'Ordinary reply recovery and idempotence passed';
+END $$;
 ROLLBACK;
