@@ -1,5 +1,6 @@
 'use client';
 
+import { ListPagination } from '@/components/ui/list-pagination';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -41,16 +42,12 @@ function Section({
       sectionKey === 'customFieldFailed' ||
       sectionKey === 'skipped'
   );
-  const [shown, setShown] = useState(PAGE);
+  const [page, setPage] = useState(0);
 
   if (rows.length === 0) return null;
 
   function detail(row: ReportRow): string {
     const parts: string[] = [];
-    if (row.existingTags?.length)
-      parts.push(
-        t('detailExistingTags', { tags: row.existingTags.join(', ') })
-      );
     if (row.reason) parts.push(t(`reason.${row.reason}`));
     if (row.rename) {
       parts.push(
@@ -66,7 +63,7 @@ function Section({
         t('detailCustomFields', { fields: row.customFields.join(', ') })
       );
     if (row.error) parts.push(row.error);
-    return parts.join(' · ');
+    return parts.join('\n');
   }
 
   return (
@@ -90,9 +87,9 @@ function Section({
       {open && (
         <div className="border-border border-t">
           <ul className="divide-border/70 divide-y text-xs">
-            {rows.slice(0, shown).map((row, i) => (
-              <li key={i} className="px-3 py-1.5">
-                <div className="flex items-baseline justify-between gap-3">
+            {rows.slice(page * PAGE, (page + 1) * PAGE).map((row, i) => (
+              <li key={i} className="space-y-2 px-3 py-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
                   <span className="text-popover-foreground min-w-0 truncate">
                     {row.name || '—'}
                   </span>
@@ -100,24 +97,38 @@ function Section({
                     {row.phone}
                   </span>
                 </div>
+                {row.existingTags?.length ? (
+                  <div className="space-y-1.5">
+                    <p className="text-muted-foreground">
+                      {t('detailExistingTags', { tags: '' })}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {row.existingTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="bg-muted text-muted-foreground rounded-md px-2 py-1 break-all"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {detail(row) && (
-                  <p className="text-muted-foreground mt-0.5 wrap-anywhere">
+                  <p className="text-muted-foreground mt-1 leading-relaxed wrap-anywhere whitespace-pre-line">
                     {detail(row)}
                   </p>
                 )}
               </li>
             ))}
           </ul>
-          {shown < rows.length && (
-            <button
-              type="button"
-              onClick={() => setShown(shown + PAGE)}
-              className="border-border text-muted-foreground hover:text-foreground focus-visible:ring-ring min-h-10 w-full border-t px-3 py-2 text-sm outline-none focus-visible:ring-2"
-            >
-              {t('reportShowMore', {
-                count: Math.min(PAGE, rows.length - shown),
-              })}
-            </button>
+          {rows.length > PAGE && (
+            <ListPagination
+              page={page}
+              pageSize={PAGE}
+              total={rows.length}
+              onPageChange={setPage}
+            />
           )}
         </div>
       )}
@@ -133,12 +144,12 @@ export function ImportReportDetails({ report }: { report: ImportReport }) {
       <p className="text-foreground text-sm font-semibold">
         {t('reportTitle')}
       </p>
+      <Section sectionKey="imported" rows={report.imported} />
+      <Section sectionKey="updated" rows={report.updated} />
+      <Section sectionKey="skipped" rows={report.skipped} />
       <Section sectionKey="failed" rows={report.failed} />
       <Section sectionKey="tagFailed" rows={report.tagFailed} />
       <Section sectionKey="customFieldFailed" rows={report.customFieldFailed} />
-      <Section sectionKey="skipped" rows={report.skipped} />
-      <Section sectionKey="updated" rows={report.updated} />
-      <Section sectionKey="imported" rows={report.imported} />
       {report.skippedTags.length > 0 && (
         <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200">
           {t('reportSkippedTags', { names: report.skippedTags.join(', ') })}
