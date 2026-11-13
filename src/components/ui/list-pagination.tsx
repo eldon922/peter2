@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from './button';
@@ -38,29 +38,68 @@ export function ListPagination({
 }) {
   const t = useTranslations('Pagination');
   const [jump, setJump] = useState('');
+  const container = useRef<HTMLElement>(null);
+  const range = useRef<HTMLSpanElement>(null);
+  const navigation = useRef<HTMLDivElement>(null);
+  const goTo = useRef<HTMLFormElement>(null);
+  const [narrow, setNarrow] = useState(true);
+  const [showGoTo, setShowGoTo] = useState(false);
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      if (
+        !container.current ||
+        !range.current ||
+        !navigation.current ||
+        !goTo.current
+      )
+        return;
+      const width = container.current.clientWidth - 16;
+      setNarrow(width < 640);
+      const sideWidth = (width - navigation.current.offsetWidth) / 2 - 8;
+      setShowGoTo(
+        sideWidth >=
+          Math.max(range.current.scrollWidth, goTo.current.scrollWidth)
+      );
+    });
+    for (const element of [
+      container.current,
+      range.current,
+      navigation.current,
+      goTo.current,
+    ]) {
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, []);
+  const rangeText = t('range', {
+    from: total ? page * pageSize + 1 : 0,
+    to: Math.min(total, (page + 1) * pageSize),
+    total,
+  });
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = Array.from(
-    new Set(compact ? [page] : [0, pages - 1, page - 1, page, page + 1])
+    new Set(
+      compact || narrow ? [page] : [0, pages - 1, page - 1, page, page + 1]
+    )
   )
     .filter((value) => value >= 0 && value < pages)
     .sort((a, b) => a - b);
   return (
     <nav
+      ref={container}
       aria-label={t('label')}
-      className={`border-border text-muted-foreground flex min-w-0 shrink-0 items-center gap-2 border-t px-2 py-3 text-xs ${compact ? 'flex-nowrap' : 'flex-wrap justify-between'}`}
+      className="border-border text-muted-foreground grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
     >
       <span
+        ref={range}
         aria-live="polite"
         aria-atomic="true"
-        className={compact ? 'sr-only' : 'tabular-nums'}
+        className="truncate tabular-nums"
+        title={rangeText}
       >
-        {t('range', {
-          from: total ? page * pageSize + 1 : 0,
-          to: Math.min(total, (page + 1) * pageSize),
-          total,
-        })}
+        {rangeText}
       </span>
-      <div className="flex shrink-0 gap-1">
+      <div ref={navigation} className="flex shrink-0 gap-1">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -101,7 +140,11 @@ export function ListPagination({
         </Button>
       </div>
       <form
-        className="ml-auto flex shrink-0 items-center gap-1"
+        ref={goTo}
+        aria-hidden={!showGoTo}
+        inert={!showGoTo}
+        style={{ visibility: showGoTo ? 'visible' : 'hidden' }}
+        className="flex w-max items-center gap-1 justify-self-end"
         onSubmit={(event) => {
           event.preventDefault();
           const target = Number(jump);
