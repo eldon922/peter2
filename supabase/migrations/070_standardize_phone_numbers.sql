@@ -220,7 +220,7 @@ CREATE TRIGGER format_saved_phone BEFORE INSERT OR UPDATE OF phone_attempted ON 
   FOR EACH ROW EXECUTE FUNCTION public.format_saved_phone();
 UPDATE conversations SET contact_phone = contact_phone WHERE contact_phone IS NOT NULL;
 UPDATE contact_phone_history SET phone = phone;
-UPDATE broadcast_recipients SET phone_attempted = phone_attempted WHERE phone_attempted IS NOT NULL;
+-- Existing attempted numbers are historical evidence; only future writes are formatted.
 
 CREATE OR REPLACE FUNCTION public.preserve_contact_chat()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -302,6 +302,6 @@ ALTER TABLE conversations ADD CONSTRAINT conversations_international_phone CHECK
 ALTER TABLE contact_phone_history DROP CONSTRAINT IF EXISTS history_international_phone;
 ALTER TABLE contact_phone_history ADD CONSTRAINT history_international_phone CHECK (phone ~ '^\+[1-9][0-9]{6,14}$');
 ALTER TABLE broadcast_recipients DROP CONSTRAINT IF EXISTS recipients_international_phone;
-ALTER TABLE broadcast_recipients ADD CONSTRAINT recipients_international_phone CHECK (phone_attempted IS NULL OR phone_attempted ~ '^\+[1-9][0-9]{6,14}$');
+-- A table-wide check would also reject unrelated updates to legacy recipient rows.
 NOTIFY pgrst, 'reload schema';
 COMMIT;

@@ -2,9 +2,9 @@
 
 Completed on 2026-11-12 (Asia/Bangkok). This replaces the partial prefix-only behavior in migration 069.
 
-Every saved phone value uses `+<country code><number>`. With `DEFAULT_COUNTRY_CODE=62`, local `081234567890` and `81234567890` become `+6281234567890`. Explicit `+` and `00` international inputs preserve their country. Use an explicit international prefix for foreign numbers; unmarked national inputs use the configured default.
+New saved phone values use `+<country code><number>`. With `DEFAULT_COUNTRY_CODE=62`, local `081234567890` and `81234567890` become `+6281234567890`. Explicit `+` and `00` international inputs preserve their country. Use an explicit international prefix for foreign numbers; unmarked national inputs use the configured default.
 
-The shared country-aware formatter covers contact forms, imports and CSV previews, broadcast audiences, API contact creation, inbound WhatsApp, send-number corrections and template phone buttons. Database rules enforce the saved format on contacts, removed-chat snapshots, phone history, attempted broadcast numbers and template phone buttons. Meta receives its required digits-only value at the send boundary. Meta's phone-number IDs remain identifiers.
+The shared country-aware formatter covers contact forms, imports and CSV previews, broadcast audiences, API contact creation, inbound WhatsApp, send-number corrections and template phone buttons. Database rules enforce the saved format on contacts, removed-chat snapshots, phone history, newly written attempted broadcast numbers and template phone buttons. Existing broadcast attempted numbers remain unchanged as historical evidence. Meta receives its required digits-only value at the send boundary. Meta's phone-number IDs remain identifiers.
 
 Conversion provenance records the original input and the country code actually used. Contact details, the inbox header tooltip, imports and broadcast notices can explain a conversion after the saved number has already been standardized. Changing the installation default does not relabel earlier conversions.
 
@@ -22,6 +22,8 @@ Reconnect the migration tool before applying 070. The authenticated phone-format
 
 Migration 070 converts existing local records, checks calling codes and restores the uniqueness indexes after merging aliases within each account. It preserves messages, attachments, tags, custom values, notes, reactions, phone history, broadcast records and conversation state. Previous profiles and conflicting custom values are retained in a contact note. If aliases have competing active flows, the most recently advanced run continues and older runs are paused with their history and reason preserved.
 
+For existing broadcasts, migration 070 only changes a recipient's `contact_id` when its duplicate contact is merged. It does not rewrite `phone_attempted`, change any status, timestamps, error, attempt count, message ID, broadcast counters or schedule, or enqueue or resend messages. Existing malformed attempted numbers (including `0`) do not block this migration or unrelated status updates. The formatting trigger validates future inserts and explicit writes to `phone_attempted`; a table-wide check is deliberately omitted because it would reject unrelated updates to old records.
+
 The migration is transactional. Invalid phone data stops it rather than inventing a destination or leaving a partial conversion.
 
 ## Validation
@@ -33,3 +35,5 @@ The migration is transactional. Invalid phone data stops it rather than inventin
 - Lint reports 25 existing errors, reproduced on unchanged `8d4f61b` with the same installed dependencies; this change adds no errors. Whitespace checks passed.
 
 Evidence is retained under `/workspace/work/standard-phones-*.log` and `/workspace/work/workflow-ui/standard-phones-*.png`. Browser services are fixtures around real components; no live messages were sent.
+
+Broadcast preservation regression: snapshots of completed and scheduled broadcasts and all recipient fields (except the permitted contact link) match exactly after migration 070 runs twice, including local, invalid, and null attempted numbers. Future phone writes remain validated, and status updates to legacy rows still work.

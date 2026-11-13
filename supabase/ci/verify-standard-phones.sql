@@ -47,10 +47,32 @@ VALUES (md5('standard-recipient')::uuid, md5('standard-broadcast')::uuid, md5('s
 INSERT INTO message_templates(id, user_id, account_id, name, body_text, buttons)
 VALUES (md5('standard-template')::uuid, md5('standard-owner')::uuid, current_setting('test.standard_account')::uuid, 'phone_test', 'Call us', '[{"type":"PHONE_NUMBER","text":"Call","phone_number":"081234567890"}]');
 
+UPDATE broadcast_recipients SET status = 'read', sent_at = '2026-01-01T12:00:00Z',
+  delivered_at = '2026-01-01T12:01:00Z', read_at = '2026-01-01T12:02:00Z',
+  whatsapp_message_id = 'wamid.historical', attempt_count = 1
+WHERE id = md5('standard-recipient')::uuid;
+INSERT INTO broadcast_recipients(id, broadcast_id, contact_id, phone_attempted, status, error_message, attempt_count)
+VALUES (md5('standard-invalid-attempt')::uuid, md5('standard-broadcast')::uuid, md5('standard-alias')::uuid, '0', 'failed', 'Original failure', 2),
+  (md5('standard-deleted-contact')::uuid, md5('standard-broadcast')::uuid, NULL, '0', 'failed', 'Contact deleted', 1);
+UPDATE broadcasts SET status = 'sent', total_recipients = 3 WHERE id = md5('standard-broadcast')::uuid;
+INSERT INTO broadcasts(id, user_id, account_id, name, template_name, status, scheduled_at)
+VALUES (md5('standard-scheduled')::uuid, md5('standard-owner')::uuid, current_setting('test.standard_account')::uuid,
+  'Scheduled', 'test', 'scheduled', '2099-01-01T12:00:00Z');
+INSERT INTO broadcast_recipients(id, broadcast_id, contact_id)
+VALUES (md5('standard-pending')::uuid, md5('standard-scheduled')::uuid, md5('standard-alias')::uuid);
+CREATE TEMP TABLE original_broadcasts AS SELECT id, to_jsonb(b) AS original FROM broadcasts b;
+CREATE TEMP TABLE original_recipients AS SELECT id, to_jsonb(r) - 'contact_id' AS original FROM broadcast_recipients r;
+
 \ir ../migrations/070_standardize_phone_numbers.sql
 \ir ../migrations/070_standardize_phone_numbers.sql
 
 DO $$ BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM original_broadcasts o FULL JOIN broadcasts b ON b.id = o.id
+    WHERE o.original IS DISTINCT FROM to_jsonb(b)), 'broadcasts including counters and schedules must be completely unchanged';
+  ASSERT NOT EXISTS (SELECT 1 FROM original_recipients o FULL JOIN broadcast_recipients r ON r.id = o.id
+    WHERE o.original IS DISTINCT FROM (to_jsonb(r) - 'contact_id')), 'only recipient contact links may change; all other fields and row counts must remain identical';
+  ASSERT (SELECT count(*) = 3 FROM broadcast_recipients WHERE contact_id = md5('standard-local')::uuid), 'recipients of merged aliases must reference the surviving contact';
+  ASSERT (SELECT contact_id IS NULL FROM broadcast_recipients WHERE id = md5('standard-deleted-contact')::uuid), 'deleted contact references must remain null';
   BEGIN
     PERFORM international_phone_number('+999123456789', '62');
     RAISE EXCEPTION 'An unknown country code was accepted';
@@ -77,7 +99,7 @@ DO $$ BEGIN
   ASSERT EXISTS (SELECT 1 FROM contact_phone_history WHERE contact_id = md5('standard-local')::uuid AND phone = '+6281111111111'), 'old phone history must be canonical and retained';
   ASSERT (SELECT contact_phone = '+6282222222222' AND contact_phone_conversion->>'countryCode' = '62'
     FROM conversations WHERE id = md5('standard-removed')::uuid), 'removed chats must retain a canonical snapshot and conversion notice';
-  ASSERT (SELECT phone_attempted = '+6281234567890' AND contact_id = md5('standard-local')::uuid FROM broadcast_recipients WHERE id = md5('standard-recipient')::uuid), 'broadcast history must stay linked and canonical';
+  ASSERT (SELECT phone_attempted = '081234567890' AND contact_id = md5('standard-local')::uuid FROM broadcast_recipients WHERE id = md5('standard-recipient')::uuid), 'broadcast contact link must change without rewriting the historical attempted number';
   ASSERT (SELECT buttons->0->>'phone_number' = '+6281234567890' FROM message_templates WHERE id = md5('standard-template')::uuid), 'template phone buttons must be canonical';
   BEGIN INSERT INTO contacts(user_id, account_id, phone) VALUES (md5('standard-owner')::uuid, current_setting('test.standard_account')::uuid, '081234567890');
     RAISE EXCEPTION 'A raw local number bypassed canonical uniqueness'; EXCEPTION WHEN unique_violation THEN NULL; END;
@@ -101,3 +123,22 @@ DO $$ BEGIN
     WHERE v.id = md5('standard-removed')::uuid AND c.phone = '+6282222222222' AND c.phone_conversion IS NOT NULL), 'restoration must retain the converted identity and notice';
 END $$;
 RESET ROLE;
+
+BEGIN;
+-- A late delivery update must not be blocked by an invalid legacy attempted number.
+UPDATE broadcast_recipients SET status = 'delivered', delivered_at = now()
+WHERE id = md5('standard-invalid-attempt')::uuid;
+DO $$ BEGIN
+  ASSERT (SELECT phone_attempted = '0' FROM broadcast_recipients WHERE id = md5('standard-invalid-attempt')::uuid), 'status updates must preserve the historical number';
+  BEGIN
+    INSERT INTO broadcast_recipients(broadcast_id, contact_id, phone_attempted)
+    VALUES (md5('standard-broadcast')::uuid, md5('standard-local')::uuid, '0');
+    RAISE EXCEPTION 'A new invalid attempted number was accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+END $$;
+INSERT INTO broadcast_recipients(id, broadcast_id, contact_id, phone_attempted)
+VALUES (md5('standard-new-attempt')::uuid, md5('standard-broadcast')::uuid, md5('standard-local')::uuid, '081234567890');
+DO $$ BEGIN
+  ASSERT (SELECT phone_attempted = '+6281234567890' FROM broadcast_recipients WHERE id = md5('standard-new-attempt')::uuid), 'future attempted numbers must still be canonical';
+END $$;
+ROLLBACK;
