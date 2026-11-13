@@ -1,4 +1,9 @@
 'use client';
+import {
+  toggleFormat,
+  clipboardText,
+  selectionPosition,
+} from '@/lib/editor/formatting';
 
 import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
 import {
@@ -149,6 +154,7 @@ export function MessageComposer({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
+  const [formatPosition, setFormatPosition] = useState({ left: 8, top: 8 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formattingRef = useRef<HTMLDivElement>(null);
   const [hasSelection, setHasSelection] = useState(false);
@@ -260,13 +266,11 @@ export function MessageComposer({
       if (!element || inputsDisabled) return;
       const start = element.selectionStart;
       const end = element.selectionEnd;
-      const selected = text.slice(start, end);
-      setText(
-        text.slice(0, start) + marker + selected + marker + text.slice(end)
-      );
+      const next = toggleFormat(text, start, end, marker);
+      setText(next.text);
       requestAnimationFrame(() => {
         element.focus();
-        element.setSelectionRange(start + marker.length, end + marker.length);
+        element.setSelectionRange(next.start, next.end);
         adjustHeight();
       });
     },
@@ -640,7 +644,8 @@ export function MessageComposer({
       {hasSelection && !inputsDisabled && !draft && !recording && (
         <div
           ref={formattingRef}
-          className="border-border bg-popover text-popover-foreground absolute right-3 bottom-full z-20 mb-2 flex w-fit max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-lg border p-1 shadow-lg"
+          style={formatPosition}
+          className="border-border bg-popover text-popover-foreground fixed z-50 flex w-fit max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-lg border p-1 shadow-lg"
           role="toolbar"
           aria-label={t('formatting')}
           onBlur={(event) => {
@@ -984,12 +989,31 @@ export function MessageComposer({
             aria-label={t('message')}
             value={text}
             onChange={handleChange}
-            onSelect={(event) =>
+            onSelect={(event) => {
               setHasSelection(
                 event.currentTarget.selectionStart !==
                   event.currentTarget.selectionEnd
-              )
-            }
+              );
+              setFormatPosition(selectionPosition(event.currentTarget));
+            }}
+            onScroll={() => setHasSelection(false)}
+            onPaste={(event) => {
+              const value = clipboardText(event.clipboardData);
+              if (!value) return;
+              event.preventDefault();
+              const editor = event.currentTarget;
+              const start = editor.selectionStart;
+              setText(
+                text.slice(0, start) + value + text.slice(editor.selectionEnd)
+              );
+              requestAnimationFrame(() => {
+                editor.setSelectionRange(
+                  start + value.length,
+                  start + value.length
+                );
+                adjustHeight();
+              });
+            }}
             onBlur={(event) => {
               if (!formattingRef.current?.contains(event.relatedTarget as Node))
                 setHasSelection(false);
