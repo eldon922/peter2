@@ -1,4 +1,5 @@
 'use client';
+import { ListPagination } from '@/components/ui/list-pagination';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -45,8 +46,6 @@ import {
   Trash2,
   Loader2,
   Users,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
   Filter,
   FilterX,
@@ -94,7 +93,11 @@ function ContactTagFilter({
           />
         }
       >
-        {excluded ? <FilterX className="size-4" /> : <Filter className="size-4" />}
+        {excluded ? (
+          <FilterX className="size-4" />
+        ) : (
+          <Filter className="size-4" />
+        )}
         {label}
         {value.length > 0 && (
           <span className="bg-primary text-primary-foreground ml-1 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold">
@@ -646,10 +649,6 @@ export default function ContactsPage() {
     setDeleteByTagOpen(false);
   }
 
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const hasNext = page < totalPages - 1;
-  const hasPrev = page > 0;
-
   // Tag filter helpers. Every change resets to page 0 — the result set
   // shrinks/grows so page N may no longer be valid (mirrors the search box).
   const allTags = Object.values(tagsMap).sort((a, b) =>
@@ -1117,41 +1116,12 @@ export default function ContactsPage() {
         </Table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-muted-foreground text-xs">
-            {t('showingPagination', {
-              start: page * PAGE_SIZE + 1,
-              end: Math.min((page + 1) * PAGE_SIZE, totalCount),
-              total: totalCount,
-            })}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={!hasPrev}
-              onClick={() => setPage((p) => p - 1)}
-              className="border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-muted-foreground px-2 text-xs">
-              {t('pageCount', { page: page + 1, total: totalPages })}
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={!hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <ListPagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={totalCount}
+        onPageChange={setPage}
+      />
 
       {/* Contact Form Dialog */}
       <ContactForm

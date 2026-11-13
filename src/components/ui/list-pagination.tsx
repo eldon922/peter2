@@ -35,6 +35,12 @@ export function ListPagination({
   busy?: boolean;
 }) {
   const t = useTranslations('Pagination');
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const visiblePages = Array.from(
+    new Set([0, pages - 1, page - 1, page, page + 1])
+  )
+    .filter((value) => value >= 0 && value < pages)
+    .sort((a, b) => a - b);
   return (
     <nav
       aria-label={t('label')}
@@ -58,6 +64,24 @@ export function ListPagination({
         >
           <ChevronLeft className="size-4" />
         </Button>
+        {visiblePages.map((value, index) => (
+          <span key={value} className="flex items-center gap-1">
+            {index > 0 && value - visiblePages[index - 1] > 1 && (
+              <span aria-hidden>…</span>
+            )}
+            <Button
+              type="button"
+              variant={page === value ? 'secondary' : 'ghost'}
+              size="icon-sm"
+              className="size-9 pointer-coarse:size-11"
+              disabled={busy}
+              aria-current={page === value ? 'page' : undefined}
+              onClick={() => onPageChange(value)}
+            >
+              {value + 1}
+            </Button>
+          </span>
+        ))}
         <Button
           variant="ghost"
           size="icon-sm"
