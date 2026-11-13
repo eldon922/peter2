@@ -49,6 +49,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
   Filter,
+  FilterX,
   X,
   ArrowUp,
   ArrowDown,
@@ -68,12 +69,14 @@ import { fetchAllRows } from '@/lib/supabase/batching';
 import { useTranslations } from 'next-intl';
 
 function ContactTagFilter({
+  excluded = false,
   label,
   tags,
   value,
   onToggle,
   onClear,
 }: {
+  excluded?: boolean;
   label: string;
   tags: Tag[];
   value: string[];
@@ -91,7 +94,7 @@ function ContactTagFilter({
           />
         }
       >
-        <Filter className="size-4" />
+        {excluded ? <FilterX className="size-4" /> : <Filter className="size-4" />}
         {label}
         {value.length > 0 && (
           <span className="bg-primary text-primary-foreground ml-1 inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold">
@@ -807,6 +810,7 @@ export default function ContactsPage() {
               onClear={clearTagFilters}
             />
             <ContactTagFilter
+              excluded
               label={t('excludeTags')}
               tags={[untaggedOption, ...allTags]}
               value={excludedTagIds}
