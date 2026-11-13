@@ -40,7 +40,10 @@ export function ListPagination({
   const range = useRef<HTMLSpanElement>(null);
   const navigation = useRef<HTMLDivElement>(null);
   const goTo = useRef<HTMLFormElement>(null);
-  const [centered, setCentered] = useState(false);
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const [pageWindow, setPageWindow] = useState<'full' | 'nearby' | 'current'>(
+    'current'
+  );
   const [showGoTo, setShowGoTo] = useState(false);
   useEffect(() => {
     const observer = new ResizeObserver(() => {
@@ -52,11 +55,28 @@ export function ListPagination({
       )
         return;
       const width = container.current.clientWidth - 16;
-      setCentered(
-        width >=
-          navigation.current.scrollWidth + 2 * range.current.scrollWidth + 16
+      const buttonWidth =
+        navigation.current.querySelector('button')?.getBoundingClientRect()
+          .width ?? 36;
+      const choices = [
+        [...new Set([0, pages - 1, page - 1, page, page + 1])]
+          .filter((n) => n >= 0 && n < pages)
+          .sort((a, b) => a - b),
+        [page - 1, page, page + 1].filter((n) => n >= 0 && n < pages),
+        [page],
+      ];
+      const needed = (numbers: number[]) =>
+        (numbers.length + 2) * buttonWidth +
+        (numbers.length + 1) * 4 +
+        numbers.filter((n, i) => i > 0 && n - numbers[i - 1] > 1).length * 16;
+      const available = width - range.current.scrollWidth - 8;
+      const choice = choices.findIndex(
+        (numbers) => needed(numbers) <= available
       );
-      const sideWidth = (width - navigation.current.scrollWidth) / 2 - 8;
+      setPageWindow(
+        choice === 0 ? 'full' : choice === 1 ? 'nearby' : 'current'
+      );
+      const sideWidth = (width - needed(choices[0])) / 2 - 8;
       setShowGoTo(
         sideWidth >=
           Math.max(range.current.scrollWidth, goTo.current.scrollWidth)
@@ -71,15 +91,20 @@ export function ListPagination({
       if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, []);
+  }, [page, pages]);
   const rangeText = t('range', {
     from: total ? page * pageSize + 1 : 0,
     to: Math.min(total, (page + 1) * pageSize),
     total,
   });
-  const pages = Math.max(1, Math.ceil(total / pageSize));
   const visiblePages = Array.from(
-    new Set([0, pages - 1, page - 1, page, page + 1])
+    new Set(
+      pageWindow === 'current'
+        ? [page]
+        : pageWindow === 'nearby'
+          ? [page - 1, page, page + 1]
+          : [0, pages - 1, page - 1, page, page + 1]
+    )
   )
     .filter((value) => value >= 0 && value < pages)
     .sort((a, b) => a - b);
@@ -88,9 +113,9 @@ export function ListPagination({
       ref={container}
       aria-label={t('label')}
       style={{
-        gridTemplateColumns: centered
+        gridTemplateColumns: showGoTo
           ? 'minmax(0,1fr) auto minmax(0,1fr)'
-          : 'max-content minmax(0,1fr) 0px',
+          : 'max-content minmax(0,1fr)',
       }}
       className="border-border text-muted-foreground relative grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t px-2 py-3 text-xs"
     >
@@ -105,7 +130,7 @@ export function ListPagination({
       </span>
       <div
         ref={navigation}
-        className="flex w-max max-w-full min-w-0 gap-1 justify-self-center overflow-x-auto"
+        className={`flex w-max gap-1 ${showGoTo ? 'justify-self-center' : 'justify-self-end'}`}
       >
         <Button
           variant="ghost"
