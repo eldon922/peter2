@@ -49,12 +49,23 @@ export interface AudienceContact {
  * `all` is "every contact" with no exclusions, so it needs no id list.
  */
 export type ResolvedAudience =
-  | { kind: 'ids'; ids: string[]; excludedCount?: number }
-  | { kind: 'all'; count: number; excludedCount?: number }
+  | {
+      kind: 'ids';
+      ids: string[];
+      excludedCount?: number;
+      excluded?: ResolvedAudience;
+    }
+  | {
+      kind: 'all';
+      count: number;
+      excludedCount?: number;
+      excluded?: ResolvedAudience;
+    }
   | {
       kind: 'csv';
       contacts: CsvAudienceContact[];
       excludedCount?: number;
+      excluded?: ResolvedAudience;
     }
   | null;
 
@@ -201,17 +212,30 @@ export async function resolveAudience(
       kind: 'csv',
       contacts,
       excludedCount: audience.csvContacts.length - contacts.length,
+      excluded: {
+        kind: 'csv',
+        contacts: audience.csvContacts.filter((row) => !contacts.includes(row)),
+      },
     };
   } else {
     return null;
   }
 
   const beforeExclusion = ids.length;
+  let excludedIds: string[] = [];
   if (excludeTagIds.length > 0) {
     const excluded = new Set(await contactIdsForTags(supabase, excludeTagIds));
+    excludedIds = ids.filter((id) => excluded.has(id));
     ids = ids.filter((id) => !excluded.has(id));
   }
-  return { kind: 'ids', ids, excludedCount: beforeExclusion - ids.length };
+  return {
+    kind: 'ids',
+    ids,
+    excludedCount: beforeExclusion - ids.length,
+    ...(excludedIds.length
+      ? { excluded: { kind: 'ids' as const, ids: excludedIds } }
+      : {}),
+  };
 }
 
 export function resolvedCount(resolved: ResolvedAudience): number | null {

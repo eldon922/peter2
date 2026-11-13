@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { createClient } from '@/lib/supabase/client';
 import { contactDisplayName } from '@/lib/contacts/display-name';
+import { convertedAudience } from '@/lib/whatsapp/local-phones';
 import {
   AUDIENCE_PAGE_SIZE,
   fetchAudiencePage,
@@ -92,3 +93,35 @@ export function AudienceContactList({
   );
 }
 
+export function ConvertedAudienceList({
+  resolved,
+}: {
+  resolved: NonNullable<ResolvedAudience>;
+}) {
+  const t = useTranslations('PhoneFormat');
+  const [result, setResult] = useState<{
+    source: typeof resolved;
+    audience: NonNullable<ResolvedAudience>;
+  } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    convertedAudience(createClient(), resolved)
+      .then((audience) => {
+        if (!cancelled) setResult({ source: resolved, audience });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [resolved]);
+  if (result?.source !== resolved || !resolvedCount(result.audience))
+    return null;
+  return (
+    <details className="mt-4 text-sm">
+      <summary className="cursor-pointer">{t('convertedList')}</summary>
+      <div className="mt-2">
+        <AudienceContactList resolved={result.audience} />
+      </div>
+    </details>
+  );
+}

@@ -16,7 +16,10 @@ import type {
 } from '@/lib/broadcasts/audience';
 import { Button } from '@/components/ui/button';
 import { TagMultiSelect } from '@/components/ui/tag-multi-select';
-import { AudienceContactList } from '@/components/broadcasts/audience-contact-list';
+import {
+  AudienceContactList,
+  ConvertedAudienceList,
+} from '@/components/broadcasts/audience-contact-list';
 import {
   Users,
   Tags,
@@ -408,9 +411,13 @@ export function Step2SelectAudience({
                       setCsvError(importT('toastNoValidRows'));
                     onUpdate({
                       ...audience,
-                      csvContacts: unique.map(({ phone, name, phone_conversion }) => ({
-                        phone, name, phone_conversion,
-                      })),
+                      csvContacts: unique.map(
+                        ({ phone, name, phone_conversion }) => ({
+                          phone,
+                          name,
+                          phone_conversion,
+                        })
+                      ),
                     });
                   } catch {
                     if (request === csvRequest.current)
@@ -513,6 +520,15 @@ export function Step2SelectAudience({
                 press Retry to send the rest.
               </p>
             )}
+          {resolved?.excluded && excludedCount > 0 && (
+            <details className="mt-4 text-sm">
+              <summary className="cursor-pointer">
+                {t('selectAudience.excludedCount', { count: excludedCount })}
+              </summary>
+              <AudienceContactList resolved={resolved.excluded} />
+            </details>
+          )}
+          {resolved && <ConvertedAudienceList resolved={resolved} />}
           <div className="mt-4">
             <PhoneCountryWarning resolved={resolved} />
           </div>

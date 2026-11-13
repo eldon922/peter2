@@ -27,6 +27,7 @@ it('applies excluded tags and untagged rules to local/international aliases', as
     kind: 'csv',
     contacts: [{ phone: '08222222222' }],
     excludedCount: 1,
+    excluded: { kind: 'csv', contacts: [{ phone: '08111111111' }] },
   });
   expect(
     await resolveAudience(
@@ -38,7 +39,12 @@ it('applies excluded tags and untagged rules to local/international aliases', as
       },
       (phone) => toMetaPhone(phone, '62')
     )
-  ).toEqual({ kind: 'csv', contacts: [], excludedCount: 1 });
+  ).toEqual({
+    kind: 'csv',
+    contacts: [],
+    excludedCount: 1,
+    excluded: { kind: 'csv', contacts: [{ phone: '08333333333' }] },
+  });
 });
 function database() {
   return {
@@ -79,7 +85,12 @@ it('counts unique excluded recipients after tag matching', async () => {
       tagIds: ['vip'],
       excludeTagIds: ['exclude'],
     })
-  ).toEqual({ kind: 'ids', ids: ['b'], excludedCount: 1 });
+  ).toEqual({
+    kind: 'ids',
+    ids: ['b'],
+    excludedCount: 1,
+    excluded: { kind: 'ids', ids: ['a'] },
+  });
 });
 it('includes untagged contacts alongside an included tag', async () => {
   expect(
@@ -103,5 +114,9 @@ it('excludes existing and new untagged CSV numbers before saving contacts', asyn
     kind: 'csv',
     contacts: [{ phone: '+62 8111111111' }],
     excludedCount: 2,
+    excluded: {
+      kind: 'csv',
+      contacts: [{ phone: '+628333333333' }, { phone: '+628444444444' }],
+    },
   });
 });
