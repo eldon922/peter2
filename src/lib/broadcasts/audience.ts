@@ -38,6 +38,7 @@ export interface AudienceConfig {
 
 /** One row of the recipient list shown in the wizard. */
 export interface AudienceContact {
+  phone_conversion?: PhoneConversion | null;
   id: string;
   name: string | null;
   profile_name?: string | null;
@@ -257,13 +258,14 @@ export async function fetchAudiencePage(
       id: `csv-${offset + i}`,
       name: c.name ?? null,
       phone: c.phone,
+      phone_conversion: c.phone_conversion,
     }));
   }
 
   if (resolved.kind === 'all') {
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, name, profile_name, phone')
+      .select('id, name, profile_name, phone, phone_conversion')
       .order('name', { nullsFirst: false })
       .order('id')
       .range(offset, offset + limit - 1);
@@ -276,7 +278,7 @@ export async function fetchAudiencePage(
   for (const chunk of chunkIds(slice)) {
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, name, profile_name, phone')
+      .select('id, name, profile_name, phone, phone_conversion')
       .in('id', chunk);
     if (error) throw new Error(error.message);
     rows.push(...((data ?? []) as AudienceContact[]));

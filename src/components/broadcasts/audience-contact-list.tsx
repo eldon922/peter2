@@ -16,10 +16,12 @@ import {
 interface Props {
   resolved: NonNullable<ResolvedAudience>;
   maxHeightClass?: string;
+  showOriginalPhone?: boolean;
 }
 export function AudienceContactList({
   resolved,
   maxHeightClass = 'max-h-56',
+  showOriginalPhone = false,
 }: Props) {
   const t = useTranslations('Broadcasts.wizard.contactList');
   const total = resolvedCount(resolved) ?? 0;
@@ -75,6 +77,14 @@ export function AudienceContactList({
                     : t('noName')}
                 </span>
                 <span className="text-muted-foreground text-xs">
+                  {showOriginalPhone && contact.phone_conversion && (
+                    <>
+                      <span className="text-muted-foreground">
+                        {contact.phone_conversion.input}
+                      </span>
+                      <span aria-hidden> → </span>
+                    </>
+                  )}
                   {contact.phone}
                 </span>
               </li>
@@ -120,7 +130,7 @@ export function ConvertedAudienceList({
     <details className="mt-4 text-sm">
       <summary className="cursor-pointer">{t('convertedList')}</summary>
       <div className="mt-2">
-        <AudienceContactList resolved={result.audience} />
+        <AudienceContactList resolved={result.audience} showOriginalPhone />
       </div>
     </details>
   );
