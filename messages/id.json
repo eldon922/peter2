@@ -1035,7 +1035,14 @@
       },
       "applyFormatting": "Terapkan format",
       "formattingInfoLabel": "Tentang terapkan format",
-      "formattingInfo": "Format yang Anda tulis di pesan (seperti *tebal* atau _miring_) selalu berlaku. Sakelar ini hanya mengubah tampilan pratinjau. Sakelar ini tidak mengubah pesan yang dikirim."
+      "formattingInfo": "Format yang Anda tulis di pesan (seperti *tebal* atau _miring_) selalu berlaku. Sakelar ini hanya mengubah tampilan pratinjau. Sakelar ini tidak mengubah pesan yang dikirim.",
+      "cost": {
+        "title": "Perkiraan biaya pesan",
+        "loading": "Menghitung…",
+        "unavailable": "Perkiraan tidak tersedia dalam {currency} untuk audiens ini.",
+        "assumptions": "Rentang mengasumsikan 90–100% pesan terkirim, dengan hingga 10% gagal tersebar di seluruh audiens. Menggunakan tarif standar kategori dan negara penerima. Belum termasuk pajak dan biaya penyedia; diskon dan pesan gratis dapat mengurangi tagihan. Tarif pengiriman terjadwal dapat berubah.",
+        "source": "Tarif berlaku {date}"
+      }
     },
     "timing": {
       "duration": "Durasi",

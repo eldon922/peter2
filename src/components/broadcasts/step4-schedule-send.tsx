@@ -46,6 +46,7 @@ import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { ScheduleDialog } from '@/components/broadcasts/schedule-dialog';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 import { formatScheduledAt } from '@/lib/broadcasts/schedule';
+import { BroadcastCostEstimate } from './cost-estimate';
 import { UNTAGGED } from '@/lib/contacts/tag-filter';
 
 interface Step4Props {
@@ -303,6 +304,13 @@ export function Step4ScheduleSend({
           </div>
 
           {/* Recipients */}
+          {resolved && (
+            <BroadcastCostEstimate
+              resolved={resolved}
+              count={reach}
+              category={template.category}
+            />
+          )}
           {resolved && reach > 0 && (
             <div className="border-border bg-card space-y-2 rounded-xl border p-5">
               <p className="text-foreground text-sm font-medium">

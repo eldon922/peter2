@@ -1035,7 +1035,14 @@
       },
       "applyFormatting": "Apply formatting",
       "formattingInfoLabel": "About apply formatting",
-      "formattingInfo": "Formatting you write in the message (like *bold* or _italic_) always takes effect. This switch only changes how the preview looks. It does not change the message that gets sent."
+      "formattingInfo": "Formatting you write in the message (like *bold* or _italic_) always takes effect. This switch only changes how the preview looks. It does not change the message that gets sent.",
+      "cost": {
+        "title": "Estimated message cost",
+        "loading": "Calculating…",
+        "unavailable": "Estimate unavailable in {currency} for this audience.",
+        "assumptions": "Range assumes 90–100% delivery, with up to 10% failed messages distributed across the audience. Uses standard category and recipient-country rates. Excludes taxes and provider fees; discounts and free-message eligibility can lower the final bill. Scheduled rates may change.",
+        "source": "Rate card effective {date}"
+      }
     },
     "timing": {
       "duration": "Duration",
