@@ -37,7 +37,9 @@ export function PhoneCountryWarning({
   const tooltipId = useId();
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const source =
-    conversion ??
+    (conversion
+      ? `${conversion.input}:${conversion.countryCode}:${phone ?? ''}`
+      : null) ??
     phone ??
     resolved ??
     (broadcastId ? `${broadcastId}:${recipientId ?? ''}:${retry}` : null);
