@@ -47,3 +47,31 @@ it('ignores optional button values omitted by JSON serialization', () => {
     )
   ).toBe(false);
 });
+it('does not count rotating Meta sample signatures as template edits', () => {
+  expect(
+    templateSyncChanged(
+      {
+        header_handle:
+          'https://scontent.xx.fbcdn.net/media/image.jpg?oh=old&oe=1',
+      },
+      {
+        header_handle:
+          'https://scontent.xx.fbcdn.net/media/image.jpg?oh=new&oe=2',
+      }
+    )
+  ).toBe(false);
+  expect(
+    templateSyncChanged(
+      { header_handle: 'https://scontent.xx.fbcdn.net/media/old.jpg?a=1' },
+      { header_handle: 'https://scontent.xx.fbcdn.net/media/new.jpg?a=2' }
+    )
+  ).toBe(true);
+});
+it('treats empty optional fields as absent', () => {
+  expect(
+    templateSyncChanged(
+      { buttons: [], sample_values: {}, footer_text: '' },
+      { buttons: null, sample_values: null, footer_text: null }
+    )
+  ).toBe(false);
+});

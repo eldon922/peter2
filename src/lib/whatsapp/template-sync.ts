@@ -11,6 +11,36 @@ function canonical(value: unknown): unknown {
   return value ?? null;
 }
 
+function comparable(key: string, value: unknown): unknown {
+  if (key === 'header_handle' && typeof value === 'string') {
+    try {
+      const url = new URL(value);
+      // Meta rotates CDN signatures without changing the underlying sample media.
+      if (
+        url.hostname.endsWith('.fbcdn.net') ||
+        url.hostname.endsWith('.fbsbx.com')
+      ) {
+        for (const key of [...url.searchParams.keys()])
+          if (['oh', 'oe'].includes(key) || key.startsWith('_nc_'))
+            url.searchParams.delete(key);
+        return url.toString();
+      }
+    } catch {
+      /* Opaque upload handles are compared verbatim. */
+    }
+  }
+  if (
+    ['buttons', 'sample_values'].includes(key) &&
+    value &&
+    typeof value === 'object' &&
+    Object.keys(value).length === 0
+  )
+    return null;
+  if (['header_content', 'footer_text'].includes(key) && value === '')
+    return null;
+  return canonical(value);
+}
+
 export function templateSyncChanged(
   existing: Record<string, unknown>,
   incoming: Record<string, unknown>
@@ -18,7 +48,7 @@ export function templateSyncChanged(
   return Object.entries(incoming).some(
     ([key, value]) =>
       !['user_id', 'account_id', 'updated_at'].includes(key) &&
-      JSON.stringify(canonical(existing[key])) !==
-        JSON.stringify(canonical(value))
+      JSON.stringify(comparable(key, existing[key])) !==
+        JSON.stringify(comparable(key, value))
   );
 }

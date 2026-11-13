@@ -285,6 +285,21 @@ export async function POST() {
 
       if (existing?.id) {
         if (!templateSyncChanged(existing, row)) {
+          // Refresh expiring sample URLs without reporting a template content edit.
+          if (existing.header_handle !== row.header_handle) {
+            const { error } = await supabase
+              .from('message_templates')
+              .update({ header_handle: row.header_handle })
+              .eq('id', existing.id);
+            if (error) {
+              errors.push({
+                name: t.name,
+                language: t.language,
+                message: error.message,
+              });
+              continue;
+            }
+          }
           unchanged++;
           continue;
         }

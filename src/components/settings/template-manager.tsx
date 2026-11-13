@@ -336,7 +336,7 @@ export function TemplateManager() {
         !data.deleted &&
         !data.errors?.length
           ? t('toastSyncUnchanged')
-          : t('toastSyncCount', { total: data.total })) +
+          : t('toastSyncCount', { total: (data.inserted ?? 0) + (data.updated ?? 0) })) +
           (data.inserted || data.updated
             ? t('toastSyncDetails', {
                 inserted: data.inserted,
