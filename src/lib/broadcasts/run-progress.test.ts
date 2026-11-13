@@ -37,3 +37,22 @@ it('handles first sends, old rows and completed runs', () => {
     }).percent
   ).toBe(100);
 });
+
+it('uses persisted pending recipients instead of stale aggregate baselines', () => {
+  const row = {
+    total_recipients: 1000,
+    sent_count: 980,
+    failed_count: 20,
+    send_run_total: 20,
+    send_run_baseline: 1000,
+    send_run_pending: 14,
+  };
+  expect(broadcastRunProgress(JSON.parse(JSON.stringify(row)))).toEqual({
+    total: 20,
+    done: 6,
+    percent: 30,
+  });
+  expect(broadcastRunProgress({ ...row, send_run_pending: 0 }).percent).toBe(
+    100
+  );
+});

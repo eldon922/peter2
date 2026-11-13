@@ -8,6 +8,7 @@ export function broadcastRunProgress(
     | 'failed_count'
     | 'send_run_total'
     | 'send_run_baseline'
+    | 'send_run_pending'
   >
 ) {
   const total = broadcast.send_run_total ?? broadcast.total_recipients;
@@ -15,9 +16,11 @@ export function broadcastRunProgress(
     total,
     Math.max(
       0,
-      broadcast.sent_count +
-        broadcast.failed_count -
-        (broadcast.send_run_baseline ?? 0)
+      broadcast.send_run_pending != null
+        ? total - broadcast.send_run_pending
+        : broadcast.sent_count +
+            broadcast.failed_count -
+            (broadcast.send_run_baseline ?? 0)
     )
   );
   return {

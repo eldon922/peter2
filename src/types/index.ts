@@ -455,6 +455,7 @@ export interface Broadcast {
   completed_at?: string | null;
   send_run_total?: number | null;
   send_run_baseline?: number | null;
+  send_run_pending?: number | null;
   id: string;
   user_id: string;
   name: string;
