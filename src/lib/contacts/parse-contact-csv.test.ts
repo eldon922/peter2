@@ -78,11 +78,11 @@ describe('parseContactCsv', () => {
 
   it('handles line breaks and escaped quotes inside quoted cells', () => {
     const csv =
-      'phone,name,tags\r\n+1555,"Line\none ""Q""","a,b"\r\n+1556,Bob,c\r\n';
+      'phone,name,tags\r\n+14155550111,"Line\none ""Q""","a,b"\r\n+14155550112,Bob,c\r\n';
     const { rows } = parseContactCsv(csv);
     expect(rows.map((r) => [r.phone, r.name, r.tagNames])).toEqual([
-      ['+1555', 'Line\none "Q"', ['a', 'b']],
-      ['+1556', 'Bob', ['c']],
+      ['+14155550111', 'Line\none "Q"', ['a', 'b']],
+      ['+14155550112', 'Bob', ['c']],
     ]);
   });
 
@@ -98,7 +98,7 @@ describe('parseContactCsv', () => {
 
 it('imports existing custom fields by trimmed case-insensitive column name', () => {
   const result = parseContactCsv(
-    'phone, Membership LEVEL ,Order code,unknown\n+1555,Gold,"order,123",ignored',
+    'phone, Membership LEVEL ,Order code,unknown\n+14155550111,Gold,"order,123",ignored',
     [
       { id: 'membership-id', field_name: 'Membership level' },
       { id: 'order-id', field_name: 'Order code' },
@@ -113,7 +113,7 @@ it('imports existing custom fields by trimmed case-insensitive column name', () 
 });
 
 it('omits blank custom cells so existing values are preserved', () => {
-  const result = parseContactCsv('phone,Code,Score\n+1555, ,0', [
+  const result = parseContactCsv('phone,Code,Score\n+14155550111, ,0', [
     { id: 'code', field_name: 'Code' },
     { id: 'score', field_name: 'Score' },
   ]);
@@ -121,7 +121,7 @@ it('omits blank custom cells so existing values are preserved', () => {
 });
 
 it('keeps built-in columns separate when a custom field has the same name', () => {
-  const result = parseContactCsv('phone,name\n+1555,Dewi', [
+  const result = parseContactCsv('phone,name\n+14155550111,Dewi', [
     { id: 'custom-name', field_name: 'name' },
   ]);
   expect(result.rows[0].name).toBe('Dewi');

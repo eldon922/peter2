@@ -41,3 +41,20 @@ describe('international phone standardization', () => {
     );
   });
 });
+
+it.each([
+  '0',
+  '+62',
+  '123',
+  '+0001234567890',
+  '0812#3456789',
+  '0812 ext 123',
+  '62+81234567890',
+])('rejects malformed phone %s', (input) => {
+  expect(internationalPhone(input, '62')).toBe('');
+});
+it('normalizes clipboard direction marks and full-width phone digits', () => {
+  expect(internationalPhone('\u200e＋６２ ８１２３４５６７８９０', '62')).toBe(
+    '+6281234567890'
+  );
+});
