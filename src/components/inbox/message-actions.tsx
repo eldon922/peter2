@@ -112,16 +112,6 @@ export function MessageActions({
             isAgent ? 'right-3' : 'left-3'
           )}
         >
-          {onDelete && !message.id.startsWith('temp-') && (
-            <button
-              type="button"
-              onClick={onDelete}
-              aria-label={t('deleteMessage')}
-              className="hover:bg-muted flex size-7 items-center justify-center rounded-full text-red-500"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          )}
           {!readOnly && (
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger
@@ -166,6 +156,16 @@ export function MessageActions({
           >
             <Copy className="h-4 w-4" />
           </button>
+          {onDelete && !message.id.startsWith('temp-') && (
+            <button
+              type="button"
+              onClick={onDelete}
+              aria-label={t('deleteMessage')}
+              className="hover:bg-muted flex size-7 items-center justify-center rounded-full text-red-500"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
