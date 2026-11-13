@@ -333,7 +333,7 @@ export function Step4ScheduleSend({
               onCheckedChange={setFormatted}
             />
           </div>
-          <div className="lg:max-h-[calc(100dvh-14rem)] lg:overflow-y-auto">
+          <div className="min-w-0">
             <BroadcastMessagePreview
               template={template}
               bodyText={previewBody}

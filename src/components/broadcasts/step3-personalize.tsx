@@ -34,9 +34,17 @@ import { contactDisplayName } from '@/lib/contacts/display-name';
 import { FormattingToggle } from '@/components/broadcasts/formatting-toggle';
 import { HeaderMediaPicker } from '@/components/broadcasts/header-media-picker';
 
+import { useAudience } from '@/hooks/use-audience';
+import {
+  fetchAudiencePage,
+  type AudienceConfig,
+} from '@/lib/broadcasts/audience';
+const ALL_AUDIENCE: AudienceConfig = { type: 'all' };
+
 type VariableType = 'static' | 'field' | 'custom_field';
 
 interface Step3Props {
+  audience?: AudienceConfig;
   template: MessageTemplate;
   variables: Record<string, VariableMapping>;
   onUpdate: (variables: Record<string, VariableMapping>) => void;
@@ -67,6 +75,7 @@ const SAMPLE_CONTACT: Contact = {
 };
 
 export function Step3Personalize({
+  audience = ALL_AUDIENCE,
   template,
   variables,
   onUpdate,
@@ -78,6 +87,7 @@ export function Step3Personalize({
 }: Step3Props) {
   const t = useTranslations('Broadcasts.wizard');
   const formId = useId();
+  const { resolved } = useAudience(audience);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [loadingFields, setLoadingFields] = useState(true);
   const [firstContact, setFirstContact] = useState<Contact | null>(null);
@@ -94,26 +104,39 @@ export function Step3Personalize({
       const supabase = createClient();
       const [fieldsRes, contactRes] = await Promise.all([
         supabase.from('custom_fields').select('*').order('field_name'),
-        supabase
-          .from('contacts')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+        resolved
+          ? fetchAudiencePage(supabase, resolved, 0)
+          : Promise.resolve([]),
       ]);
       if (cancelled) return;
 
       setCustomFields(fieldsRes.data ?? []);
       setLoadingFields(false);
 
-      const contact = contactRes.data ?? null;
+      const first = contactRes[0];
+      const detail = first
+        ? await supabase.from('contacts').select('*')
+            .eq(resolved?.kind === 'csv' ? 'phone' : 'id', resolved?.kind === 'csv' ? first.phone : first.id)
+            .maybeSingle()
+        : null;
+      if (cancelled) return;
+      const contact = first
+        ? {
+            ...SAMPLE_CONTACT,
+            email: '',
+            company: '',
+            ...first,
+            ...detail?.data,
+          }
+        : null;
       setFirstContact(contact);
+      setFirstContactCustomValues(new Map());
 
-      if (contact) {
+      if (detail?.data) {
         const { data: customVals } = await supabase
           .from('contact_custom_values')
           .select('custom_field_id, value')
-          .eq('contact_id', contact.id);
+          .eq('contact_id', detail.data.id);
         if (!cancelled) {
           const map = new Map<string, string>();
           for (const row of customVals ?? []) {
@@ -123,11 +146,13 @@ export function Step3Personalize({
         }
       }
       setLoadingPreview(false);
-    })();
+    })().catch(() => {
+      if (!cancelled) { setLoadingFields(false); setLoadingPreview(false); }
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resolved]);
 
   const placeholders = useMemo(
     () => [
@@ -152,6 +177,24 @@ export function Step3Personalize({
     ],
     [template, t]
   );
+
+  useEffect(() => {
+    if (loadingFields || customFields.length !== 1) return;
+    const missing = placeholders.filter(
+      ({ key }) =>
+        variables[key]?.type === 'custom_field' && !variables[key].value
+    );
+    if (missing.length)
+      onUpdate({
+        ...variables,
+        ...Object.fromEntries(
+          missing.map(({ key }) => [
+            key,
+            { type: 'custom_field' as const, value: customFields[0].id },
+          ])
+        ),
+      });
+  }, [loadingFields, customFields, placeholders, variables, onUpdate]);
 
   // A template with an IMAGE/VIDEO/DOCUMENT header needs that media on
   // every send — Meta rejects the broadcast without it.
@@ -190,7 +233,7 @@ export function Step3Personalize({
 
   function updateVariable(key: string, patch: Partial<VariableMapping>) {
     const current = variables[key] ?? {
-      type: 'static' as VariableType,
+      type: 'field' as VariableType,
       value: '',
     };
     onUpdate({
@@ -268,7 +311,7 @@ export function Step3Personalize({
               {placeholders.map((placeholder) => {
                 const { key, label } = placeholder;
                 const id = `${formId}-${key}`;
-                const mapping = variables[key] ?? { type: 'static', value: '' };
+                const mapping = variables[key] ?? { type: 'field', value: '' };
                 const missing = unmappedKeys.includes(key);
                 const valueLabel =
                   mapping.type === 'static'
@@ -321,8 +364,12 @@ export function Step3Personalize({
                           ]}
                           onValueChange={(val) =>
                             updateVariable(key, {
-                              type: (val as VariableType) || 'static',
-                              value: '',
+                              type: (val as VariableType) || 'field',
+                              value:
+                                val === 'custom_field' &&
+                                customFields.length === 1
+                                  ? customFields[0].id
+                                  : '',
                             })
                           }
                         >
@@ -490,7 +537,7 @@ export function Step3Personalize({
               onCheckedChange={setFormatted}
             />
           </div>
-          <div className="p-3 pt-0 lg:max-h-[calc(100dvh-15rem)] lg:overflow-y-auto">
+          <div className="p-3 pt-0">
             <BroadcastMessagePreview
               template={template}
               bodyText={previewText}

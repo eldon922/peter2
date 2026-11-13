@@ -302,6 +302,7 @@ export default function NewBroadcastPage() {
           )}
           {currentStep === 2 && template && (
             <Step3Personalize
+              audience={audience}
               template={template}
               variables={variables}
               onUpdate={(next) => {
