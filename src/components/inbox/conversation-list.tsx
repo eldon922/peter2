@@ -676,14 +676,16 @@ function ConversationItem({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-foreground truncate text-sm font-medium">
-            {displayName}
-          </span>
-          {conversation.contact_removed_at && (
-            <span className="text-[10px] text-amber-600 dark:text-amber-300">
-              {t('contactRemoved')}
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-foreground truncate text-sm font-medium">
+              {displayName}
             </span>
-          )}
+            {conversation.contact_removed_at && (
+              <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-300">
+                {t('contactRemoved')}
+              </span>
+            )}
+          </div>
           <span className="text-muted-foreground shrink-0 text-[10px]">
             {timeAgo}
           </span>
