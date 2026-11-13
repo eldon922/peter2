@@ -1686,13 +1686,15 @@
       "toastMediaTooLarge": "{kind} is {size} MB — the limit is {limit} MB.",
       "toastSyncDeleted": "{count, plural, =1 {# template was} other {# templates were}} deleted on Meta and marked as Deleted.",
       "show": "Show",
-      "showTitle": "View this template (deleted on Meta, read-only)",
-      "showLabel": "Show deleted template",
-      "dialogViewTitle": "Deleted Template",
-      "dialogViewDesc": "This template was deleted on Meta, so it can't be edited or used. This is the last version that was synced.",
+      "showTitle": "View template details",
+      "showLabel": "Show template",
+      "dialogViewTitle": "Template details",
+      "dialogViewDesc": "Read-only preview of this template.",
       "close": "Close",
       "toastSyncUnchanged": "Templates are already up to date. No changes.",
-      "namedVariableHint": "Use numbered variables like '{{1}}' or named variables like '{{first_name}}'. Use one style per template and provide a sample for each variable."
+      "namedVariableHint": "Use '{{1}}', '{{2}}'… or '{{first_name}}'. Don’t mix styles. Add an example for each variable.",
+      "submitProgressSending": "Sending to Meta for review. Media headers may take longer.",
+      "submitProgressRefreshing": "Submission accepted. Refreshing your templates…"
     },
     "roles": {
       "admin": "Admin",
@@ -2024,6 +2026,7 @@
     "remove": "Remove {name}"
   },
   "PhoneFormat": {
+    "convertedList": "Recipients with an added country code",
     "warning": "Local numbers starting with 0 use +{code} by default. Include a country code for numbers from other countries.",
     "fallback": "Use full international phone numbers. Local numbers starting with 0 use your default country code.",
     "converted": "{phone} was converted to {number} using the default country code +{code}.",

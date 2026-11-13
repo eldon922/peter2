@@ -1,4 +1,5 @@
 'use client';
+import { FormattedTextarea } from '@/components/ui/formatted-textarea';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,7 +25,6 @@ import { GatedButton } from '@/components/ui/gated-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useLocale, useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
@@ -127,12 +127,19 @@ export function TemplateManager() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitStage, setSubmitStage] = useState<'sending' | 'refreshing'>(
+    'sending'
+  );
   const [syncing, setSyncing] = useState(false);
   const [form, setForm] = useState<TemplateFormData>(emptyForm);
   // Non-null when the dialog is editing an existing row — switches the
   // submit handler from POST /submit to PATCH /[id] and changes the
   // dialog title + CTA. Set to the template id to pre-fill from a row.
   const [editingId, setEditingId] = useState<string | null>(null);
+  const editingRemote = Boolean(
+    editingId &&
+    templates.find((item) => item.id === editingId)?.meta_template_id
+  );
   // Deleted-on-Meta templates open read-only: there is nothing to edit.
   const [viewOnly, setViewOnly] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -232,6 +239,7 @@ export function TemplateManager() {
   }
 
   function openEdit(template: MessageTemplate) {
+    setViewOnly(false);
     setEditingId(template.id);
     setForm({
       name: template.name,
@@ -255,6 +263,7 @@ export function TemplateManager() {
   }
 
   function openCreate() {
+    setViewOnly(false);
     setEditingId(null);
     setForm({
       ...emptyForm,
@@ -266,6 +275,7 @@ export function TemplateManager() {
   }
 
   function handleDialogOpenChange(open: boolean) {
+    if (submitting) return;
     setDialogOpen(open);
     if (!open) {
       setEditingId(null);
@@ -280,14 +290,18 @@ export function TemplateManager() {
     if (form.category === 'Authentication') return;
     try {
       setSubmitting(true);
-      const isEdit = editingId !== null;
+      setSubmitStage('sending');
+      const isEdit = editingRemote;
       const url = isEdit
         ? `/api/whatsapp/templates/${editingId}`
         : '/api/whatsapp/templates/submit';
       const res = await fetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildSubmitPayload()),
+        body: JSON.stringify({
+          ...buildSubmitPayload(),
+          ...(!isEdit && editingId ? { draft_id: editingId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -298,6 +312,7 @@ export function TemplateManager() {
       }
       // Refresh first, then close — re-opening the dialog
       // immediately should not show a stale list.
+      setSubmitStage('refreshing');
       if (user) await fetchTemplates();
       toast.success(
         data.dry_run
@@ -336,7 +351,9 @@ export function TemplateManager() {
         !data.deleted &&
         !data.errors?.length
           ? t('toastSyncUnchanged')
-          : t('toastSyncCount', { total: (data.inserted ?? 0) + (data.updated ?? 0) })) +
+          : t('toastSyncCount', {
+              total: (data.inserted ?? 0) + (data.updated ?? 0),
+            })) +
           (data.inserted || data.updated
             ? t('toastSyncDetails', {
                 inserted: data.inserted,
@@ -624,22 +641,25 @@ export function TemplateManager() {
                       </div>
                     )}
                   </div>
-                  {canEdit && (
-                    <div className="ml-2 flex shrink-0 items-center gap-1">
-                      {statusKey === 'DELETED' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openView(template)}
-                          title={t('showTitle')}
-                          aria-label={t('showLabel')}
-                          className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
-                        >
-                          <Eye className="size-3.5" />
-                          {t('show')}
-                        </Button>
-                      )}
-                      {statusKey === 'APPROVED' && (
+                  <div className="ml-2 flex shrink-0 items-center gap-1">
+                    {
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openView(template)}
+                        title={t('showTitle')}
+                        aria-label={t('showLabel')}
+                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 h-8 px-2"
+                      >
+                        <Eye className="size-3.5" />
+                        {t('show')}
+                      </Button>
+                    }
+                    {canEdit &&
+                      (statusKey === 'APPROVED' ||
+                        statusKey === 'DRAFT' ||
+                        (!template.meta_template_id &&
+                          Boolean(template.submission_error))) && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -652,7 +672,8 @@ export function TemplateManager() {
                           {t('edit')}
                         </Button>
                       )}
-                      {(statusKey === 'REJECTED' || statusKey === 'PAUSED') && (
+                    {canEdit &&
+                      (statusKey === 'REJECTED' || statusKey === 'PAUSED') && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -665,6 +686,7 @@ export function TemplateManager() {
                           {t('resubmit')}
                         </Button>
                       )}
+                    {canEdit && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -688,8 +710,8 @@ export function TemplateManager() {
                           <Trash2 className="size-4" />
                         )}
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -727,7 +749,10 @@ export function TemplateManager() {
             </div>
           )}
 
-          <fieldset disabled={viewOnly} className="min-w-0 space-y-4 py-2">
+          <fieldset
+            disabled={viewOnly || submitting}
+            className="min-w-0 space-y-4 py-2"
+          >
             <div className="space-y-2">
               <Label className="text-muted-foreground">
                 {t('templateName')}
@@ -745,7 +770,7 @@ export function TemplateManager() {
                     name: normalizeTemplateName(e.target.value),
                   })
                 }
-                disabled={editingId !== null}
+                disabled={editingRemote}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p className="text-muted-foreground text-[11px]">
@@ -790,7 +815,7 @@ export function TemplateManager() {
                   onChange={(e) =>
                     setForm({ ...form, language: e.target.value })
                   }
-                  disabled={editingId !== null}
+                  disabled={editingRemote}
                   className="bg-muted border-border text-foreground h-9 w-full rounded-md border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {!TEMPLATE_LANGUAGES.some(
@@ -965,21 +990,17 @@ export function TemplateManager() {
 
             <div className="space-y-2">
               <Label className="text-muted-foreground">{t('bodyText')}</Label>
-              <Textarea
+              <FormattedTextarea
+                disabled={viewOnly || submitting}
                 placeholder={t('bodyPlaceholder')}
                 value={form.body_text}
-                onChange={(e) =>
-                  setForm({ ...form, body_text: e.target.value })
-                }
+                onValueChange={(body_text) => setForm({ ...form, body_text })}
                 rows={4}
                 maxLength={TEMPLATE_LIMITS.bodyMaxLength}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none"
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
                 {t('namedVariableHint')}
-              </p>
-              <p className="text-muted-foreground text-[11px]">
-                {t('bodyHint')}
               </p>
 
               {bodyVarCount > 0 && (
@@ -1167,6 +1188,15 @@ export function TemplateManager() {
             </div>
           </fieldset>
 
+          {submitting && (
+            <p role="status" className="text-muted-foreground text-sm">
+              {t(
+                submitStage === 'sending'
+                  ? 'submitProgressSending'
+                  : 'submitProgressRefreshing'
+              )}
+            </p>
+          )}
           <DialogFooter className="bg-popover border-border">
             <Button
               variant="outline"
@@ -1218,6 +1248,15 @@ export function TemplateManager() {
                 : t('deleteLocalDesc', { name: templateToDelete?.name || '' })}
             </DialogDescription>
           </DialogHeader>
+          {submitting && (
+            <p role="status" className="text-muted-foreground text-sm">
+              {t(
+                submitStage === 'sending'
+                  ? 'submitProgressSending'
+                  : 'submitProgressRefreshing'
+              )}
+            </p>
+          )}
           <DialogFooter className="bg-popover border-border">
             <Button
               variant="outline"

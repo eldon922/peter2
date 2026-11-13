@@ -1686,13 +1686,15 @@
       "toastMediaTooLarge": "{kind} berukuran {size} MB — batasnya {limit} MB.",
       "toastSyncDeleted": "{count} template sudah dihapus di Meta dan ditandai Dihapus.",
       "show": "Lihat",
-      "showTitle": "Lihat template ini (dihapus di Meta, hanya baca)",
-      "showLabel": "Lihat template yang dihapus",
-      "dialogViewTitle": "Template yang Dihapus",
-      "dialogViewDesc": "Template ini dihapus di Meta sehingga tidak dapat diedit atau digunakan. Ini adalah versi terakhir yang disinkronkan.",
+      "showTitle": "Lihat detail template",
+      "showLabel": "Lihat template",
+      "dialogViewTitle": "Detail template",
+      "dialogViewDesc": "Pratinjau template ini dalam mode hanya baca.",
       "close": "Tutup",
       "toastSyncUnchanged": "Template sudah terbaru. Tidak ada perubahan.",
-      "namedVariableHint": "Gunakan variabel bernomor seperti '{{1}}' atau bernama seperti '{{first_name}}'. Gunakan satu gaya per template dan isi contoh untuk setiap variabel."
+      "namedVariableHint": "Gunakan '{{1}}', '{{2}}'… atau '{{first_name}}'. Jangan campur format. Isi contoh untuk setiap variabel.",
+      "submitProgressSending": "Mengirim ke Meta untuk ditinjau. Header media mungkin memerlukan waktu lebih lama.",
+      "submitProgressRefreshing": "Pengajuan diterima. Memperbarui daftar template…"
     },
     "roles": {
       "admin": "Admin",
@@ -2024,6 +2026,7 @@
     "remove": "Hapus {name}"
   },
   "PhoneFormat": {
+    "convertedList": "Penerima dengan kode negara yang ditambahkan",
     "warning": "Nomor lokal yang diawali 0 menggunakan +{code} secara default. Sertakan kode negara untuk nomor dari negara lain.",
     "fallback": "Gunakan nomor telepon internasional lengkap. Nomor lokal yang diawali 0 menggunakan kode negara default Anda.",
     "converted": "{phone} dikonversi menjadi {number} menggunakan kode negara default +{code}.",

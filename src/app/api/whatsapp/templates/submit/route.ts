@@ -1,21 +1,21 @@
-import { normalizePhoneButtons } from '@/lib/whatsapp/international-phone'
-import { NextResponse } from 'next/server'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { normalizePhoneButtons } from '@/lib/whatsapp/international-phone';
+import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   ForbiddenError,
   UnauthorizedError,
   requireRole,
   toErrorResponse,
-} from '@/lib/auth/account'
-import { decrypt } from '@/lib/whatsapp/encryption'
-import { submitMessageTemplate } from '@/lib/whatsapp/meta-api'
+} from '@/lib/auth/account';
+import { decrypt } from '@/lib/whatsapp/encryption';
+import { submitMessageTemplate } from '@/lib/whatsapp/meta-api';
 import {
   validateTemplatePayload,
   type TemplatePayload,
-} from '@/lib/whatsapp/template-validators'
-import { buildMetaTemplatePayload } from '@/lib/whatsapp/template-components'
-import { ensureImageHeaderHandle } from '@/lib/whatsapp/template-header-handle'
-import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize'
+} from '@/lib/whatsapp/template-validators';
+import { buildMetaTemplatePayload } from '@/lib/whatsapp/template-components';
+import { ensureImageHeaderHandle } from '@/lib/whatsapp/template-header-handle';
+import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize';
 
 /**
  * Shared upsert payload builder — both the Meta-failure path and the
@@ -27,10 +27,10 @@ function buildUpsertRow(
   userId: string,
   payload: TemplatePayload,
   extras: {
-    status: 'DRAFT' | string
-    metaTemplateId: string | null
-    submissionError: string | null
-  },
+    status: 'DRAFT' | string;
+    metaTemplateId: string | null;
+    submissionError: string | null;
+  }
 ) {
   return {
     // Account tenancy — required NOT NULL on message_templates as
@@ -59,23 +59,33 @@ function buildUpsertRow(
     // webhook will set it again if Meta still rejects.
     rejection_reason: extras.submissionError ? null : null,
     last_submitted_at: new Date().toISOString(),
-  }
+  };
 }
 
 async function upsertTemplateRow(
   supabase: SupabaseClient,
   row: ReturnType<typeof buildUpsertRow>,
+  draftId?: string
 ) {
   // TODO(account-sharing): conflict target is still scoped to
   // user_id. Once a follow-up migration drops the legacy unique
   // index on (user_id, name, language) and adds (account_id,
   // name, language), switch `onConflict` here so two teammates
   // can't shadow each other's same-named template.
+  if (draftId)
+    return supabase
+      .from('message_templates')
+      .update(row)
+      .eq('id', draftId)
+      .eq('account_id', row.account_id)
+      .is('meta_template_id', null)
+      .select()
+      .single();
   return supabase
     .from('message_templates')
     .upsert(row, { onConflict: 'user_id,name,language' })
     .select()
-    .single()
+    .single();
 }
 
 /**
@@ -100,13 +110,42 @@ export async function POST(request: Request) {
     // membership, so a viewer or agent could push a template to Meta for
     // approval — an external side effect RLS can't roll back — before the
     // local upsert was refused.
-    const { supabase, accountId, userId } = await requireRole('admin')
+    const { supabase, accountId, userId } = await requireRole('admin');
 
-    let payload: TemplatePayload
+    let payload: TemplatePayload;
     try {
-      payload = (await request.json()) as TemplatePayload
+      payload = (await request.json()) as TemplatePayload;
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Invalid JSON body.' },
+        { status: 400 }
+      );
+    }
+
+    const draftId = (payload as TemplatePayload & { draft_id?: string })
+      .draft_id;
+    if (draftId) {
+      if (!/^[0-9a-f-]{36}$/i.test(draftId))
+        return NextResponse.json(
+          { error: 'Invalid draft ID.' },
+          { status: 400 }
+        );
+      const { data: draft, error } = await supabase
+        .from('message_templates')
+        .select('id, meta_template_id')
+        .eq('id', draftId)
+        .eq('account_id', accountId)
+        .maybeSingle();
+      if (error || !draft)
+        return NextResponse.json(
+          { error: 'Draft not found.' },
+          { status: 404 }
+        );
+      if (draft.meta_template_id)
+        return NextResponse.json(
+          { error: 'Use the edit endpoint for submitted templates.' },
+          { status: 400 }
+        );
     }
 
     if (payload.category === 'Authentication') {
@@ -115,44 +154,45 @@ export async function POST(request: Request) {
           error:
             'AUTHENTICATION templates are not yet supported here — create them in Meta WhatsApp Manager and use "Sync from Meta".',
         },
-        { status: 400 },
-      )
+        { status: 400 }
+      );
     }
 
     try {
-      if (Array.isArray(payload.buttons)) payload.buttons = normalizePhoneButtons(payload.buttons)
-      validateTemplatePayload(payload)
+      if (Array.isArray(payload.buttons))
+        payload.buttons = normalizePhoneButtons(payload.buttons);
+      validateTemplatePayload(payload);
     } catch (e) {
       return NextResponse.json(
         { error: e instanceof Error ? e.message : 'Validation failed.' },
-        { status: 400 },
-      )
+        { status: 400 }
+      );
     }
 
     const dryRun =
       process.env.WHATSAPP_TEMPLATES_DRY_RUN === 'true' ||
-      process.env.WHATSAPP_TEMPLATES_DRY_RUN === '1'
+      process.env.WHATSAPP_TEMPLATES_DRY_RUN === '1';
 
-    let metaTemplateId: string
-    let metaStatus: string
+    let metaTemplateId: string;
+    let metaStatus: string;
 
     if (dryRun) {
-      metaTemplateId = `dry-run-${crypto.randomUUID()}`
-      metaStatus = 'PENDING'
+      metaTemplateId = `dry-run-${crypto.randomUUID()}`;
+      metaStatus = 'PENDING';
     } else {
       const { data: config, error: configError } = await supabase
         .from('whatsapp_config')
         .select('*')
         .eq('account_id', accountId)
-        .single()
+        .single();
       if (configError || !config) {
         return NextResponse.json(
           {
             error:
               'WhatsApp not configured. Connect your WhatsApp Business account in Settings first.',
           },
-          { status: 400 },
-        )
+          { status: 400 }
+        );
       }
       if (!config.waba_id) {
         return NextResponse.json(
@@ -160,36 +200,39 @@ export async function POST(request: Request) {
             error:
               'WABA (WhatsApp Business Account) ID missing. Re-connect your account in Settings.',
           },
-          { status: 400 },
-        )
+          { status: 400 }
+        );
       }
 
-      const accessToken = decrypt(config.access_token)
+      const accessToken = decrypt(config.access_token);
 
       // Image headers need a Resumable-Upload handle (Meta rejects a
       // plain URL at creation). Derive it from header_media_url before
       // building the payload. Surfaces a 400 with an actionable message
       // (missing App ID, unreachable URL, wrong type/size).
       try {
-        await ensureImageHeaderHandle(payload, accessToken, config.app_id)
+        await ensureImageHeaderHandle(payload, accessToken, config.app_id);
       } catch (e) {
         return NextResponse.json(
-          { error: e instanceof Error ? e.message : 'Header image upload failed.' },
-          { status: 400 },
-        )
+          {
+            error:
+              e instanceof Error ? e.message : 'Header image upload failed.',
+          },
+          { status: 400 }
+        );
       }
 
-      const metaPayload = buildMetaTemplatePayload(payload)
+      const metaPayload = buildMetaTemplatePayload(payload);
       try {
         const meta = await submitMessageTemplate({
           wabaId: config.waba_id,
           accessToken,
           payload: metaPayload,
-        })
-        metaTemplateId = meta.id
-        metaStatus = meta.status
+        });
+        metaTemplateId = meta.id;
+        metaStatus = meta.status;
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Meta submit failed.'
+        const message = e instanceof Error ? e.message : 'Meta submit failed.';
         // Persist the failure so the user can retry; row stays DRAFT
         // until they fix and re-submit.
         await upsertTemplateRow(
@@ -199,16 +242,17 @@ export async function POST(request: Request) {
             metaTemplateId: null,
             submissionError: message,
           }),
-        )
-        const isRateLimit = /\b429\b/.test(message)
+          draftId
+        );
+        const isRateLimit = /\b429\b/.test(message);
         return NextResponse.json(
           {
             error: isRateLimit
               ? 'Meta rate limit hit (100 template creates per hour). Try again later.'
               : message,
           },
-          { status: isRateLimit ? 429 : 502 },
-        )
+          { status: isRateLimit ? 429 : 502 }
+        );
       }
     }
 
@@ -219,7 +263,8 @@ export async function POST(request: Request) {
         metaTemplateId,
         submissionError: null,
       }),
-    )
+      draftId
+    );
 
     if (upsertErr) {
       // The submit succeeded on Meta's side but we failed to persist
@@ -230,33 +275,30 @@ export async function POST(request: Request) {
           error: `Submitted to Meta but failed to save locally: ${upsertErr.message}. Run "Sync from Meta" to recover.`,
           meta_template_id: metaTemplateId,
         },
-        { status: 500 },
-      )
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
       template: row,
       dry_run: dryRun,
-    })
+    });
   } catch (error) {
     // Auth failures map to 401/403. Handled before the generic branch
     // below, which surfaces `error.message` as a 500 — reporting "you
     // aren't an admin" as a template submission failure would send the
     // user chasing the wrong problem.
-    if (
-      error instanceof UnauthorizedError ||
-      error instanceof ForbiddenError
-    ) {
-      return toErrorResponse(error)
+    if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+      return toErrorResponse(error);
     }
-    console.error('Error submitting template:', error)
+    console.error('Error submitting template:', error);
     return NextResponse.json(
       {
         error:
           error instanceof Error ? error.message : 'Failed to submit template.',
       },
-      { status: 500 },
-    )
+      { status: 500 }
+    );
   }
 }
