@@ -525,7 +525,9 @@ export function Step2SelectAudience({
               <summary className="cursor-pointer">
                 {t('selectAudience.excludedCount', { count: excludedCount })}
               </summary>
-              <AudienceContactList resolved={resolved.excluded} />
+              <div className="mt-2">
+                <AudienceContactList resolved={resolved.excluded} />
+              </div>
             </details>
           )}
           {resolved && <ConvertedAudienceList resolved={resolved} />}
