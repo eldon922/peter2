@@ -9,6 +9,11 @@
 export type FormatNode =
   | string
   | { type: 'bold' | 'italic' | 'strike' | 'code'; children: FormatNode[] }
+  | {
+      type: 'quote' | 'bullet' | 'numbered';
+      children: FormatNode[];
+      number?: number;
+    }
   | { type: 'codeblock'; text: string }
   | { type: 'link'; url: string };
 
@@ -75,7 +80,11 @@ function parseInline(s: string): FormatNode[] {
 }
 
 /** Swap placeholders for link nodes (or the raw URL text inside code). */
-function restoreUrls(nodes: FormatNode[], urls: string[], inCode = false): FormatNode[] {
+function restoreUrls(
+  nodes: FormatNode[],
+  urls: string[],
+  inCode = false
+): FormatNode[] {
   const out: FormatNode[] = [];
   for (const node of nodes) {
     if (typeof node !== 'string') {
@@ -84,7 +93,11 @@ function restoreUrls(nodes: FormatNode[], urls: string[], inCode = false): Forma
       } else {
         out.push({
           ...node,
-          children: restoreUrls(node.children, urls, inCode || node.type === 'code'),
+          children: restoreUrls(
+            node.children,
+            urls,
+            inCode || node.type === 'code'
+          ),
         });
       }
       continue;
@@ -115,7 +128,28 @@ export function parseFormatting(text: string): FormatNode[] {
       urls.push(trimmed);
       return PLACEHOLDER(urls.length - 1) + tail;
     });
-    out.push(...restoreUrls(parseInline(masked), urls));
+    const lines = masked.split('\n');
+    if (!lines.some((line) => /^(?:> |[-*] |\d+\. )/.test(line))) {
+      out.push(...restoreUrls(parseInline(masked), urls));
+      return;
+    }
+    lines.forEach((line, index) => {
+      const match = /^(> |[-*] |(\d+)\. )(.*)$/.exec(line);
+      if (match)
+        out.push({
+          type: match[1] === '> ' ? 'quote' : match[2] ? 'numbered' : 'bullet',
+          ...(match[2] ? { number: Number(match[2]) } : {}),
+          children: restoreUrls(parseInline(match[3]), urls),
+        });
+      else {
+        out.push(...restoreUrls(parseInline(line), urls));
+        if (
+          index < lines.length - 1 &&
+          !/^(?:> |[-*] |\d+\. )/.test(lines[index + 1])
+        )
+          out.push('\n');
+      }
+    });
   };
 
   for (const m of text.matchAll(blockRe)) {

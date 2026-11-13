@@ -1,7 +1,15 @@
 'use client';
 import { useRef, useState, type ComponentProps } from 'react';
 import { useTranslations } from 'next-intl';
-import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  List,
+  ListOrdered,
+  Quote,
+} from 'lucide-react';
 import { Textarea } from './textarea';
 import { Button } from './button';
 import {
@@ -112,6 +120,9 @@ export function FormattedTextarea({ value, onValueChange, ...props }: Props) {
             { marker: '_', label: 'italic', Icon: Italic },
             { marker: '~', label: 'strike', Icon: Strikethrough },
             { marker: '```', label: 'code', Icon: Code },
+            { marker: 'bullet', label: 'bulletList', Icon: List },
+            { marker: 'numbered', label: 'numberedList', Icon: ListOrdered },
+            { marker: 'quote', label: 'quote', Icon: Quote },
           ].map(({ marker, label, Icon }) => (
             <Button
               key={label}

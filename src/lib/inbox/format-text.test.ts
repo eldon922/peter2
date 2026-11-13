@@ -66,3 +66,11 @@ describe('parseFormatting', () => {
     ]);
   });
 });
+
+it('parses lists and quoted text while retaining inline formatting', () => {
+  expect(parseFormatting('- *one*\n2. two\n> quote')).toEqual([
+    { type: 'bullet', children: [{ type: 'bold', children: ['one'] }] },
+    { type: 'numbered', number: 2, children: ['two'] },
+    { type: 'quote', children: ['quote'] },
+  ]);
+});

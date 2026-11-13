@@ -4,6 +4,35 @@ export function toggleFormat(
   end: number,
   marker: string
 ) {
+  if (['bullet', 'numbered', 'quote'].includes(marker)) {
+    const from = start === 0 ? 0 : text.lastIndexOf('\n', start - 1) + 1;
+    const endPoint = end > start && text[end - 1] === '\n' ? end - 1 : end;
+    const nextBreak = text.indexOf('\n', endPoint);
+    const to = nextBreak < 0 ? text.length : nextBreak;
+    const lines = text.slice(from, to).split('\n');
+    const own =
+      marker === 'bullet' ? /^[-*] / : marker === 'quote' ? /^> / : /^\d+\. /;
+    const remove = lines.every((line) => !line.trim() || own.test(line));
+    let number = 0;
+    const replacement = lines
+      .map((line) => {
+        if (!line.trim()) return line;
+        const content = line.replace(/^(?:[-*] |\d+\. |> )/, '');
+        return remove
+          ? content
+          : (marker === 'bullet'
+              ? '- '
+              : marker === 'quote'
+                ? '> '
+                : `${++number}. `) + content;
+      })
+      .join('\n');
+    return {
+      text: text.slice(0, from) + replacement + text.slice(to),
+      start: from,
+      end: from + replacement.length,
+    };
+  }
   const size = marker.length;
   if (
     start >= size &&
@@ -67,7 +96,21 @@ export function clipboardText(data: Pick<DataTransfer, 'getData'>): string {
     for (const marker of markers)
       if (value && !(value.startsWith(marker) && value.endsWith(marker)))
         value = marker + value + marker;
-    if (['P', 'DIV', 'LI'].includes(node.tagName)) value += '\n';
+    if (node.tagName === 'LI') {
+      const index =
+        Array.from(node.parentElement?.children ?? []).indexOf(node) + 1;
+      value =
+        (node.parentElement?.tagName === 'OL' ? `${index}. ` : '- ') +
+        value.trimEnd();
+    }
+    if (node.tagName === 'BLOCKQUOTE')
+      value = value
+        .trimEnd()
+        .split('\n')
+        .map((line) => '> ' + line)
+        .join('\n');
+    if (['P', 'DIV', 'LI', 'UL', 'OL', 'BLOCKQUOTE'].includes(node.tagName))
+      value += '\n';
     return value;
   }
   const result = Array.from(document.body.childNodes)
@@ -112,7 +155,7 @@ export function selectionPosition(editor: HTMLTextAreaElement) {
     left: Math.max(
       8,
       Math.min(
-        window.innerWidth - 200,
+        window.innerWidth - 328,
         bounds.left + selected.left - editor.scrollLeft
       )
     ),

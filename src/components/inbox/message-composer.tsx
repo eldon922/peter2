@@ -22,6 +22,9 @@ import {
   MessageSquareDashed,
   Zap,
   Bold,
+  List,
+  ListOrdered,
+  Quote,
   Italic,
   Strikethrough,
   Code,
@@ -669,6 +672,9 @@ export function MessageComposer({
             { marker: '_', label: 'italic', Icon: Italic },
             { marker: '~', label: 'strike', Icon: Strikethrough },
             { marker: '```', label: 'code', Icon: Code },
+            { marker: 'bullet', label: 'bulletList', Icon: List },
+            { marker: 'numbered', label: 'numberedList', Icon: ListOrdered },
+            { marker: 'quote', label: 'quote', Icon: Quote },
           ].map(({ marker, label, Icon }) => (
             <Button
               key={label}
@@ -678,7 +684,7 @@ export function MessageComposer({
               disabled={inputsDisabled}
               aria-label={t(label)}
               title={t(label)}
-              className="size-9 pointer-coarse:size-11"
+              className="size-9 pointer-coarse:size-10"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => applyFormat(marker)}
             >
@@ -687,19 +693,22 @@ export function MessageComposer({
           ))}
         </div>
       )}
-      {!readOnly && !draft && !recording && /[*_~`]/.test(text) && (
-        <div
-          role="region"
-          aria-label={t('formatPreview')}
-          tabIndex={0}
-          className="border-border bg-muted/40 focus-visible:ring-ring mb-3 max-h-32 overflow-y-auto rounded-lg border px-3 py-2 text-sm break-words whitespace-pre-wrap outline-none focus-visible:ring-2"
-        >
-          <p className="text-muted-foreground mb-1 text-xs font-medium">
-            {t('formatPreview')}
-          </p>
-          <FormattedText text={text} />
-        </div>
-      )}
+      {!readOnly &&
+        !draft &&
+        !recording &&
+        /[*_~`]|^(?:> |[-*] |\d+\. )/m.test(text) && (
+          <div
+            role="region"
+            aria-label={t('formatPreview')}
+            tabIndex={0}
+            className="border-border bg-muted/40 focus-visible:ring-ring mb-3 max-h-32 overflow-y-auto rounded-lg border px-3 py-2 text-sm break-words whitespace-pre-wrap outline-none focus-visible:ring-2"
+          >
+            <p className="text-muted-foreground mb-1 text-xs font-medium">
+              {t('formatPreview')}
+            </p>
+            <FormattedText text={text} />
+          </div>
+        )}
       {/* Hidden file inputs driven by the attach menu. */}
       <input
         ref={imageInputRef}

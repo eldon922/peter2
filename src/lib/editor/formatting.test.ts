@@ -22,3 +22,17 @@ it('removes markers included in the selection and preserves surrounding text', (
 it('preserves other formatting when toggling one style', () => {
   expect(toggleFormat('*_world_*', 1, 8, '*').text).toBe('_world_');
 });
+it.each(['bullet', 'numbered', 'quote'])(
+  'toggles selected lines as %s',
+  (marker) => {
+    const first = toggleFormat('one\ntwo', 0, 7, marker);
+    expect(toggleFormat(first.text, first.start, first.end, marker).text).toBe(
+      'one\ntwo'
+    );
+  }
+);
+it('numbers whole selected lines and preserves surrounding lines', () => {
+  expect(toggleFormat('before\none\ntwo\nafter', 8, 14, 'numbered').text).toBe(
+    'before\n1. one\n2. two\nafter'
+  );
+});
