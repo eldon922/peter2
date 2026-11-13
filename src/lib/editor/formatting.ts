@@ -33,6 +33,10 @@ export function toggleFormat(
       end: from + replacement.length,
     };
   }
+  const selection = text.slice(start, end);
+  if (!selection.trim()) return { text, start, end };
+  start += selection.length - selection.trimStart().length;
+  end -= selection.length - selection.trimEnd().length;
   const size = marker.length;
   if (
     start >= size &&

@@ -36,3 +36,21 @@ it('numbers whole selected lines and preserves surrounding lines', () => {
     'before\n1. one\n2. two\nafter'
   );
 });
+
+it.each(['*', '_', '~', '```'])(
+  'trims selected edge whitespace for %s',
+  (marker) => {
+    const result = toggleFormat('hello  world \n', 5, 14, marker);
+    expect(result.text).toBe(`hello  ${marker}world${marker} \n`);
+    expect(
+      toggleFormat(result.text, result.start, result.end, marker).text
+    ).toBe('hello  world \n');
+  }
+);
+it('does not format a whitespace-only selection', () => {
+  expect(toggleFormat('  ', 0, 2, '*')).toEqual({
+    text: '  ',
+    start: 0,
+    end: 2,
+  });
+});
