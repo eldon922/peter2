@@ -55,6 +55,8 @@ interface MetaErrorResponse {
      */
     error_user_msg?: string
     error_user_title?: string
+    fbtrace_id?: string
+    error_subcode?: number
   }
 }
 
@@ -68,9 +70,9 @@ export async function throwMetaError(response: Response, fallback: string): Prom
     // surface as a blank error message.
     const detail = [
       err?.error_data?.details,
-      err?.message,
       err?.error_user_msg,
       err?.error_user_title,
+      err?.message,
     ]
       .map((s) => s?.trim())
       .find((s): s is string => !!s)
@@ -79,6 +81,8 @@ export async function throwMetaError(response: Response, fallback: string): Prom
       // Keep the numeric code — Meta's error docs are indexed by it.
       const tag = typeof err?.code === 'number' ? `#${err.code}` : ''
       message = tag && !detail.includes(tag) ? `(${tag}) ${detail}` : detail
+      if (typeof err?.error_subcode === 'number') message += ` (subcode ${err.error_subcode})`
+      if (typeof err?.fbtrace_id === 'string') message += ` [Meta trace: ${err.fbtrace_id}]`
     }
   } catch {
     // response body wasn't JSON — keep the fallback

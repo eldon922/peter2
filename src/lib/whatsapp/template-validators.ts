@@ -137,6 +137,28 @@ export function validateBody(bodyText: string): number[] {
       `Body text exceeds ${TEMPLATE_LIMITS.bodyMaxLength} chars (got ${bodyText.length}).`
     );
   }
+  const body = bodyText.trim();
+  const placeholder = /\{\{(?:[a-z_][a-z0-9_]*|[1-9]\d*)\}\}/g;
+  if (/[{}]/.test(body.replace(placeholder, ''))) {
+    throw new Error(
+      'Body variables must use {{1}}, {{2}} or lowercase names such as {{first_name}}. Check for missing braces and invalid variable names.'
+    );
+  }
+  if (/^\{\{|\}\}$/.test(body)) {
+    throw new Error(
+      'Body text cannot start or end with a variable. Add words before the first variable and after the last one.'
+    );
+  }
+  if (/\}\}\s*\{\{/.test(body)) {
+    throw new Error(
+      'Add text between body variables; variables cannot be next to each other.'
+    );
+  }
+  if (/\t| {5}/.test(body)) {
+    throw new Error(
+      'Body text cannot contain tabs or more than four consecutive spaces.'
+    );
+  }
   const indices = extractVariableIndices(bodyText);
   assertContiguous(indices, 'Body');
   const keys = extractTemplateVariables(bodyText);
@@ -324,7 +346,9 @@ export function validateButtons(buttons: TemplateButton[] | undefined): void {
           );
         }
         if (!b.phone_number.startsWith('+') || !isValidE164(b.phone_number)) {
-          throw new Error(`PHONE_NUMBER button #${i + 1} needs a valid international phone number.`);
+          throw new Error(
+            `PHONE_NUMBER button #${i + 1} needs a valid international phone number.`
+          );
         }
         break;
       case 'COPY_CODE':

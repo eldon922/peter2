@@ -14,7 +14,8 @@ it('creates, personalizes, previews and sends named variables consistently', () 
     name: 'welcome',
     category: 'Marketing' as const,
     language: 'en_US',
-    body_text: 'Hi {{customer_name}}, order {{order_id}} for {{customer_name}}',
+    body_text:
+      'Hi {{customer_name}}, order {{order_id}} for {{customer_name}} is ready.',
     sample_values: { body: ['Dewi', '123'] },
   };
   expect(validateTemplatePayload(template).bodyVarCount).toBe(2);
@@ -43,7 +44,7 @@ it('creates, personalizes, previews and sends named variables consistently', () 
     { name: 'Sari' } as Contact
   );
   expect(renderTemplateBody(template.body_text, body)).toBe(
-    'Hi Sari, order 456 for Sari'
+    'Hi Sari, order 456 for Sari is ready.'
   );
   expect(buildSendComponents(template as MessageTemplate, { body })).toEqual([
     {
@@ -61,7 +62,7 @@ it('rejects mixed formats and variables in footers', () => {
     name: 'test',
     category: 'Utility' as const,
     language: 'en_US',
-    body_text: '{{1}} {{name}}',
+    body_text: 'Hi {{1}}, welcome {{name}} today.',
   };
   expect(() => validateTemplatePayload(template)).toThrow(/mixing/);
   expect(() =>

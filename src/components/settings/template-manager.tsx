@@ -55,6 +55,7 @@ import {
   extractVariableIndices,
   extractTemplateVariables,
   normalizeTemplateName,
+  validateBody,
   TEMPLATE_LIMITS,
 } from '@/lib/whatsapp/template-validators';
 import { TEMPLATE_LANGUAGES } from '@/lib/whatsapp/template-languages';
@@ -291,6 +292,7 @@ export function TemplateManager() {
     if (form.category === 'Authentication') return;
     try {
       setSubmitting(true);
+      validateBody(form.body_text);
       setSubmitStage('sending');
       const isEdit = editingRemote;
       const url = isEdit
