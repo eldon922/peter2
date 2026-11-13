@@ -1041,7 +1041,8 @@
         "loading": "Menghitung…",
         "unavailable": "Perkiraan tidak tersedia dalam {currency} untuk audiens ini.",
         "assumptions": "Rentang mengasumsikan 90–100% pesan terkirim, dengan hingga 10% gagal tersebar di seluruh audiens. Menggunakan tarif standar kategori dan negara penerima. Belum termasuk pajak dan biaya penyedia; diskon dan pesan gratis dapat mengurangi tagihan. Tarif pengiriman terjadwal dapat berubah.",
-        "source": "Tarif berlaku {date}"
+        "source": "Tarif berlaku {date}",
+        "deliveries": "Berdasarkan {minimum}–{total} pesan terkirim (90% dibulatkan ke atas)."
       }
     },
     "timing": {

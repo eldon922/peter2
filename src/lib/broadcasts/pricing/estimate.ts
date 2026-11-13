@@ -23,7 +23,15 @@ export function estimateBroadcastCost(
       throw new Error('No published rate for this audience.');
     return sum + rate;
   }, 0);
-  return { minimum: maximum * 0.9, maximum };
+  return deliveryCostRange(maximum, phones.length);
+}
+export function deliveryCostRange(maximum: number, count: number) {
+  const delivered = Math.ceil((count * 9) / 10);
+  return {
+    minimum: count ? (maximum / count) * delivered : 0,
+    maximum,
+    delivered,
+  };
 }
 export const pricingSource = {
   effective: data.effective_date,

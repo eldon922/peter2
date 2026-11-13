@@ -9,6 +9,7 @@ import {
 } from '@/lib/broadcasts/audience';
 import {
   estimateBroadcastCost,
+  deliveryCostRange,
   pricingSource,
   type PriceCategory,
 } from '@/lib/broadcasts/pricing/estimate';
@@ -105,9 +106,13 @@ export function BroadcastCostEstimate({
           ? t('loading')
           : current.maximum == null
             ? t('unavailable', { currency: defaultCurrency })
-            : `${money(current.maximum * 0.9)} – ${money(current.maximum)}`}
+            : `${money(deliveryCostRange(current.maximum, count).minimum)} – ${money(current.maximum)}`}
       </p>
       <p className="text-muted-foreground text-xs leading-relaxed">
+        {t('deliveries', {
+          minimum: Math.ceil((count * 9) / 10),
+          total: count,
+        })}{' '}
         {t('assumptions')}
       </p>
       <a
