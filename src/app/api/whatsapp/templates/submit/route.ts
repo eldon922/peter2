@@ -233,6 +233,7 @@ export async function POST(request: Request) {
         metaStatus = meta.status;
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Meta submit failed.';
+        console.error('[templates.submit] Meta rejected submission:', message);
         // Persist the failure so the user can retry; row stays DRAFT
         // until they fix and re-submit.
         await upsertTemplateRow(

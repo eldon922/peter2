@@ -57,6 +57,8 @@ COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 
+COPY --from=builder --chown=nextjs:nextjs /app/scripts/request-logging.cjs ./request-logging.cjs
+
 USER nextjs
 EXPOSE 3001
-CMD ["node", "server.js"]
+CMD ["node", "--require", "./request-logging.cjs", "server.js"]
