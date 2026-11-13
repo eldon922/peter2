@@ -41,6 +41,12 @@ export default function NewBroadcastPage() {
     useBroadcastSending();
 
   const [currentStep, setCurrentStep] = useState(0);
+  const stepTopRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = stepTopRef.current?.closest('main');
+    if (scroller) scroller.scrollTo({ top: 0, behavior: 'instant' });
+    else window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentStep]);
   const [highestStep, setHighestStep] = useState(0);
   const [audienceValid, setAudienceValid] = useState(false);
   const [personalizationValid, setPersonalizationValid] = useState(false);
@@ -232,7 +238,7 @@ export default function NewBroadcastPage() {
           return (
             <li
               key={step.key}
-              className={`flex min-w-0 flex-col gap-2 border-b-2 pb-3 ${isActive || isCompleted ? 'border-primary' : 'border-border'}`}
+              className={`flex min-w-0 flex-col gap-2 border-b-2 ${isActive || isCompleted ? 'border-primary' : 'border-border'}`}
             >
               <button
                 type="button"
@@ -247,7 +253,7 @@ export default function NewBroadcastPage() {
                       (index > 2 && !personalizationValid)))
                 }
                 onClick={() => setCurrentStep(index)}
-                className="focus-visible:ring-ring flex w-full flex-col items-start gap-2 rounded-md text-left outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center"
+                className="focus-visible:ring-ring flex h-full w-full cursor-pointer flex-col items-start gap-2 rounded-md pb-3 text-left outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center"
               >
                 <span
                   className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${isCompleted ? 'bg-primary text-primary-foreground' : isActive ? 'bg-primary-soft text-primary' : 'bg-muted text-muted-foreground'}`}
@@ -266,7 +272,7 @@ export default function NewBroadcastPage() {
       </ol>
 
       {/* Step Content */}
-      <div className="relative flex flex-1 flex-col">
+      <div ref={stepTopRef} className="relative flex flex-1 flex-col">
         <div
           className="flex flex-1 flex-col transition-opacity duration-300 ease-in-out"
           style={{
