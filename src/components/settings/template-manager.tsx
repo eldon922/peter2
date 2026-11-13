@@ -1,4 +1,5 @@
 'use client';
+import { FormattedText } from '@/components/inbox/formatted-text';
 import { FormattedTextarea } from '@/components/ui/formatted-textarea';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
@@ -999,6 +1000,19 @@ export function TemplateManager() {
                 maxLength={TEMPLATE_LIMITS.bodyMaxLength}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none"
               />
+              {form.body_text && (
+                <section
+                  aria-label={t('bodyPreview')}
+                  className="bg-muted/30 space-y-2 rounded-lg border p-3"
+                >
+                  <p className="text-muted-foreground text-xs font-medium">
+                    {t('bodyPreview')}
+                  </p>
+                  <div className="text-sm break-words whitespace-pre-wrap">
+                    <FormattedText text={form.body_text} />
+                  </div>
+                </section>
+              )}
               <p className="text-muted-foreground text-xs leading-relaxed">
                 {t('namedVariableHint')}
               </p>
