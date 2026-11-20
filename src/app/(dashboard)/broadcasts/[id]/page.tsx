@@ -101,7 +101,7 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
         >
           {icon}
         </div>
-        <span className="text-muted-foreground text-xs">{pct}%</span>
+        <span className="text-xl font-bold tabular-nums">{pct}%</span>
       </div>
       <p className="text-foreground mt-3 text-2xl font-bold">
         {value.toLocaleString()}
@@ -127,99 +127,7 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
           label
         )}
       </p>
-    </div>
-  );
-}
-
-interface FunnelStep {
-  label: string;
-  value: number;
-  /** Tailwind bg class for the fill, e.g. "bg-primary". */
-  color: string;
-  /** Text colour that reads on top of `color`, in both themes. */
-  onColor: string;
-}
-
-/**
- * Pure-CSS funnel chart: decreasing-width rounded bars, each labelled
- * with its count and its share of the audience.
- *
- * Measured against **Sent**, so the top bar is always 100% and each step
- * below reads as "of the messages that went out, this many got here".
- * That is deliberately a different denominator from the stat cards and
- * the list page, which are shares of the whole audience — so the header
- * spells the basis out. Without that label the two readings of the same
- * broadcast look like a bug.
- *
- * Both the bar width and the percentage use that one denominator, so a
- * bar's length and its own label always say the same thing.
- *
- * The label sits *inside* the bar, which is where it reads best but also
- * where colour gets hard: `text-foreground` is near-black on indigo in
- * light mode and near-white on green-500 in dark, and a short bar leaves
- * half the text hanging off the fill onto the muted track. Rather than
- * pick one colour that loses somewhere, the label is drawn twice — once
- * in `text-foreground` for the track, and again in the fill's own
- * foreground colour inside a box clipped to the fill. Each pixel of text
- * is then painted in the colour that suits whatever is behind it, at any
- * bar width, in either theme. Nothing is dimmed with `opacity`: a
- * washed-out percentage was the first thing to become unreadable on the
- * light-mode track.
- */
-function FunnelChart({ steps, sent }: { steps: FunnelStep[]; sent: number }) {
-  return (
-    <div className="border-border bg-card rounded-xl border p-4">
-      <h3 className="text-foreground mb-4 text-sm font-medium">
-        Funnel
-        <span className="text-muted-foreground ml-2 text-xs font-normal">
-          % of sent
-        </span>
-      </h3>
-      <div className="grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-x-2 gap-y-2 sm:gap-x-3">
-        {steps.map((step) => {
-          const pct = percentOfRecipients(step.value, sent);
-          // Keep a sliver visible for any step that isn't zero — a step
-          // one person in a thousand reached should still be findable —
-          // but never draw a bar for a step nobody reached.
-          const width = step.value > 0 ? Math.max(2, pct) : 0;
-          const label = (
-            <>
-              {step.value.toLocaleString()}
-              <span className="ml-1.5 font-normal">({pct}%)</span>
-            </>
-          );
-          return (
-            <div key={step.label} className="contents">
-              <span className="text-muted-foreground text-xs whitespace-nowrap">
-                {step.label}
-              </span>
-              <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded-full">
-                <div
-                  className={`h-full rounded-full ${step.color} transition-[width] duration-500`}
-                  style={{ width: `${width}%` }}
-                />
-                <span className="text-foreground absolute inset-y-0 left-0 flex items-center px-3 text-xs font-semibold whitespace-nowrap tabular-nums">
-                  {label}
-                </span>
-                {/* Same label, same position, clipped to the fill. Purely
-                    presentational — the copy above is the one screen
-                    readers announce. */}
-                <span
-                  aria-hidden
-                  className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-500"
-                  style={{ width: `${width}%` }}
-                >
-                  <span
-                    className={`flex h-full items-center px-3 text-xs font-semibold whitespace-nowrap tabular-nums ${step.onColor}`}
-                  >
-                    {label}
-                  </span>
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <div className="bg-muted mt-4 h-2 overflow-hidden rounded-full"><div className={`h-full rounded-full bg-current ${color.split(" ").at(-1)}`} style={{width: `${Math.min(100,pct)}%`}} /></div>
     </div>
   );
 }
@@ -700,36 +608,6 @@ export default function BroadcastDetailPage() {
     percent: sendProgress,
   } = broadcastRunProgress(broadcast);
 
-  // `onColor` is the text colour drawn on top of each fill. The primary
-  // bar uses the theme's paired token; the three raw Tailwind fills are
-  // saturated enough at 500 that white reads on them in both themes.
-  const funnelSteps: FunnelStep[] = [
-    {
-      label: t('stats.sent'),
-      value: broadcast.sent_count,
-      color: 'bg-primary',
-      onColor: 'text-primary-foreground',
-    },
-    {
-      label: t('stats.delivered'),
-      value: broadcast.delivered_count,
-      color: 'bg-green-500',
-      onColor: 'text-white',
-    },
-    {
-      label: t('stats.read'),
-      value: broadcast.read_count,
-      color: 'bg-blue-500',
-      onColor: 'text-white',
-    },
-    {
-      label: t('stats.replied'),
-      value: broadcast.replied_count,
-      color: 'bg-indigo-500',
-      onColor: 'text-white',
-    },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -980,8 +858,10 @@ export default function BroadcastDetailPage() {
         </div>
       )}
 
-      {/* Stats — 6 cards: Total / Sent / Delivered / Read / Replied / Failed */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+<section className="space-y-4">
+<h2 className="text-xl font-semibold">Campaign performance</h2>
+<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">Recipients overview</h3><span className="text-muted-foreground text-xs">Based on {broadcast.total_recipients.toLocaleString()} total recipients</span></div>
+<div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           label={t('stats.totalRecipients')}
           value={broadcast.total_recipients}
@@ -997,16 +877,26 @@ export default function BroadcastDetailPage() {
           color="bg-primary/10 text-primary"
         />
         <StatCard
+          label={t('stats.failed')}
+          value={broadcast.failed_count}
+          total={broadcast.total_recipients}
+          icon={<AlertCircle className="h-4 w-4" />}
+          color="bg-red-500/10 text-red-400"
+        />
+</div>
+<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">Message performance</h3><span className="text-muted-foreground text-xs">Based on {broadcast.sent_count.toLocaleString()} sent messages</span></div>
+<div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
           label={t('stats.delivered')}
           value={broadcast.delivered_count}
-          total={broadcast.total_recipients}
+          total={broadcast.sent_count}
           icon={<CheckCheck className="h-4 w-4" />}
           color="bg-green-500/10 text-green-400"
         />
         <StatCard
           label={t('stats.read')}
           value={broadcast.read_count}
-          total={broadcast.total_recipients}
+          total={broadcast.sent_count}
           icon={<Eye className="h-4 w-4" />}
           color="bg-blue-500/10 text-blue-400"
         />
@@ -1014,21 +904,12 @@ export default function BroadcastDetailPage() {
           label={t('stats.replied')}
           hint={t('stats.repliedHint')}
           value={broadcast.replied_count}
-          total={broadcast.total_recipients}
+          total={broadcast.sent_count}
           icon={<MessageCircle className="h-4 w-4" />}
           color="bg-indigo-500/10 text-indigo-400"
         />
-        <StatCard
-          label={t('stats.failed')}
-          value={broadcast.failed_count}
-          total={broadcast.total_recipients}
-          icon={<AlertCircle className="h-4 w-4" />}
-          color="bg-red-500/10 text-red-400"
-        />
-      </div>
-
-      <FunnelChart steps={funnelSteps} sent={broadcast.sent_count} />
-
+</div>
+</section>
       {/* Recipients Table */}
                   <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <BroadcastDuration broadcast={broadcast} />
