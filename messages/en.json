@@ -238,7 +238,8 @@
       "formatPreview": "Formatted preview",
       "bulletList": "Bulleted list",
       "numberedList": "Numbered list",
-      "quote": "Quote"
+      "quote": "Quote",
+      "insertEmoji": "Insert emoji"
     },
     "bubble": {
       "photo": "Photo",
@@ -730,7 +731,7 @@
       },
       "errorLoad": "Failed to load broadcasts",
       "retry": "Retry",
-      "searchPlaceholder": "Search broadcasts by name or template…"
+      "searchPlaceholder": "Search by broadcast, template or tag…"
     },
     "status": {
       "draft": "Draft",
@@ -789,7 +790,15 @@
         "read": "Read",
         "replied": "Replied / reacted",
         "failed": "Failed",
-        "repliedHint": "Unique recipients who replied or reacted. Each recipient counts once. Replies without a quoted message belong to the most recently sent broadcast."
+        "repliedHint": "Unique recipients who replied or reacted. Each recipient counts once. Replies without a quoted message belong to the most recently sent broadcast.",
+        "campaign": "Campaign performance",
+        "overview": "Recipients overview",
+        "performance": "Message performance",
+        "audienceBasis": "Based on {count, number} total recipients",
+        "sentBasis": "Based on {count, number} sent messages",
+        "clickRate": "Button link click rate",
+        "untracked": "Untracked",
+        "clickBasis": "{count, number} unique recipients clicked / {sent, number} sent"
       },
       "toastFailedDelete": "Failed to delete: {error}",
       "toastDeleted": "Broadcast deleted",
@@ -850,7 +859,7 @@
       "scheduleTitle": "Schedule broadcast",
       "scheduleDesc": "Pick when to send it.",
       "toastScheduled": "Broadcast scheduled for {time}",
-      "searchRecipients": "Search recipients by name or phone…"
+      "searchRecipients": "Search by name, phone or tag…"
     },
     "new": {
       "title": "New Broadcast",

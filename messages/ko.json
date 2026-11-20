@@ -238,7 +238,8 @@
       "formatPreview": "서식 미리보기",
       "bulletList": "글머리 기호 목록",
       "numberedList": "번호 목록",
-      "quote": "인용"
+      "quote": "인용",
+      "insertEmoji": "이모지 삽입"
     },
     "bubble": {
       "photo": "사진",
@@ -730,7 +731,7 @@
       },
       "errorLoad": "브로드캐스트를 불러오지 못했습니다",
       "retry": "다시 시도",
-      "searchPlaceholder": "이름 또는 템플릿으로 방송 검색…"
+      "searchPlaceholder": "방송, 템플릿 또는 태그 검색…"
     },
     "status": {
       "draft": "초안",
@@ -789,7 +790,15 @@
         "read": "읽음",
         "replied": "답장 / 반응",
         "failed": "실패",
-        "repliedHint": "답장하거나 반응한 고유 수신자 수입니다. 각 수신자는 한 번만 집계됩니다. 인용 메시지가 없는 답장은 가장 최근에 보낸 브로드캐스트에 집계됩니다."
+        "repliedHint": "답장하거나 반응한 고유 수신자 수입니다. 각 수신자는 한 번만 집계됩니다. 인용 메시지가 없는 답장은 가장 최근에 보낸 브로드캐스트에 집계됩니다.",
+        "campaign": "캠페인 성과",
+        "overview": "수신자 개요",
+        "performance": "메시지 성과",
+        "audienceBasis": "전체 수신자 {count, number}명 기준",
+        "sentBasis": "발송 메시지 {count, number}건 기준",
+        "clickRate": "버튼 링크 클릭률",
+        "untracked": "추적되지 않음",
+        "clickBasis": "클릭한 수신자 {count, number}명 / 발송 {sent, number}건"
       },
       "toastFailedDelete": "삭제하지 못했습니다: {error}",
       "toastDeleted": "브로드캐스트가 삭제되었습니다",
@@ -850,7 +859,7 @@
       "scheduleTitle": "브로드캐스트 예약",
       "scheduleDesc": "전송할 시간을 선택하세요.",
       "toastScheduled": "브로드캐스트가 {time}에 예약되었습니다",
-      "searchRecipients": "이름 또는 전화번호로 수신자 검색…"
+      "searchRecipients": "이름, 전화번호 또는 태그 검색…"
     },
     "new": {
       "title": "새 브로드캐스트",

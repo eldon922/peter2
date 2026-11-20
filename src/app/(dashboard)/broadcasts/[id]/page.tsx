@@ -59,7 +59,6 @@ import { toast } from 'sonner';
 import {
   getBroadcastStatus,
   getRecipientStatus,
-  percentOfRecipients,
   recipientStatusConfig,
   statusTextClass,
 } from '@/lib/broadcast-status';
@@ -90,7 +89,7 @@ interface StatCardProps {
 }
 
 function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
-  const pct = percentOfRecipients(value, total);
+  const pct = total ? Math.round((value / total) * 1000) / 10 : 0;
   const hintId = useId();
   const [hintOpen, setHintOpen] = useState(false);
   return (
@@ -101,7 +100,7 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
         >
           {icon}
         </div>
-        <span className="text-xl font-bold tabular-nums">{pct}%</span>
+        <span className={`text-xl font-bold tabular-nums ${color.split(" ").at(-1)}`}>{pct}%</span>
       </div>
       <p className="text-foreground mt-3 text-2xl font-bold">
         {value.toLocaleString()}
@@ -859,8 +858,8 @@ export default function BroadcastDetailPage() {
       )}
 
 <section className="space-y-4">
-<h2 className="text-xl font-semibold">Campaign performance</h2>
-<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">Recipients overview</h3><span className="text-muted-foreground text-xs">Based on {broadcast.total_recipients.toLocaleString()} total recipients</span></div>
+<h2 className="text-xl font-semibold">{t('stats.campaign')}</h2>
+<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">{t('stats.overview')}</h3><span className="text-muted-foreground text-xs">{t('stats.audienceBasis', {count:broadcast.total_recipients})}</span></div>
 <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           label={t('stats.totalRecipients')}
@@ -884,7 +883,7 @@ export default function BroadcastDetailPage() {
           color="bg-red-500/10 text-red-400"
         />
 </div>
-<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">Message performance</h3><span className="text-muted-foreground text-xs">Based on {broadcast.sent_count.toLocaleString()} sent messages</span></div>
+<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">{t('stats.performance')}</h3><span className="text-muted-foreground text-xs">{t('stats.sentBasis', {count:broadcast.sent_count})}</span></div>
 <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           label={t('stats.delivered')}
@@ -910,9 +909,9 @@ export default function BroadcastDetailPage() {
         />
 </div>
   <div className="border-border bg-card rounded-xl border p-4">
-    <p className="text-muted-foreground text-sm">Button link click rate</p>
-    <p className="text-xl font-semibold">{broadcast.link_click_count == null ? 'Untracked' : `${broadcast.sent_count ? (100 * broadcast.link_click_count / broadcast.sent_count).toFixed(1) : 0}%`}</p>
-    {broadcast.link_click_count != null && <p className="text-muted-foreground text-xs">{broadcast.link_click_count.toLocaleString()} unique recipients clicked / {broadcast.sent_count.toLocaleString()} sent</p>}
+    <p className="text-muted-foreground text-sm">{t('stats.clickRate')}</p>
+    <p className="text-xl font-semibold">{broadcast.link_click_count == null ? t('stats.untracked') : `${broadcast.sent_count ? (100 * broadcast.link_click_count / broadcast.sent_count).toFixed(1) : 0}%`}</p>
+    {broadcast.link_click_count != null && <p className="text-muted-foreground text-xs">{t('stats.clickBasis', {count:broadcast.link_click_count, sent:broadcast.sent_count})}</p>}
   </div>
 </section>
       {/* Recipients Table */}
@@ -971,7 +970,7 @@ export default function BroadcastDetailPage() {
         }
       >
         <div className="border-border flex flex-col gap-3 border-b p-4 @min-[50rem]:flex-row @min-[50rem]:items-center">
-          <h2 className="text-foreground text-sm font-semibold">
+          <h2 className="text-foreground text-sm font-semibold whitespace-nowrap">
             {statusFilter !== 'all' || deferredRecipientSearch.trim()
               ? t('recipientsHeader', {
                   filtered: recipientCount,

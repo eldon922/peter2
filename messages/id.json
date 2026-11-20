@@ -238,7 +238,8 @@
       "formatPreview": "Pratinjau format",
       "bulletList": "Daftar berpoin",
       "numberedList": "Daftar bernomor",
-      "quote": "Kutipan"
+      "quote": "Kutipan",
+      "insertEmoji": "Sisipkan emoji"
     },
     "bubble": {
       "photo": "Foto",
@@ -730,7 +731,7 @@
       },
       "errorLoad": "Gagal memuat blast",
       "retry": "Coba lagi",
-      "searchPlaceholder": "Cari broadcast berdasarkan nama atau template…"
+      "searchPlaceholder": "Cari broadcast, template, atau tag…"
     },
     "status": {
       "draft": "Draf",
@@ -789,7 +790,15 @@
         "read": "Dibaca",
         "replied": "Dibalas / direaksi",
         "failed": "Gagal",
-        "repliedHint": "Penerima unik yang membalas atau bereaksi. Setiap penerima dihitung sekali. Balasan tanpa kutipan pesan dihitung untuk blast yang terakhir dikirim."
+        "repliedHint": "Penerima unik yang membalas atau bereaksi. Setiap penerima dihitung sekali. Balasan tanpa kutipan pesan dihitung untuk blast yang terakhir dikirim.",
+        "campaign": "Performa kampanye",
+        "overview": "Ringkasan penerima",
+        "performance": "Performa pesan",
+        "audienceBasis": "Berdasarkan {count, number} penerima",
+        "sentBasis": "Berdasarkan {count, number} pesan terkirim",
+        "clickRate": "Rasio klik tautan tombol",
+        "untracked": "Tidak dilacak",
+        "clickBasis": "{count, number} penerima unik mengeklik / {sent, number} terkirim"
       },
       "toastFailedDelete": "Gagal menghapus: {error}",
       "toastDeleted": "Blast dihapus",
@@ -850,7 +859,7 @@
       "scheduleTitle": "Jadwalkan blast",
       "scheduleDesc": "Pilih kapan blast dikirim.",
       "toastScheduled": "Blast dijadwalkan pada {time}",
-      "searchRecipients": "Cari penerima berdasarkan nama atau nomor…"
+      "searchRecipients": "Cari nama, telepon, atau tag…"
     },
     "new": {
       "title": "Blast Baru",

@@ -1009,7 +1009,7 @@ export function MessageComposer({
             </GatedButton>
           </div>
 
-          <EmojiMenu label="Insert emoji" disabled={inputsDisabled} onPick={(emoji) => {
+          <EmojiMenu label={t('insertEmoji')} disabled={inputsDisabled} onPick={(emoji) => {
             const editor = textareaRef.current;
             if (!editor) return;
             const start = editor.selectionStart;
