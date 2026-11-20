@@ -18,6 +18,12 @@ import {
   RotateCcw,
   Upload,
   Eye,
+  BadgeCheck,
+  FileText,
+  Megaphone,
+  ShieldCheck,
+  Wrench,
+  type LucideIcon,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { uploadAccountMedia } from '@/lib/storage/upload-media';
@@ -72,10 +78,22 @@ const HEADER_FORMATS: HeaderFormat[] = [
   'document',
 ];
 
-const categoryColors: Record<string, string> = {
-  Marketing: 'bg-purple-600/20 text-purple-400 border-purple-600/30',
-  Utility: 'bg-blue-600/20 text-blue-400 border-blue-600/30',
-  Authentication: 'bg-amber-600/20 text-amber-400 border-amber-600/30',
+const categoryDisplay: Record<
+  MessageTemplate['category'],
+  { icon: LucideIcon; classes: string }
+> = {
+  Marketing: {
+    icon: Megaphone,
+    classes: 'bg-purple-600/20 text-purple-400 border-purple-600/30',
+  },
+  Utility: {
+    icon: Wrench,
+    classes: 'bg-blue-600/20 text-blue-400 border-blue-600/30',
+  },
+  Authentication: {
+    icon: ShieldCheck,
+    classes: 'bg-amber-600/20 text-amber-400 border-amber-600/30',
+  },
 };
 
 interface TemplateFormData {
@@ -585,6 +603,8 @@ export function TemplateManager() {
           {templates.map((template) => {
             const statusKey = template.status || 'DRAFT';
             const status = templateStatusConfig[statusKey];
+            const category = categoryDisplay[template.category];
+            const CategoryIcon = category?.icon ?? FileText;
             return (
               <Card key={template.id}>
                 <CardContent className="@container space-y-2 pt-4">
@@ -671,11 +691,15 @@ export function TemplateManager() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
-                      className={`border text-xs ${categoryColors[template.category] || ''}`}
+                      className={`border text-xs ${category?.classes ?? ''}`}
                     >
+                      <CategoryIcon data-icon="inline-start" aria-hidden />
                       {template.category}
                     </Badge>
                     <Badge className={`border text-xs ${status.classes}`}>
+                      {statusKey === 'APPROVED' && (
+                        <BadgeCheck data-icon="inline-start" aria-hidden />
+                      )}
                       {status.label}
                     </Badge>
                     {template.language && (
