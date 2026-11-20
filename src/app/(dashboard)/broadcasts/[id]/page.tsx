@@ -1187,7 +1187,6 @@ export default function BroadcastDetailPage() {
             recipients={filteredRecipients}
             tagsFor={recipientTags}
             includeTagIds={audienceFilter.tagIds ?? []}
-            excludeTagIds={audienceFilter.excludeTagIds ?? []}
             sending={broadcast.status === 'sending'}
             retrying={retrying}
             canSend={canSend}

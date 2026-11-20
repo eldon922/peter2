@@ -12,7 +12,7 @@ export function TagChips({
   tone = 'default',
 }: {
   tags: Tag[];
-  tone?: keyof typeof tones | ((tag: Tag) => keyof typeof tones);
+  tone?: keyof typeof tones;
 }) {
   if (!tags.length) return null;
   return (
@@ -20,7 +20,7 @@ export function TagChips({
       {tags.map((tag) => (
         <span
           key={tag.id}
-          className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-normal ${tones[typeof tone === 'function' ? tone(tag) : tone]}`}
+          className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-normal ${tones[tone]}`}
         >
           <span
             aria-hidden

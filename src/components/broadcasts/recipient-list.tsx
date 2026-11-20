@@ -31,7 +31,6 @@ export function BroadcastRecipientList({
   recipients,
   tagsFor,
   includeTagIds,
-  excludeTagIds,
   sending,
   retrying,
   canSend,
@@ -40,7 +39,6 @@ export function BroadcastRecipientList({
   recipients: BroadcastRecipient[];
   tagsFor: (recipient: BroadcastRecipient) => Tag[];
   includeTagIds: string[];
-  excludeTagIds: string[];
   sending: boolean;
   retrying: string | null;
   canSend: boolean;
@@ -48,11 +46,7 @@ export function BroadcastRecipientList({
 }) {
   const t = useTranslations('Broadcasts.detail');
   const tStatus = useTranslations('Broadcasts.status');
-  function tagTone(tag: Tag) {
-    if (excludeTagIds.includes(tag.id)) return 'exclude';
-    if (includeTagIds.includes(tag.id)) return 'include';
-    return 'default';
-  }
+  const targetTagIds = new Set(includeTagIds);
   const entries = recipients.map((recipient) => {
     const status = getRecipientStatus(recipient.status);
     const failed = recipient.status === 'failed';
@@ -135,7 +129,7 @@ export function BroadcastRecipientList({
       name: recipient.contact
         ? contactDisplayName(recipient.contact)
         : tStatus('unknown'),
-      tags: tagsFor(recipient),
+      tags: tagsFor(recipient).filter((tag) => targetTagIds.has(tag.id)),
       phoneBlock,
       statusChip,
       stamps,
@@ -175,7 +169,7 @@ export function BroadcastRecipientList({
                 </div>
                 {statusChip}
               </div>
-              <TagChips tags={tags} tone={tagTone} />
+              <TagChips tags={tags} tone="include" />
               {(stamps.length > 0 || attempts > 1) && (
                 <dl className="border-border text-muted-foreground grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-t pt-2 text-xs">
                   {stamps.map(({ label, value, tint, at }) => (
@@ -218,9 +212,11 @@ export function BroadcastRecipientList({
               <TableHead className="text-muted-foreground">
                 {t('table.phone')}
               </TableHead>
-              <TableHead className="text-muted-foreground hidden md:table-cell">
-                {t('table.tags')}
-              </TableHead>
+              {targetTagIds.size > 0 && (
+                <TableHead className="text-muted-foreground">
+                  {t('table.tags')}
+                </TableHead>
+              )}
               <TableHead className="text-muted-foreground">
                 {t('table.status')}
               </TableHead>
@@ -256,22 +252,19 @@ export function BroadcastRecipientList({
                 <TableRow key={id} className="border-border">
                   <TableCell className="text-foreground max-w-xs truncate font-medium">
                     {name}
-                    {tags.length > 0 && (
-                      <div className="mt-1 whitespace-normal md:hidden">
-                        <TagChips tags={tags} tone={tagTone} />
-                      </div>
-                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {phoneBlock}
                   </TableCell>
-                  <TableCell className="hidden max-w-64 whitespace-normal md:table-cell">
-                    {tags.length ? (
-                      <TagChips tags={tags} tone={tagTone} />
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
+                  {targetTagIds.size > 0 && (
+                    <TableCell className="max-w-64 whitespace-normal">
+                      {tags.length ? (
+                        <TagChips tags={tags} tone="include" />
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     {statusChip}
                     {error && (
