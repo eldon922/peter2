@@ -644,7 +644,7 @@ export function TemplateManager() {
                       </div>
                     )}
                   </div>
-                  <div className="ml-2 flex shrink-0 items-center gap-1">
+                  <div className="ml-2 flex shrink-0 flex-col items-center gap-1">
                     {
                       <Button
                         variant="ghost"
