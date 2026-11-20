@@ -19,7 +19,6 @@ import {
   HEADER_VARIABLE_KEY,
   resolveVariables,
   resolveHeaderVariable,
-  resolveButtonVariables,
   buttonVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
@@ -542,11 +541,6 @@ export function Step3Personalize({
               template={template}
               bodyText={previewText}
               headerText={previewHeader}
-              buttonParams={resolveButtonVariables(
-                variables,
-                previewContact,
-                firstContactCustomValues
-              )}
               formatted={formatted}
               mediaUrl={
                 headerMedia.mediaId

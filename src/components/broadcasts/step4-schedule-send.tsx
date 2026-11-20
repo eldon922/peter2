@@ -34,7 +34,6 @@ import {
   fetchCustomValueIndex,
   resolveVariables,
   resolveHeaderVariable,
-  resolveButtonVariables,
   type VariableMapping,
 } from '@/lib/broadcasts/variables';
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
@@ -163,9 +162,6 @@ export function Step4ScheduleSend({
   }, [template.body_text, variables, sampleContact, sample?.custom]);
   const previewHeader = sampleContact
     ? resolveHeaderVariable(variables, sampleContact, sample?.custom)
-    : undefined;
-  const previewButtons = sampleContact
-    ? resolveButtonVariables(variables, sampleContact, sample?.custom)
     : undefined;
   const previewLabel = sampleContact
     ? t('scheduleSend.previewFor', {
@@ -346,7 +342,6 @@ export function Step4ScheduleSend({
               template={template}
               bodyText={previewBody}
               headerText={previewHeader}
-              buttonParams={previewButtons}
               mediaUrl={headerMediaUrl}
               formatted={formatted}
             />
@@ -537,7 +532,6 @@ export function Step4ScheduleSend({
                     template={template}
                     bodyText={previewBody}
                     headerText={previewHeader}
-                    buttonParams={previewButtons}
                     mediaUrl={headerMediaUrl}
                     formatted={formatted}
                   />
