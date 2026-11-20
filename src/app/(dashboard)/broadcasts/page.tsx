@@ -50,11 +50,14 @@ function RateCell({
 }) {
   const pct = percentOfRecipients(value, total);
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-muted-foreground w-10 text-right text-xs tabular-nums">
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums">
         {pct}%
       </span>
-      <div className="bg-muted h-1.5 w-20 overflow-hidden rounded-full">
+      <div
+        aria-hidden
+        className="bg-muted h-1.5 w-20 overflow-hidden rounded-full"
+      >
         <div
           className={`h-1.5 rounded-full ${color}`}
           style={{ width: `${pct}%` }}
@@ -405,20 +408,20 @@ export default function BroadcastsPage() {
                           {broadcast.total_recipients.toLocaleString()}
                         </dd>
                         <dt>{t('table.delivery')}</dt>
-                        <dd className="text-foreground text-right tabular-nums">
-                          {percentOfRecipients(
-                            broadcast.delivered_count,
-                            broadcast.total_recipients
-                          )}
-                          %
+                        <dd className="flex min-w-0 justify-end">
+                          <RateCell
+                            value={broadcast.delivered_count}
+                            total={broadcast.total_recipients}
+                            color="bg-primary"
+                          />
                         </dd>
                         <dt>{t('table.read')}</dt>
-                        <dd className="text-foreground text-right tabular-nums">
-                          {percentOfRecipients(
-                            broadcast.read_count,
-                            broadcast.total_recipients
-                          )}
-                          %
+                        <dd className="flex min-w-0 justify-end">
+                          <RateCell
+                            value={broadcast.read_count}
+                            total={broadcast.total_recipients}
+                            color="bg-blue-500"
+                          />
                         </dd>
                         <dt>{t('table.date')}</dt>
                         <dd className="text-foreground text-right">
