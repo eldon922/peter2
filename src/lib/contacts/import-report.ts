@@ -3,12 +3,14 @@
 export type SkipReason =
   | 'file_duplicate' // same number appeared later in the file
   | 'no_phone' // no usable number in the row
+  | 'excel_numeric_phone' // numeric cell is too long or not a whole number
   | 'nothing_new' // already saved, and the row adds nothing
   | 'already_exists'; // the database rejected it as a duplicate
 
 export interface ReportRow {
   phone: string;
   name?: string;
+  sourceRow?: number;
   /** Updated rows: the name change, when the file renamed the contact. */
   rename?: { from: string | null; to: string };
   /** Updated rows: tags the file carried for this contact. */

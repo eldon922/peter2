@@ -37,11 +37,11 @@ export function parseTagCell(value: string | undefined): string[] {
   return names;
 }
 
-export interface ParseContactCsvResult {
+export interface ParsedContactRows {
   rows: ParsedContactRow[];
-  /** True when the CSV header includes a `tags` column. */
+  /** True when the header includes a `tags` column. */
   hasTagsColumn: boolean;
-  /** True when the CSV header includes a `company` column. */
+  /** True when the header includes a `company` column. */
   hasCompanyColumn: boolean;
   customFieldIds?: string[];
 }
@@ -50,8 +50,15 @@ export function parseContactCsv(
   text: string,
   customFields: Pick<CustomField, 'id' | 'field_name'>[] = [],
   countryCode = DEFAULT_COUNTRY_CODE
-): ParseContactCsvResult {
-  const records = parseCsv(text);
+): ParsedContactRows {
+  return parseContactRows(parseCsv(text), customFields, countryCode);
+}
+
+export function parseContactRows(
+  records: string[][],
+  customFields: Pick<CustomField, 'id' | 'field_name'>[] = [],
+  countryCode = DEFAULT_COUNTRY_CODE
+): ParsedContactRows {
   const empty = { rows: [], hasTagsColumn: false, hasCompanyColumn: false };
   if (records.length < 2) return empty;
 
@@ -91,7 +98,9 @@ export function parseContactCsv(
     const normalized = normalizePhoneInput(phone, countryCode);
     rows.push({
       phone: normalized.phone,
-      ...(normalized.phone_conversion ? { phone_conversion: normalized.phone_conversion } : {}),
+      ...(normalized.phone_conversion
+        ? { phone_conversion: normalized.phone_conversion }
+        : {}),
       ...(Object.keys(customValues).length ? { customValues } : {}),
       name: cell(values, nameIdx),
       email: cell(values, emailIdx),

@@ -14,9 +14,12 @@ import {
 } from '@/lib/contacts/dedupe';
 import {
   parseContactCsv,
+  parseContactRows,
   parseTagCell,
   type ParsedContactRow,
+  type ParsedContactRows,
 } from '@/lib/contacts/parse-contact-csv';
+import type { ContactWorkbook } from '@/lib/contacts/read-contact-workbook';
 import {
   assignImportedContactTags,
   resolveImportTagIds,
@@ -66,7 +69,7 @@ import { useTranslations } from 'next-intl';
 const DEFAULT_TAG_COLOR = '#3b82f6';
 const PREVIEW_LIMIT = 5;
 
-const csvColumn = (chunks: ReactNode) => (
+const columnCode = (chunks: ReactNode) => (
   <code className="bg-muted text-foreground rounded px-1 py-0.5 text-xs">
     {chunks}
   </code>
@@ -159,9 +162,13 @@ export function ImportModal({
   const [parsingFile, setParsingFile] = useState(false);
   const [countryCode, setCountryCode] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
-  const [csvCustomFieldIds, setCsvCustomFieldIds] = useState<string[]>([]);
+  const [importCustomFieldIds, setImportCustomFieldIds] = useState<string[]>(
+    []
+  );
 
   const [file, setFile] = useState<File | null>(null);
+  const [workbook, setWorkbook] = useState<ContactWorkbook | null>(null);
+  const [sheetName, setSheetName] = useState('');
   const [dragging, setDragging] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedContactRow[]>([]);
   const [availableTags, setAvailableTags] = useState<TagRecord[]>([]);
@@ -202,14 +209,7 @@ export function ImportModal({
       tagNames: parseTagCell([...row.tagNames, ...added].join(';')),
     }));
   }, [parsedRows, selectedTagIds, availableTags, extraTags]);
-  /**
-   * In-file duplicates dropped at parse time, carried through to the
-   * result summary so they're still reported as skipped. De-duping here
-   * rather than at import time keeps the preview, the "rows ready" chip
-   * and the Import button count all describing the same set of contacts —
-   * they previously listed the raw CSV rows, so a file with the same
-   * number twice showed (and offered to import) it twice.
-   */
+  // Keep rows skipped during preview in the final import report.
   const [inFileDropped, setInFileDropped] = useState<ReportRow[]>([]);
   const [hasTagsColumn, setHasTagsColumn] = useState(false);
   const [hasCompanyColumn, setHasCompanyColumn] = useState(false);
@@ -240,18 +240,24 @@ export function ImportModal({
     total?: number;
   } | null>(null);
 
+  function clearPreview() {
+    setImportCustomFieldIds([]);
+    setParsedRows([]);
+    setInFileDropped([]);
+    setHasTagsColumn(false);
+    setHasCompanyColumn(false);
+  }
+
   function reset() {
     setCountryCode(null);
     fileRequest.current++;
     setParsingFile(false);
-    setCsvCustomFieldIds([]);
+    clearPreview();
     setFile(null);
-    setParsedRows([]);
+    setWorkbook(null);
+    setSheetName('');
     setSelectedTagIds([]);
     setExtraTags('');
-    setInFileDropped([]);
-    setHasTagsColumn(false);
-    setHasCompanyColumn(false);
     setResult(null);
     setProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -265,15 +271,30 @@ export function ImportModal({
 
   async function loadFile(selected: File) {
     if (importing || !accountId) return;
+    const excel = /\.xlsx$/i.test(selected.name);
+    if (
+      !excel &&
+      !/\.csv$/i.test(selected.name) &&
+      selected.type !== 'text/csv'
+    ) {
+      toast.error(t('toastUnsupportedFile'));
+      return;
+    }
     const request = ++fileRequest.current;
     setFile(selected);
+    setWorkbook(null);
+    setSheetName('');
     setResult(null);
-    setParsedRows([]);
-    setCsvCustomFieldIds([]);
+    clearPreview();
     setParsingFile(true);
     try {
-      const [text, fields, code] = await Promise.all([
-        selected.text(),
+      const [source, fields, code] = await Promise.all([
+        excel
+          ? import('@/lib/contacts/read-contact-workbook').then(
+              async ({ readContactWorkbook }) =>
+                readContactWorkbook(await selected.arrayBuffer())
+            )
+          : selected.text(),
         fetchAllRows<CustomField>((from, to) =>
           supabase
             .from('custom_fields')
@@ -286,44 +307,14 @@ export function ImportModal({
       ]);
       if (request !== fileRequest.current) return;
       if (fields.error) throw fields.error;
-      const {
-        rows,
-        hasTagsColumn: csvHasTags,
-        hasCompanyColumn: csvHasCompany,
-        customFieldIds = [],
-      } = parseContactCsv(text, fields.rows, code);
       setCountryCode(code);
       setCustomFields(fields.rows);
-      setCsvCustomFieldIds(customFieldIds);
-
-      if (rows.length === 0) {
-        toast.error(t('toastNoValidRows'));
-        setParsedRows([]);
-        setInFileDropped([]);
-        setHasTagsColumn(false);
-        setHasCompanyColumn(false);
-        return;
+      if (typeof source === 'string') {
+        showPreview(parseContactCsv(source, fields.rows, code), code);
+      } else {
+        setWorkbook(source);
+        showWorksheet(source, source.sheetNames[0] ?? '', fields.rows, code);
       }
-
-      // Collapse repeats of the same number now, so everything downstream —
-      // preview, counts, insert — works from one list.
-      const { unique, dropped } = dedupeByPhone(
-        rows.slice().reverse(),
-        undefined,
-        (phone) => toMetaPhone(phone, code)
-      );
-      unique.reverse();
-      dropped.reverse();
-      setParsedRows(unique);
-      setInFileDropped(
-        dropped.map(({ row, reason }) => ({
-          phone: row.phone,
-          name: row.name,
-          reason: reason === 'no_phone' ? 'no_phone' : 'file_duplicate',
-        }))
-      );
-      setHasTagsColumn(csvHasTags);
-      setHasCompanyColumn(csvHasCompany);
     } catch {
       if (request === fileRequest.current) toast.error(t('toastError'));
     } finally {
@@ -331,17 +322,58 @@ export function ImportModal({
     }
   }
 
+  function showPreview(
+    parsed: ParsedContactRows,
+    code: string,
+    skipped: ReportRow[] = []
+  ) {
+    // Reverse before deduping so the last row for a phone number wins.
+    const { unique, dropped } = dedupeByPhone(
+      parsed.rows.slice().reverse(),
+      undefined,
+      (phone) => toMetaPhone(phone, code)
+    );
+    setParsedRows(unique.reverse());
+    setInFileDropped([
+      ...skipped,
+      ...dropped.reverse().map(({ row, reason }): ReportRow => ({
+        phone: row.phone,
+        name: row.name,
+        reason: reason === 'no_phone' ? 'no_phone' : 'file_duplicate',
+      })),
+    ]);
+    setImportCustomFieldIds(parsed.customFieldIds ?? []);
+    setHasTagsColumn(parsed.hasTagsColumn);
+    setHasCompanyColumn(parsed.hasCompanyColumn);
+    if (unique.length === 0 && skipped.length === 0)
+      toast.error(t('toastNoValidRows'));
+  }
+
+  function showWorksheet(
+    source: ContactWorkbook,
+    name: string,
+    fields: CustomField[],
+    code: string
+  ) {
+    setSheetName(name);
+    const { records, invalidNumericPhones } = source.rowsFromSheet(name);
+    showPreview(
+      parseContactRows(records, fields, code),
+      code,
+      invalidNumericPhones.map(({ row, phone, name }) => ({
+        phone,
+        name,
+        sourceRow: row,
+        reason: 'excel_numeric_phone',
+      }))
+    );
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
     const dropped = e.dataTransfer.files[0];
-    // Dropping bypasses the picker's `accept`, so check here.
-    if (!dropped || importing) return;
-    if (!/\.csv$/i.test(dropped.name) && dropped.type !== 'text/csv') {
-      toast.error(t('toastNotCsv'));
-      return;
-    }
-    void loadFile(dropped);
+    if (dropped && !importing) void loadFile(dropped);
   }
 
   async function handleImport() {
@@ -356,8 +388,6 @@ export function ImportModal({
     // what actually happened rather than lose it behind a generic
     // error toast — rows already written to the DB shouldn't vanish
     // from the summary just because a later request timed out.
-    // In-file duplicates were already collapsed at parse time; they
-    // still count as skipped in the summary.
     const report = emptyReport();
     report.skipped.push(...inFileDropped);
     let tagsAssigned = 0;
@@ -529,7 +559,8 @@ export function ImportModal({
       const chunkSize = INSERT_BATCH_SIZE;
 
       for (let i = 0; i < toInsert.length; i += chunkSize) {
-        const chunk = toInsert.slice(i, i + chunkSize)
+        const chunk = toInsert
+          .slice(i, i + chunkSize)
           .sort((a, b) => a.phone.localeCompare(b.phone));
         await prepareContactPhones(
           supabase,
@@ -599,7 +630,7 @@ export function ImportModal({
             const source = sourceByPhone.get(inserted.phone_normalized);
             if (!source)
               throw new Error(
-                'Could not match an imported contact to its CSV row'
+                'Could not match an imported contact to its source row'
               );
             report.imported.push(toRow(source));
             queueValues(inserted.id, source);
@@ -808,13 +839,19 @@ export function ImportModal({
 
   const preview = importRows.slice(0, PREVIEW_LIMIT);
   const previewCustomFields = customFields.filter((field) =>
-    csvCustomFieldIds.includes(field.id)
+    importCustomFieldIds.includes(field.id)
   );
-  // Tags: OR — show when the CSV declares a column or preview rows carry
+  const duplicates = inFileDropped.filter(
+    (row) => row.reason === 'file_duplicate'
+  ).length;
+  const invalidNumericPhones = inFileDropped.filter(
+    (row) => row.reason === 'excel_numeric_phone'
+  );
+  // Tags: OR — show when the file declares a column or preview rows carry
   // values, so an all-empty tags column still renders for validation.
   const previewHasTags =
     hasTagsColumn || preview.some((row) => row.tagNames.length > 0);
-  // Company: AND — hide unless the CSV declares it and preview has data,
+  // Company: AND — hide unless the file declares it and preview has data,
   // avoiding an all-dash column that wastes horizontal space.
   const previewHasCompany =
     hasCompanyColumn && preview.some((row) => row.company?.trim());
@@ -855,7 +892,7 @@ export function ImportModal({
               <button
                 type="button"
                 disabled={parsingFile}
-                aria-label={file ? t('changeFile') : t('chooseCsv')}
+                aria-label={file ? t('changeFile') : t('chooseFile')}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -909,30 +946,74 @@ export function ImportModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => {
                   const selected = e.target.files?.[0];
+                  e.target.value = '';
                   if (selected) void loadFile(selected);
                 }}
                 className="hidden"
               />
+              {workbook && workbook.sheetNames.length > 1 && (
+                <label className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  {t('worksheet')}
+                  <select
+                    value={sheetName}
+                    className="border-input bg-background focus-visible:ring-ring max-w-full rounded-lg border px-2 py-1.5 focus-visible:ring-2"
+                    onChange={(event) => {
+                      if (!countryCode) return;
+                      showWorksheet(
+                        workbook,
+                        event.target.value,
+                        customFields,
+                        countryCode
+                      );
+                    }}
+                  >
+                    {workbook.sheetNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {invalidNumericPhones.length > 0 && (
+                <p
+                  role="status"
+                  className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200"
+                >
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {t('excelPhoneWarning', {
+                    count: invalidNumericPhones.length,
+                  })}{' '}
+                  {t('excelPhoneRows', {
+                    rows: invalidNumericPhones
+                      .slice(0, 5)
+                      .map((row) => row.sourceRow)
+                      .join(', '),
+                    more: Math.max(invalidNumericPhones.length - 5, 0),
+                  })}
+                </p>
+              )}
               <details className="group text-sm">
                 <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-md outline-none focus-visible:ring-2 [&::-webkit-details-marker]:hidden">
-                  {t('csvGuide')}
+                  {t('fileGuide')}
                   <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="text-muted-foreground space-y-3 pt-2 text-xs leading-relaxed">
                   <p>
                     {t.rich('desc', {
-                      phoneCode: csvColumn,
-                      nameCode: csvColumn,
-                      emailCode: csvColumn,
-                      companyCode: csvColumn,
-                      tagsCode: csvColumn,
+                      phoneCode: columnCode,
+                      nameCode: columnCode,
+                      emailCode: columnCode,
+                      companyCode: columnCode,
+                      tagsCode: columnCode,
                     })}
                   </p>
                   <p>{t('mergeHint')}</p>
                   <p>{t('customFieldsHint')}</p>
+                  <p>{t('excelFormatHint')}</p>
                 </div>
               </details>
               {file && (
@@ -949,10 +1030,10 @@ export function ImportModal({
                   {t('preview', { count: preview.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {inFileDropped.length > 0 && (
+                  {duplicates > 0 && (
                     <span className="bg-muted/90 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-amber-800 dark:text-amber-200">
                       <AlertTriangle className="size-3" />
-                      {t('previewDuplicates', { count: inFileDropped.length })}
+                      {t('previewDuplicates', { count: duplicates })}
                     </span>
                   )}
                   {tagStats.rowsWithTags > 0 && (
@@ -975,7 +1056,9 @@ export function ImportModal({
                   aria-label={t('preview', { count: preview.length })}
                 >
                   <div className="px-3 py-2">
-                    <PhoneCountryWarning resolved={{ kind: 'csv', contacts: importRows }} />
+                    <PhoneCountryWarning
+                      resolved={{ kind: 'csv', contacts: importRows }}
+                    />
                   </div>
                   <table className="w-full min-w-[32rem] text-sm">
                     <thead>

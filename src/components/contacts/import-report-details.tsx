@@ -48,6 +48,8 @@ function Section({
 
   function detail(row: ReportRow): string {
     const parts: string[] = [];
+    if (row.sourceRow !== undefined)
+      parts.push(t('sourceRow', { row: row.sourceRow }));
     if (row.reason) parts.push(t(`reason.${row.reason}`));
     if (row.rename) {
       parts.push(
