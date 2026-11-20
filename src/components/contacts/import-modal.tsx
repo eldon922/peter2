@@ -63,11 +63,27 @@ import {
   AlertTriangle,
   Tag,
   ChevronDown,
+  Plus,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 const DEFAULT_TAG_COLOR = '#3b82f6';
 const PREVIEW_LIMIT = 5;
+
+function fetchImportTags(
+  db: ReturnType<typeof createClient>,
+  accountId: string
+) {
+  return fetchAllRows<TagRecord>((from, to) =>
+    db
+      .from('tags')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('name')
+      .order('id')
+      .range(from, to)
+  );
+}
 
 const columnCode = (chunks: ReactNode) => (
   <code className="bg-muted text-foreground rounded px-1 py-0.5 text-xs">
@@ -155,10 +171,12 @@ export function ImportModal({
   onImported,
 }: ImportModalProps) {
   const t = useTranslations('Contacts.importModal');
+  const tTags = useTranslations('Settings.tagsAndFields');
   const supabase = createClient();
-  const { accountId, canEditSettings } = useAuth();
+  const { accountId, canEditSettings, user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileRequest = useRef(0);
+  const tagsRequest = useRef(0);
   const [parsingFile, setParsingFile] = useState(false);
   const [countryCode, setCountryCode] = useState<string | null>(null);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -174,19 +192,13 @@ export function ImportModal({
   const [availableTags, setAvailableTags] = useState<TagRecord[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [extraTags, setExtraTags] = useState('');
+  const [savingTags, setSavingTags] = useState(false);
   useEffect(() => {
     if (!open || !accountId) return;
     let cancelled = false;
-    fetchAllRows<TagRecord>((from, to) =>
-      supabase
-        .from('tags')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('name')
-        .order('id')
-        .range(from, to)
-    ).then(({ rows, error }) => {
-      if (cancelled) return;
+    const request = ++tagsRequest.current;
+    fetchImportTags(supabase, accountId).then(({ rows, error }) => {
+      if (cancelled || request !== tagsRequest.current) return;
       if (error) {
         toast.error(t('toastError'));
         return;
@@ -264,9 +276,49 @@ export function ImportModal({
   }
 
   function handleOpenChange(next: boolean) {
-    if (!next && importing) return;
+    if (!next && (importing || savingTags)) return;
     if (!next) reset();
     onOpenChange(next);
+  }
+
+  async function handleAddTags() {
+    const names = parseTagCell(extraTags);
+    if (
+      !names.length ||
+      !user ||
+      !accountId ||
+      !canEditSettings ||
+      savingTags ||
+      importing
+    )
+      return;
+    const request = tagsRequest.current;
+    setSavingTags(true);
+    try {
+      const { tagIdByKey } = await withRetry(() =>
+        resolveImportTagIds(supabase, {
+          accountId,
+          userId: user.id,
+          tagNames: names,
+          canCreateTags: true,
+        })
+      );
+      const { rows, error } = await fetchImportTags(supabase, accountId);
+      if (request !== tagsRequest.current) return;
+      if (error) throw error;
+      const addedIds = names.flatMap((name) => {
+        const id = tagIdByKey.get(name.toLowerCase());
+        return id ? [id] : [];
+      });
+      tagsRequest.current++;
+      setAvailableTags(rows);
+      setSelectedTagIds((current) => [...new Set([...current, ...addedIds])]);
+      setExtraTags('');
+    } catch {
+      toast.error(tTags('failedToCreateTag'));
+    } finally {
+      setSavingTags(false);
+    }
   }
 
   async function loadFile(selected: File) {
@@ -377,7 +429,13 @@ export function ImportModal({
   }
 
   async function handleImport() {
-    if (parsedRows.length === 0 || parsingFile || importing || !countryCode)
+    if (
+      parsedRows.length === 0 ||
+      parsingFile ||
+      importing ||
+      savingTags ||
+      !countryCode
+    )
       return;
     setImporting(true);
     setProgress({ stage: 'checking', done: 0, total: parsedRows.length });
@@ -870,7 +928,7 @@ export function ImportModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        showCloseButton={!importing}
+        showCloseButton={!importing && !savingTags}
         className="bg-popover text-popover-foreground flex max-h-[min(90dvh,48rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl [&>[data-slot=dialog-close]]:size-10"
       >
         <DialogHeader className="border-border shrink-0 gap-2 border-b px-5 py-5 pr-14">
@@ -1177,14 +1235,46 @@ export function ImportModal({
                 }
                 onClear={() => setSelectedTagIds([])}
               />
-              <Input
-                className="bg-background h-10"
-                value={extraTags}
-                disabled={importing || !canEditSettings}
-                onChange={(event) => setExtraTags(event.target.value)}
-                aria-label={t('newTags')}
-                placeholder={t('newTags')}
-              />
+              {canEditSettings && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="bg-background h-10"
+                    value={extraTags}
+                    disabled={savingTags}
+                    onChange={(event) => setExtraTags(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === 'Enter' &&
+                        !event.nativeEvent.isComposing
+                      ) {
+                        event.preventDefault();
+                        void handleAddTags();
+                      }
+                    }}
+                    aria-label={t('newTags')}
+                    placeholder={t('newTags')}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10"
+                    disabled={
+                      savingTags ||
+                      !user ||
+                      !accountId ||
+                      !parseTagCell(extraTags).length
+                    }
+                    onClick={handleAddTags}
+                  >
+                    {savingTags ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Plus className="size-4" />
+                    )}
+                    {tTags('addTag')}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           {!result && importing && progress && (
@@ -1294,7 +1384,7 @@ export function ImportModal({
           <Button
             type="button"
             variant="outline"
-            disabled={importing}
+            disabled={importing || savingTags}
             onClick={() => handleOpenChange(false)}
             className="h-auto min-h-10 px-4 py-2 whitespace-normal"
           >
@@ -1303,7 +1393,12 @@ export function ImportModal({
           {!result && (
             <Button
               type="button"
-              disabled={parsedRows.length === 0 || parsingFile || importing}
+              disabled={
+                parsedRows.length === 0 ||
+                parsingFile ||
+                importing ||
+                savingTags
+              }
               onClick={handleImport}
               className="h-auto min-h-10 px-5 py-2 whitespace-normal"
             >
