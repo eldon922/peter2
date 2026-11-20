@@ -21,6 +21,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -335,12 +336,12 @@ export function ContactForm({
             <Label htmlFor="cf-phone" className="text-muted-foreground">
               {t('phoneLabel')} <span className="text-red-400">*</span>
             </Label>
-            <Input
+            <PhoneInput
               id="cf-phone"
               value={phone}
-              onChange={(e) => {
+              onValueChange={(value) => {
                 duplicateRequest.current++;
-                setPhone(e.target.value);
+                setPhone(value);
                 if (dupMatch) setDupMatch(null);
               }}
               onBlur={checkDuplicate}
