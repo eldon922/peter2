@@ -27,27 +27,31 @@ export function EmojiMenu({
     setOpen(value);
     onOpenChange?.(value);
   }
+  function choose({ emoji }: { emoji: string }) {
+    toggle(false);
+    onPick(emoji);
+  }
   return (
     <Popover open={open} onOpenChange={toggle}>
       <PopoverTrigger
         disabled={disabled}
         aria-label={label}
         title={label}
-        className="hover:bg-muted grid size-8 shrink-0 place-items-center rounded-full"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring grid size-8 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2 disabled:opacity-50"
       >
         <SmilePlus className="size-4" />
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
+      <PopoverContent className="w-auto p-0" side="top" initialFocus={false}>
         {open && (
           <Picker
             theme="auto"
             emojiStyle="native"
+            reactionsDefaultOpen
+            autoFocusSearch={false}
             width="min(340px, 90vw)"
             height="min(400px, 55dvh)"
-            onEmojiClick={({ emoji }) => {
-              toggle(false);
-              onPick(emoji);
-            }}
+            onReactionClick={choose}
+            onEmojiClick={choose}
           />
         )}
       </PopoverContent>

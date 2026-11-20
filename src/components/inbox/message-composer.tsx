@@ -1016,97 +1016,105 @@ export function MessageComposer({
             </GatedButton>
           </div>
 
-          <EmojiMenu
-            label={t('insertEmoji')}
-            disabled={inputsDisabled}
-            onPick={(emoji) => {
-              const editor = textareaRef.current;
-              if (!editor) return;
-              const start = editor.selectionStart;
-              setText(
-                text.slice(0, start) + emoji + text.slice(editor.selectionEnd)
-              );
-              requestAnimationFrame(() => {
-                editor.focus();
-                editor.setSelectionRange(
-                  start + emoji.length,
-                  start + emoji.length
+          <div className="relative min-w-0 flex-1">
+            <textarea
+              ref={textareaRef}
+              aria-label={t('message')}
+              value={text}
+              onChange={handleChange}
+              onSelect={(event) => {
+                setHasSelection(
+                  event.currentTarget.selectionStart !==
+                    event.currentTarget.selectionEnd
                 );
-                adjustHeight();
-              });
-            }}
-          />
-          <textarea
-            ref={textareaRef}
-            aria-label={t('message')}
-            value={text}
-            onChange={handleChange}
-            onSelect={(event) => {
-              setHasSelection(
-                event.currentTarget.selectionStart !==
-                  event.currentTarget.selectionEnd
-              );
-              setFormatPosition(selectionPosition(event.currentTarget));
-            }}
-            onScroll={() => setHasSelection(false)}
-            onPaste={(event) => {
-              const value = clipboardText(event.clipboardData);
-              if (!value) return;
-              event.preventDefault();
-              const editor = event.currentTarget;
-              const start = editor.selectionStart;
-              setText(
-                text.slice(0, start) + value + text.slice(editor.selectionEnd)
-              );
-              requestAnimationFrame(() => {
-                editor.setSelectionRange(
-                  start + value.length,
-                  start + value.length
+                setFormatPosition(selectionPosition(event.currentTarget));
+              }}
+              onScroll={() => setHasSelection(false)}
+              onPaste={(event) => {
+                const value = clipboardText(event.clipboardData);
+                if (!value) return;
+                event.preventDefault();
+                const editor = event.currentTarget;
+                const start = editor.selectionStart;
+                setText(
+                  text.slice(0, start) + value + text.slice(editor.selectionEnd)
                 );
-                adjustHeight();
-              });
-            }}
-            onBlur={(event) => {
-              if (!formattingRef.current?.contains(event.relatedTarget as Node))
-                setHasSelection(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Tab' && event.shiftKey && hasSelection) {
-                const firstAction =
-                  formattingRef.current?.querySelector<HTMLButtonElement>(
-                    'button:not(:disabled)'
+                requestAnimationFrame(() => {
+                  editor.setSelectionRange(
+                    start + value.length,
+                    start + value.length
                   );
-                if (firstAction) {
-                  event.preventDefault();
-                  firstAction.focus();
-                  return;
+                  adjustHeight();
+                });
+              }}
+              onBlur={(event) => {
+                if (
+                  !formattingRef.current?.contains(event.relatedTarget as Node)
+                )
+                  setHasSelection(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Tab' && event.shiftKey && hasSelection) {
+                  const firstAction =
+                    formattingRef.current?.querySelector<HTMLButtonElement>(
+                      'button:not(:disabled)'
+                    );
+                  if (firstAction) {
+                    event.preventDefault();
+                    firstAction.focus();
+                    return;
+                  }
                 }
+                if (event.key === 'Escape') setHasSelection(false);
+                handleKeyDown(event);
+              }}
+              placeholder={
+                readOnly
+                  ? t('readOnlyPlaceholder')
+                  : sessionExpired
+                    ? t('sessionExpiredPlaceholder')
+                    : t('typeMessagePlaceholder')
               }
-              if (event.key === 'Escape') setHasSelection(false);
-              handleKeyDown(event);
-            }}
-            placeholder={
-              readOnly
-                ? t('readOnlyPlaceholder')
-                : sessionExpired
-                  ? t('sessionExpiredPlaceholder')
-                  : t('typeMessagePlaceholder')
-            }
-            disabled={sessionExpired || readOnly}
-            rows={1}
-            // Textarea keeps its own inline title — the GatedButton
-            // wrapping pattern doesn't apply to non-button inputs.
-            // The placeholder text also surfaces the read-only state.
-            title={readOnly ? t('readOnlyTitle') : undefined}
-            className={cn(
-              // `min-w-0`: a textarea's intrinsic width comes from its
-              // `cols` default (~20 chars), and a flex item won't shrink
-              // below that on its own — so on a narrow phone the row
-              // would overflow instead of the box getting smaller.
-              'border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus-visible:ring-ring min-h-11 min-w-0 flex-1 resize-none rounded-lg border px-3 py-2.5 text-sm transition-colors outline-none focus-visible:ring-2',
-              (sessionExpired || readOnly) && 'cursor-not-allowed opacity-50'
-            )}
-          />
+              disabled={sessionExpired || readOnly}
+              rows={1}
+              // Textarea keeps its own inline title — the GatedButton
+              // wrapping pattern doesn't apply to non-button inputs.
+              // The placeholder text also surfaces the read-only state.
+              title={readOnly ? t('readOnlyTitle') : undefined}
+              className={cn(
+                // `min-w-0`: a textarea's intrinsic width comes from its
+                // `cols` default (~20 chars), and a flex item won't shrink
+                // below that on its own — so on a narrow phone the row
+                // would overflow instead of the box getting smaller.
+                'border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus-visible:ring-ring block min-h-11 w-full resize-none rounded-lg border py-2.5 pr-11 pl-3 text-sm transition-colors outline-none focus-visible:ring-2',
+                (sessionExpired || readOnly) && 'cursor-not-allowed opacity-50'
+              )}
+            />
+            <div className="absolute right-1.5 bottom-1.5">
+              <EmojiMenu
+                label={t('insertEmoji')}
+                disabled={inputsDisabled}
+                onPick={(emoji) => {
+                  const editor = textareaRef.current;
+                  if (!editor) return;
+                  const start = editor.selectionStart;
+                  setText(
+                    text.slice(0, start) +
+                      emoji +
+                      text.slice(editor.selectionEnd)
+                  );
+                  requestAnimationFrame(() => {
+                    editor.focus();
+                    editor.setSelectionRange(
+                      start + emoji.length,
+                      start + emoji.length
+                    );
+                    adjustHeight();
+                  });
+                }}
+              />
+            </div>
+          </div>
 
           <GatedButton
             size="sm"
