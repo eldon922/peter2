@@ -62,6 +62,7 @@ import {
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive';
 import type { InteractiveMessagePayload, QuickReply } from '@/types';
 import { QuickReplyPicker } from './quick-reply-picker';
+import { EmojiMenu } from './emoji-menu';
 import { FormattedText } from './formatted-text';
 
 /** Media content types an agent can send from the composer. */
@@ -1007,6 +1008,17 @@ export function MessageComposer({
             </GatedButton>
           </div>
 
+          <EmojiMenu label="Insert emoji" disabled={inputsDisabled} onPick={(emoji) => {
+            const editor = textareaRef.current;
+            if (!editor) return;
+            const start = editor.selectionStart;
+            setText(text.slice(0, start) + emoji + text.slice(editor.selectionEnd));
+            requestAnimationFrame(() => {
+              editor.focus();
+              editor.setSelectionRange(start + emoji.length, start + emoji.length);
+              adjustHeight();
+            });
+          }} />
           <textarea
             ref={textareaRef}
             aria-label={t('message')}
