@@ -1,9 +1,8 @@
 import { supabaseAdmin } from '@/lib/flows/admin-client';
-import { isUuid } from '@/lib/api/v1/pagination';
 
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  if (!isUuid(token)) return new Response(null, { status: 404 });
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(token)) return new Response(null, { status: 404 });
   const { data, error } = await supabaseAdmin().rpc('follow_broadcast_button', { p_token: token });
   if (error) return new Response(null, { status: 503 });
   if (!data) return new Response(null, { status: 404 });
