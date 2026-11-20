@@ -451,6 +451,7 @@ export type RecipientStatus =
   'pending' | 'sent' | 'delivered' | 'read' | 'replied' | 'failed';
 
 export interface Broadcast {
+  link_click_count?: number | null;
   started_at?: string | null;
   completed_at?: string | null;
   send_run_total?: number | null;

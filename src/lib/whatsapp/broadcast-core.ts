@@ -1272,6 +1272,23 @@ export async function deliverBroadcast(
       attemptedPhone = variant;
 
       try {
+        let messageParams = recipient.messageParams;
+        const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '');
+        for (const [index, button] of (plan.templateRow?.buttons ?? []).entries()) {
+          if (!site || button.type !== 'URL' || button.url !== site + '/r/{{1}}') continue;
+          const destination = new URL(recipient.messageParams?.buttonParams?.[index] ?? '');
+          if (destination.protocol !== 'https:' || destination.username || destination.password) {
+            throw new Error('Tracked buttons require an HTTPS destination.');
+          }
+          const { data: link, error } = await db.from('broadcast_button_links')
+            .insert({ recipient_id: recipient.recipientRowId, destination: destination.href })
+            .select('token').single();
+          if (error || !link) throw new Error('Could not create tracked button link.');
+          const { error: countError } = await db.from('broadcasts').update({ link_click_count: 0 })
+            .eq('id', plan.broadcastId).is('link_click_count', null);
+          if (countError) throw new Error('Could not initialize click tracking.');
+          messageParams = { ...messageParams, buttonParams: { ...messageParams?.buttonParams, [index]: link.token } };
+        }
         const result = await sendTemplateMessage({
           phoneNumberId: plan.phoneNumberId,
           accessToken: plan.accessToken,
@@ -1279,7 +1296,7 @@ export async function deliverBroadcast(
           templateName: plan.templateName,
           language: plan.templateLanguage,
           template: plan.templateRow ?? undefined,
-          messageParams: recipient.messageParams,
+          messageParams,
           params: recipient.params,
         });
         sentMessageId = result.messageId;

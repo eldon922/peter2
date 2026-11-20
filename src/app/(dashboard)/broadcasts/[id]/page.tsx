@@ -909,6 +909,11 @@ export default function BroadcastDetailPage() {
           color="bg-indigo-500/10 text-indigo-400"
         />
 </div>
+  <div className="border-border bg-card rounded-xl border p-4">
+    <p className="text-muted-foreground text-sm">Button link click rate</p>
+    <p className="text-xl font-semibold">{broadcast.link_click_count == null ? 'Untracked' : `${broadcast.sent_count ? (100 * broadcast.link_click_count / broadcast.sent_count).toFixed(1) : 0}%`}</p>
+    {broadcast.link_click_count != null && <p className="text-muted-foreground text-xs">{broadcast.link_click_count.toLocaleString()} unique recipients clicked / {broadcast.sent_count.toLocaleString()} sent</p>}
+  </div>
 </section>
       {/* Recipients Table */}
                   <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
