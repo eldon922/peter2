@@ -1064,8 +1064,8 @@
       "days": "{days} days {time}",
       "startsIn": "Starts in {time}",
       "startingSoon": "Scheduled time reached — waiting to start",
-      "sendingDuration": "Sending duration: {time}",
-      "sentDuration": "Sent duration: {time}"
+      "sendingDuration": "Sending duration",
+      "sentDuration": "Sent duration"
     }
   },
   "Automations": {

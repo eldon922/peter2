@@ -16,7 +16,6 @@ import { Broadcast, BroadcastRecipient, RecipientStatus, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { GatedButton } from '@/components/ui/gated-button';
 import { useCan } from '@/hooks/use-can';
-import { numberChanged } from '@/lib/broadcasts/variables';
 import {
   headerMediaError,
   NO_HEADER_MEDIA,
@@ -24,14 +23,6 @@ import {
 } from '@/lib/broadcasts/header-media';
 import { isHeaderMediaKind, type HeaderMediaKind } from '@/lib/media-specs';
 import { HeaderMediaPicker } from '@/components/broadcasts/header-media-picker';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,16 +49,11 @@ import {
   Square,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  getBroadcastStatus,
-  getRecipientStatus,
-  recipientStatusConfig,
-  statusTextClass,
-} from '@/lib/broadcast-status';
+import { getBroadcastStatus, getRecipientStatus } from '@/lib/broadcast-status';
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
+import { BroadcastRecipientList } from '@/components/broadcasts/recipient-list';
 import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
-import { contactDisplayName } from '@/lib/contacts/display-name';
 import { fetchBroadcastRecipients } from '@/lib/broadcasts/recipients';
 import { SendConfirmationDialog } from '@/components/broadcasts/send-confirmation-dialog';
 import {
@@ -190,17 +176,6 @@ const RECIPIENT_STATUSES: readonly RecipientStatus[] = [
 ];
 
 /**
- * Timestamp lines in the recipients table are tinted to match the status
- * chip of the step each one records, so "delivered" reads the same green
- * whether you're looking at the chip, the funnel bar, or the time.
- */
-const STAMP_TINTS = {
-  sent: statusTextClass(recipientStatusConfig.sent),
-  delivered: statusTextClass(recipientStatusConfig.delivered),
-  read: statusTextClass(recipientStatusConfig.read),
-} as const;
-
-/**
  * CSV export helper — RFC 4180 quoting. Quote every field so
  * commas/newlines/quotes round-trip cleanly.
  */
@@ -232,6 +207,8 @@ export default function BroadcastDetailPage() {
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
   const tStatus = useTranslations('Broadcasts.status');
+  const tList = useTranslations('Broadcasts.page');
+  const tTiming = useTranslations('Broadcasts.timing');
   const locale = useLocale();
   // Shared with the wizard's personalize step — same upload/URL
   // strings, same recommendation, so a retry prompt doesn't teach the
@@ -638,6 +615,41 @@ export default function BroadcastDetailPage() {
       : audienceFilter.type === 'csv'
         ? t('targetCsv')
         : t('targetAll');
+  const audience = targetTags.length ? (
+    <TagChips tags={targetTags} tone="include" />
+  ) : (
+    targetLabel
+  );
+  const campaignDetails = [
+    ...(broadcast.started_at
+      ? [
+          {
+            label: tTiming(
+              broadcast.status === 'sending'
+                ? 'sendingDuration'
+                : 'sentDuration'
+            ),
+            value: (
+              <BroadcastDuration broadcast={broadcast} showLabel={false} />
+            ),
+          },
+        ]
+      : []),
+    { label: tList('table.template'), value: broadcast.template_name },
+    {
+      label: tList('table.recipients'),
+      value: broadcast.total_recipients.toLocaleString(locale),
+    },
+    { label: t('target'), value: audience },
+    ...(excludedTags.length
+      ? [
+          {
+            label: t('targetExcluding'),
+            value: <TagChips tags={excludedTags} tone="exclude" />,
+          },
+        ]
+      : []),
+  ];
   const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
   const ofAudience = t('stats.ofAudience', {
     count: broadcast.total_recipients,
@@ -690,9 +702,12 @@ export default function BroadcastDetailPage() {
               dateTime={broadcast.created_at}
             >
               {t('createdAt', {
-                date: new Date(broadcast.created_at).toLocaleDateString(locale, {
-                  dateStyle: 'medium',
-                }),
+                date: new Date(broadcast.created_at).toLocaleDateString(
+                  locale,
+                  {
+                    dateStyle: 'medium',
+                  }
+                ),
               })}
             </time>
           </div>
@@ -1009,8 +1024,24 @@ export default function BroadcastDetailPage() {
           />
         </div>
       </section>
-      {/* Recipients Table */}
-      <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <div className="border-border bg-card overflow-hidden rounded-xl border sm:hidden">
+        <table className="w-full text-sm">
+          <tbody className="divide-border divide-y">
+            {campaignDetails.map(({ label, value }) => (
+              <tr key={label}>
+                <th
+                  scope="row"
+                  className="text-muted-foreground w-[36%] px-3 py-2.5 text-left align-top font-medium"
+                >
+                  {label}
+                </th>
+                <td className="px-3 py-2.5 align-top wrap-anywhere">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-muted-foreground mt-1 hidden flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:flex">
         {broadcast.started_at && (
           <>
             <BroadcastDuration broadcast={broadcast} />
@@ -1024,12 +1055,7 @@ export default function BroadcastDetailPage() {
         </span>
         <span aria-hidden>·</span>
         <div className="flex flex-wrap items-center gap-1.5">
-          {t('target')}:
-          {targetTags.length > 0 ? (
-            <TagChips tags={targetTags} tone="include" />
-          ) : (
-            <span>{targetLabel}</span>
-          )}
+          {t('target')}:{audience}
           {excludedTags.length > 0 && (
             <>
               <span>{t('targetExcluding')}</span>
@@ -1072,8 +1098,8 @@ export default function BroadcastDetailPage() {
                 })
               : t('recipientsHeaderAll', { total: broadcast.total_recipients })}
           </h2>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 @min-[50rem]:flex-1 @min-[50rem]:flex-nowrap">
-            <div className="relative w-full min-w-0 @min-[50rem]:w-auto @min-[50rem]:max-w-100 @min-[50rem]:flex-1">
+          <div className="grid min-w-0 grid-cols-2 items-center gap-2 @min-[50rem]:flex @min-[50rem]:flex-1 @min-[50rem]:justify-end">
+            <div className="relative col-span-2 min-w-0 @min-[50rem]:max-w-100 @min-[50rem]:flex-1">
               <SearchInput
                 value={recipientSearch}
                 onClear={() => setRecipientSearch('')}
@@ -1157,235 +1183,16 @@ export default function BroadcastDetailPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  {/* Seven columns do not fit a phone. Rather than leave
-                      it all to horizontal scroll, secondary columns drop
-                      out on the same breakpoint ladder the broadcasts
-                      list uses — and the two that carry information you
-                      can't act without, the number dialled and the
-                      failure reason, reappear stacked inside the cells
-                      that stay. */}
-                  <TableHead className="text-muted-foreground">
-                    {t('table.contact')}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground hidden sm:table-cell">
-                    {t('table.phone')}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground hidden md:table-cell">
-                    {t('table.tags')}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground">
-                    {t('table.status')}
-                  </TableHead>
-                  {/* Cells here only ever hold "×2", so the word
-                      "Attempts" was setting this column's width by
-                      itself. Icon + tooltip keeps it narrow. */}
-                  <TableHead className="text-muted-foreground hidden lg:table-cell">
-                    <span className="inline-flex" title={t('table.attempts')}>
-                      <RotateCw className="h-3.5 w-3.5" aria-hidden />
-                      <span className="sr-only">{t('table.attempts')}</span>
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-muted-foreground hidden lg:table-cell">
-                    {t('table.timestamps')}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground hidden md:table-cell">
-                    {t('table.error')}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecipients.map((recipient) => {
-                  const rStatus = getRecipientStatus(recipient.status);
-                  const contactTags = recipientTags(recipient);
-                  // The contact was edited since this row was dialled,
-                  // so what's displayed is NOT what was messaged. Shown
-                  // on any status — a delivered row whose contact moved
-                  // is just as misleading as a failed one.
-                  const changed = numberChanged(recipient);
-                  const attempts = recipient.attempt_count ?? 1;
-                  // Sent/delivered/read share one column, one line per
-                  // step the message actually reached — a missing line
-                  // means that step never happened, not that it's late.
-                  const stamps = [
-                    {
-                      label: t('table.sent'),
-                      at: recipient.sent_at,
-                      tint: STAMP_TINTS.sent,
-                    },
-                    {
-                      label: t('table.delivered'),
-                      at: recipient.delivered_at,
-                      tint: STAMP_TINTS.delivered,
-                    },
-                    {
-                      label: t('table.read'),
-                      at: recipient.read_at,
-                      tint: STAMP_TINTS.read,
-                    },
-                  ].flatMap(({ label, at, tint }) =>
-                    at
-                      ? [
-                          {
-                            label,
-                            tint,
-                            value: new Date(at).toLocaleString(),
-                          },
-                        ]
-                      : []
-                  );
-                  // Rendered in the phone column at sm+, and stacked under
-                  // the contact name below it. The number-changed warning
-                  // has to travel with whichever one is showing — it's the
-                  // only signal that the row was dialled at a number the
-                  // contact no longer has.
-                  const phoneBlock = (
-                    <>
-                      {recipient.contact?.phone ?? '-'}
-                      {changed && (
-                        <span
-                          className="mt-0.5 flex items-center gap-1 text-xs text-amber-400"
-                          title={t('numberChangedHint', {
-                            phone: recipient.phone_attempted ?? '',
-                          })}
-                        >
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          {t('triedNumber', {
-                            phone: recipient.phone_attempted ?? '',
-                          })}
-                        </span>
-                      )}
-                    </>
-                  );
-                  const errorText = recipient.error_message?.trim();
-                  return (
-                    <TableRow key={recipient.id} className="border-border">
-                      <TableCell className="text-foreground max-w-[9rem] truncate font-medium sm:max-w-xs">
-                        {recipient.contact
-                          ? contactDisplayName(recipient.contact)
-                          : 'Unknown'}
-                        <span className="text-muted-foreground mt-0.5 block text-xs font-normal whitespace-normal sm:hidden">
-                          {phoneBlock}
-                        </span>
-                        {contactTags.length > 0 && (
-                          <div className="mt-1 whitespace-normal md:hidden">
-                            <TagChips tags={contactTags} />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground hidden sm:table-cell">
-                        {phoneBlock}
-                      </TableCell>
-                      <TableCell className="hidden max-w-64 whitespace-normal md:table-cell">
-                        {contactTags.length ? (
-                          <TagChips tags={contactTags} />
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}
-                        >
-                          {tStatus(rStatus.label)}
-                        </span>
-                        {/* The error column is hidden below md, and
-                            "Failed" with no reason is not actionable. */}
-                        {errorText && (
-                          <span className="mt-1 block max-w-[14rem] text-xs break-words whitespace-normal text-red-400 md:hidden">
-                            {errorText}
-                          </span>
-                        )}
-                        {/* Timestamps get their own column only at lg, so
-                            restate them here below that. Failed rows are
-                            excluded: the row never reached a step worth
-                            timing, and the error above is what you act
-                            on — so the two never stack up together. */}
-                        {recipient.status !== 'failed' && stamps.length > 0 && (
-                          <span className="mt-1 block lg:hidden">
-                            {stamps.map(({ label, value, tint }) => (
-                              <span
-                                key={label}
-                                className={`block text-xs whitespace-nowrap ${tint}`}
-                              >
-                                <span className="opacity-60">{label}</span>{' '}
-                                {value}
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">
-                        {attempts > 1 ? `×${attempts}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">
-                        {stamps.length === 0
-                          ? '-'
-                          : stamps.map(({ label, value, tint }) => (
-                              <div
-                                key={label}
-                                className={`text-xs whitespace-nowrap ${tint}`}
-                              >
-                                {/* Dimmed by opacity, not a muted colour,
-                                    so the label stays the step's hue. */}
-                                <span className="opacity-60">{label}</span>{' '}
-                                {value}
-                              </div>
-                            ))}
-                      </TableCell>
-                      {/* Wraps instead of truncating: a clipped WhatsApp
-                          error is unactionable, and `break-words` handles
-                          the long unspaced codes Meta returns. Overrides
-                          TableCell's default `whitespace-nowrap`. */}
-                      <TableCell className="hidden max-w-xs text-xs break-words whitespace-normal text-red-400 md:table-cell">
-                        {/* `|| '-'`, not `?? '-'`: an empty-string
-                            error_message is as unhelpful as a null one
-                            and used to render as a blank cell. */}
-                        {errorText || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {recipient.status === 'failed' && (
-                          <GatedButton
-                            canAct={canSend}
-                            gateReason="send messages"
-                            variant="outline"
-                            size="sm"
-                            disabled={
-                              broadcast.status === 'sending' ||
-                              retrying !== null
-                            }
-                            onClick={() =>
-                              setRetryConfirmation({
-                                recipientId: recipient.id,
-                              })
-                            }
-                            title={
-                              changed
-                                ? t('retryChangedNumber', {
-                                    phone: recipient.contact?.phone ?? '',
-                                  })
-                                : t('retryRow')
-                            }
-                            className="border-border text-muted-foreground hover:bg-muted h-7 bg-transparent disabled:opacity-40"
-                          >
-                            <RotateCw
-                              className={`h-3 w-3 ${
-                                retrying === recipient.id ? 'animate-spin' : ''
-                              }`}
-                            />
-                          </GatedButton>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <BroadcastRecipientList
+            recipients={filteredRecipients}
+            tagsFor={recipientTags}
+            includeTagIds={audienceFilter.tagIds ?? []}
+            excludeTagIds={audienceFilter.excludeTagIds ?? []}
+            sending={broadcast.status === 'sending'}
+            retrying={retrying}
+            canSend={canSend}
+            onRetry={(recipientId) => setRetryConfirmation({ recipientId })}
+          />
         )}
         <ListPagination
           page={recipientPage}

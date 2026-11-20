@@ -15,7 +15,13 @@ function useClock(active: boolean) {
   return now;
 }
 
-export function BroadcastDuration({ broadcast }: { broadcast: Broadcast }) {
+export function BroadcastDuration({
+  broadcast,
+  showLabel = true,
+}: {
+  broadcast: Broadcast;
+  showLabel?: boolean;
+}) {
   const t = useTranslations('Broadcasts.timing');
   const sending = broadcast.status === 'sending';
   const now = useClock(sending);
@@ -24,16 +30,16 @@ export function BroadcastDuration({ broadcast }: { broadcast: Broadcast }) {
     (broadcast.completed_at ? Date.parse(broadcast.completed_at) : now) -
     Date.parse(broadcast.started_at);
   const parts = durationParts(elapsed);
+  const time = parts.days
+    ? t('days', { days: parts.days, time: parts.time })
+    : parts.time;
   return (
     <span
-      className="text-muted-foreground block text-xs font-normal tabular-nums"
+      className="text-muted-foreground block font-normal tabular-nums"
       suppressHydrationWarning
     >
-      {t(sending ? 'sendingDuration' : 'sentDuration', {
-        time: parts.days
-          ? t('days', { days: parts.days, time: parts.time })
-          : parts.time,
-      })}
+      {showLabel ? `${t(sending ? 'sendingDuration' : 'sentDuration')}: ` : ''}
+      {time}
     </span>
   );
 }

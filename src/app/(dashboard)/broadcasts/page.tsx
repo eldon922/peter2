@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Broadcast, Tag } from '@/types';
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Radio, Plus, Loader2 } from 'lucide-react';
+import { Radio, Plus, Loader2, ChevronRight } from 'lucide-react';
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import {
@@ -63,10 +64,55 @@ function RateCell({
   );
 }
 
+function StatusBadge({ status }: { status: Broadcast['status'] }) {
+  const t = useTranslations('Broadcasts.status');
+  const { classes, label, pulse } = getBroadcastStatus(status);
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${classes}`}
+    >
+      {pulse && (
+        <span className="relative flex size-1.5" aria-hidden>
+          <span className="absolute size-full animate-ping rounded-full bg-yellow-400 opacity-75" />
+          <span className="relative size-1.5 rounded-full bg-yellow-400" />
+        </span>
+      )}
+      {t(label)}
+    </span>
+  );
+}
+
+function BroadcastSchedule({ broadcast }: { broadcast: Broadcast }) {
+  if (broadcast.status !== 'scheduled' || !broadcast.scheduled_at) return null;
+  return (
+    <>
+      <span className="text-muted-foreground mt-1 block text-xs">
+        {formatScheduledAt(broadcast.scheduled_at)}
+      </span>
+      <ScheduledCountdown broadcast={broadcast} />
+    </>
+  );
+}
+
+function AudienceTags({
+  targetTags,
+  excludedTags,
+}: {
+  targetTags: Tag[];
+  excludedTags: Tag[];
+}) {
+  if (!targetTags.length && !excludedTags.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 whitespace-normal">
+      <TagChips tags={targetTags} tone="include" />
+      <TagChips tags={excludedTags} tone="exclude" />
+    </div>
+  );
+}
+
 export default function BroadcastsPage() {
   const router = useRouter();
   const t = useTranslations('Broadcasts.page');
-  const tStatus = useTranslations('Broadcasts.status');
   const canCreate = useCan('send-messages');
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,127 +361,187 @@ export default function BroadcastsPage() {
           </GatedButton>
         </div>
       ) : (
-        <div className="border-border bg-card overflow-x-auto rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                {/* `w-full` hands this column all the space the others
+        <>
+          <ul className="space-y-3 sm:hidden" role="list">
+            {visibleBroadcasts.map(
+              ({ broadcast, targetTags, excludedTags }) => {
+                const opening = navigating && openingId === broadcast.id;
+                return (
+                  <li key={broadcast.id}>
+                    <Link
+                      href={`/broadcasts/${broadcast.id}`}
+                      prefetch={false}
+                      onNavigate={(event) => {
+                        event.preventDefault();
+                        openBroadcast(broadcast.id);
+                      }}
+                      aria-busy={opening}
+                      className="border-border bg-card hover:bg-muted/50 focus-visible:ring-ring block space-y-3 rounded-xl border p-4 text-sm outline-none focus-visible:ring-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <h2 className="min-w-0 flex-1 font-semibold wrap-anywhere">
+                          {broadcast.name}
+                        </h2>
+                        <StatusBadge status={broadcast.status} />
+                        {opening ? (
+                          <Loader2
+                            className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin"
+                            aria-hidden
+                          />
+                        ) : (
+                          <ChevronRight
+                            className="text-muted-foreground mt-0.5 size-4 shrink-0"
+                            aria-hidden
+                          />
+                        )}
+                      </div>
+                      <dl className="text-muted-foreground grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
+                        <dt>{t('table.template')}</dt>
+                        <dd className="text-foreground text-right wrap-anywhere">
+                          {broadcast.template_name}
+                        </dd>
+                        <dt>{t('table.recipients')}</dt>
+                        <dd className="text-foreground text-right tabular-nums">
+                          {broadcast.total_recipients.toLocaleString()}
+                        </dd>
+                        <dt>{t('table.delivery')}</dt>
+                        <dd className="text-foreground text-right tabular-nums">
+                          {percentOfRecipients(
+                            broadcast.delivered_count,
+                            broadcast.total_recipients
+                          )}
+                          %
+                        </dd>
+                        <dt>{t('table.read')}</dt>
+                        <dd className="text-foreground text-right tabular-nums">
+                          {percentOfRecipients(
+                            broadcast.read_count,
+                            broadcast.total_recipients
+                          )}
+                          %
+                        </dd>
+                        <dt>{t('table.date')}</dt>
+                        <dd className="text-foreground text-right">
+                          {new Date(broadcast.created_at).toLocaleDateString()}
+                        </dd>
+                      </dl>
+                      {broadcast.started_at && (
+                        <BroadcastDuration broadcast={broadcast} />
+                      )}
+                      <BroadcastSchedule broadcast={broadcast} />
+                      <AudienceTags
+                        targetTags={targetTags}
+                        excludedTags={excludedTags}
+                      />
+                    </Link>
+                  </li>
+                );
+              }
+            )}
+          </ul>
+          <div className="border-border bg-card hidden overflow-x-auto rounded-xl border sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  {/* `w-full` hands this column all the space the others
                     don't claim. It matters most below sm, where Name and
                     Status are the only two columns left and the name
                     would otherwise sit in a narrow strip with the rest of
                     the row empty. `min-w-48` keeps it readable on a
                     narrow desktop, where Template is what gives way. */}
-                <TableHead className="text-muted-foreground w-full min-w-48 md:w-[40%]">
-                  {t('table.name')}
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden min-w-28 md:table-cell">
-                  {t('table.template')}
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden text-right sm:table-cell">
-                  {t('table.recipients')}
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden lg:table-cell">
-                  {t('table.delivery')}
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden lg:table-cell">
-                  {t('table.read')}
-                </TableHead>
-                <TableHead className="text-muted-foreground text-right sm:text-left">
-                  {t('table.status')}
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden sm:table-cell">
-                  {t('table.date')}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visibleBroadcasts.map((row) => {
-                const { broadcast, targetTags, excludedTags } = row;
-                const status = getBroadcastStatus(broadcast.status);
-                return (
-                  <TableRow
-                    key={broadcast.id}
-                    className="border-border hover:bg-muted/50 cursor-pointer"
-                    onClick={() => openBroadcast(broadcast.id)}
-                    aria-busy={navigating && openingId === broadcast.id}
-                  >
-                    {/* Names are free text and routinely long enough to
+                  <TableHead className="text-muted-foreground w-full min-w-48 md:w-[40%]">
+                    {t('table.name')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden min-w-28 md:table-cell">
+                    {t('table.template')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden text-right sm:table-cell">
+                    {t('table.recipients')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden lg:table-cell">
+                    {t('table.delivery')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden lg:table-cell">
+                    {t('table.read')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-right sm:text-left">
+                    {t('table.status')}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground hidden sm:table-cell">
+                    {t('table.date')}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleBroadcasts.map((row) => {
+                  const { broadcast, targetTags, excludedTags } = row;
+                  return (
+                    <TableRow
+                      key={broadcast.id}
+                      className="border-border hover:bg-muted/50 cursor-pointer"
+                      onClick={() => openBroadcast(broadcast.id)}
+                      aria-busy={navigating && openingId === broadcast.id}
+                    >
+                      {/* Names are free text and routinely long enough to
                       set the table's width by themselves, which pushed
                       the whole row off a phone screen. Cap and ellipse
                       them; the full name is the page you land on. */}
-                    {/* `w-full max-w-0` is the table-layout idiom for a
+                      {/* `w-full max-w-0` is the table-layout idiom for a
                       cell that takes the leftover width *and* still
                       truncates: without `max-w-0` the auto layout sizes
                       the column to the longest name and `truncate`
                       never engages. */}
-                    <TableCell className="text-foreground w-full max-w-0 min-w-48 truncate font-medium md:w-[40%]">
-                      {broadcast.name}
-                      {navigating && openingId === broadcast.id && (
-                        <Loader2 className="ml-2 inline size-3 animate-spin" />
-                      )}
-                      <BroadcastDuration broadcast={broadcast} />
-                      {(targetTags.length > 0 || excludedTags.length > 0) && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5 whitespace-normal">
-                          {targetTags.length > 0 && (
-                            <TagChips tags={targetTags} tone="include" />
-                          )}
-                          {excludedTags.length > 0 && (
-                            <TagChips tags={excludedTags} tone="exclude" />
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    {/* `max-w-0` lets this column shrink and truncate
+                      <TableCell className="text-foreground w-full max-w-0 min-w-48 truncate font-medium md:w-[40%]">
+                        {broadcast.name}
+                        {navigating && openingId === broadcast.id && (
+                          <Loader2 className="ml-2 inline size-3 animate-spin" />
+                        )}
+                        <BroadcastDuration broadcast={broadcast} />
+                        {(targetTags.length > 0 || excludedTags.length > 0) && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5 whitespace-normal">
+                            <AudienceTags
+                              targetTags={targetTags}
+                              excludedTags={excludedTags}
+                            />
+                          </div>
+                        )}
+                      </TableCell>
+                      {/* `max-w-0` lets this column shrink and truncate
                       instead of claiming its full text width. */}
-                    <TableCell className="text-muted-foreground hidden max-w-0 min-w-28 truncate md:table-cell">
-                      {broadcast.template_name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
-                      {broadcast.total_recipients}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <RateCell
-                        value={broadcast.delivered_count}
-                        total={broadcast.total_recipients}
-                        color="bg-primary"
-                      />
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <RateCell
-                        value={broadcast.read_count}
-                        total={broadcast.total_recipients}
-                        color="bg-blue-500"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right sm:text-left">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`}
-                      >
-                        {status.pulse && (
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
-                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yellow-400" />
-                          </span>
-                        )}
-                        {tStatus(status.label)}
-                      </span>
-                      {broadcast.status === 'scheduled' &&
-                        broadcast.scheduled_at && (
-                          <span className="text-muted-foreground mt-1 block text-xs whitespace-nowrap">
-                            {formatScheduledAt(broadcast.scheduled_at)}
-                          </span>
-                        )}
-                      <ScheduledCountdown broadcast={broadcast} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground hidden sm:table-cell">
-                      {new Date(broadcast.created_at).toLocaleDateString()}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                      <TableCell className="text-muted-foreground hidden max-w-0 min-w-28 truncate md:table-cell">
+                        {broadcast.template_name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                        {broadcast.total_recipients}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <RateCell
+                          value={broadcast.delivered_count}
+                          total={broadcast.total_recipients}
+                          color="bg-primary"
+                        />
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <RateCell
+                          value={broadcast.read_count}
+                          total={broadcast.total_recipients}
+                          color="bg-blue-500"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right sm:text-left">
+                        <StatusBadge status={broadcast.status} />
+                        <BroadcastSchedule broadcast={broadcast} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden sm:table-cell">
+                        {new Date(broadcast.created_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   );

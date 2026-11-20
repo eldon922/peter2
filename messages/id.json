@@ -1064,8 +1064,8 @@
       "days": "{days} hari {time}",
       "startsIn": "Dimulai dalam {time}",
       "startingSoon": "Waktu terjadwal tercapai — menunggu dimulai",
-      "sendingDuration": "Durasi pengiriman berjalan: {time}",
-      "sentDuration": "Durasi pengiriman: {time}"
+      "sendingDuration": "Durasi pengiriman berjalan",
+      "sentDuration": "Durasi pengiriman"
     }
   },
   "Automations": {

@@ -1064,8 +1064,8 @@
       "days": "{days}일 {time}",
       "startsIn": "{time} 후 시작",
       "startingSoon": "예약 시간이 되어 시작을 기다리고 있습니다",
-      "sendingDuration": "발송 진행 시간: {time}",
-      "sentDuration": "발송 소요 시간: {time}"
+      "sendingDuration": "발송 진행 시간",
+      "sentDuration": "발송 소요 시간"
     }
   },
   "Automations": {
