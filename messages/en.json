@@ -798,7 +798,10 @@
         "sentBasis": "Based on {count, number} sent messages",
         "clickRate": "Button link click rate",
         "untracked": "Untracked",
-        "clickBasis": "{count, number} unique recipients clicked / {sent, number} sent"
+        "clickBasis": "{count, number} unique recipients clicked / {sent, number} sent",
+        "base": "Base audience",
+        "ofAudience": "of total recipients",
+        "ofSent": "of sent messages"
       },
       "toastFailedDelete": "Failed to delete: {error}",
       "toastDeleted": "Broadcast deleted",

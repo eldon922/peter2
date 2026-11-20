@@ -80,6 +80,7 @@ import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
 import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
 
 interface StatCardProps {
+  basis: string;
   label: string;
   hint?: string;
   value: number;
@@ -88,7 +89,15 @@ interface StatCardProps {
   color: string;
 }
 
-function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
+function StatCard({
+  label,
+  hint,
+  value,
+  total,
+  icon,
+  color,
+  basis,
+}: StatCardProps) {
   const pct = total ? Math.round((value / total) * 1000) / 10 : 0;
   const hintId = useId();
   const [hintOpen, setHintOpen] = useState(false);
@@ -130,6 +139,7 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
           label
         )}
       </p>
+      <p className="text-muted-foreground mt-1 text-xs">{basis}</p>
       <div className="bg-muted mt-4 h-2 overflow-hidden rounded-full">
         <div
           className={`h-full rounded-full bg-current ${color.split(' ').at(-1)}`}
@@ -876,6 +886,7 @@ export default function BroadcastDetailPage() {
         <div className="grid gap-3 sm:grid-cols-3">
           <StatCard
             label={t('stats.totalRecipients')}
+            basis={t('stats.base')}
             value={broadcast.total_recipients}
             total={broadcast.total_recipients}
             icon={<Users className="h-4 w-4" />}
@@ -883,6 +894,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.sent')}
+            basis={t('stats.ofAudience')}
             value={broadcast.sent_count}
             total={broadcast.total_recipients}
             icon={<Send className="h-4 w-4" />}
@@ -890,6 +902,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.failed')}
+            basis={t('stats.ofAudience')}
             value={broadcast.failed_count}
             total={broadcast.total_recipients}
             icon={<AlertCircle className="h-4 w-4" />}
@@ -905,6 +918,7 @@ export default function BroadcastDetailPage() {
         <div className="grid gap-3 sm:grid-cols-3">
           <StatCard
             label={t('stats.delivered')}
+            basis={t('stats.ofSent')}
             value={broadcast.delivered_count}
             total={broadcast.sent_count}
             icon={<CheckCheck className="h-4 w-4" />}
@@ -912,6 +926,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.read')}
+            basis={t('stats.ofSent')}
             value={broadcast.read_count}
             total={broadcast.sent_count}
             icon={<Eye className="h-4 w-4" />}
@@ -919,6 +934,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.replied')}
+            basis={t('stats.ofSent')}
             hint={t('stats.repliedHint')}
             value={broadcast.replied_count}
             total={broadcast.sent_count}

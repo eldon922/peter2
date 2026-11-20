@@ -798,7 +798,10 @@
         "sentBasis": "발송 메시지 {count, number}건 기준",
         "clickRate": "버튼 링크 클릭률",
         "untracked": "추적되지 않음",
-        "clickBasis": "클릭한 수신자 {count, number}명 / 발송 {sent, number}건"
+        "clickBasis": "클릭한 수신자 {count, number}명 / 발송 {sent, number}건",
+        "base": "전체 대상",
+        "ofAudience": "전체 수신자 기준",
+        "ofSent": "발송 메시지 기준"
       },
       "toastFailedDelete": "삭제하지 못했습니다: {error}",
       "toastDeleted": "브로드캐스트가 삭제되었습니다",
