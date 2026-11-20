@@ -750,34 +750,7 @@ export default function BroadcastDetailPage() {
             <h1 className="text-foreground text-2xl font-bold break-words">
               {broadcast.name}
             </h1>
-            <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <span>{t('template', { name: broadcast.template_name })}</span>
-              <span>-</span>
-              <span className="flex flex-wrap items-center gap-1.5">
-                {t('target')}:
-                {targetTags.length > 0 ? (
-                  <TagChips tags={targetTags} />
-                ) : (
-                  <span>{targetLabel}</span>
-                )}
-                {excludedTags.length > 0 && (
-                  <>
-                    <span>{t('targetExcluding')}</span>
-                    <TagChips tags={excludedTags} danger />
-                  </>
-                )}
-                <span>
-                  ·{' '}
-                  {t('targetRecipients', { count: broadcast.total_recipients })}
-                </span>
-              </span>
-              <span>-</span>
-              <span>
-                {t('createdAt', {
-                  date: new Date(broadcast.created_at).toLocaleDateString(),
-                })}
-              </span>
-            </div>
+
           </div>
         </div>
 
@@ -1057,7 +1030,35 @@ export default function BroadcastDetailPage() {
       <FunnelChart steps={funnelSteps} sent={broadcast.sent_count} />
 
       {/* Recipients Table */}
-      <BroadcastDuration broadcast={broadcast} />
+                  <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <BroadcastDuration broadcast={broadcast} />
+              <span>{t('template', { name: broadcast.template_name })}</span>
+              <span>-</span>
+              <span className="flex flex-wrap items-center gap-1.5">
+                {t('target')}:
+                {targetTags.length > 0 ? (
+                  <TagChips tags={targetTags} />
+                ) : (
+                  <span>{targetLabel}</span>
+                )}
+                {excludedTags.length > 0 && (
+                  <>
+                    <span>{t('targetExcluding')}</span>
+                    <TagChips tags={excludedTags} danger />
+                  </>
+                )}
+                <span>
+                  ·{' '}
+                  {t('targetRecipients', { count: broadcast.total_recipients })}
+                </span>
+              </span>
+              <span>-</span>
+              <span>
+                {t('createdAt', {
+                  date: new Date(broadcast.created_at).toLocaleDateString(),
+                })}
+              </span>
+            </div>
       <SendConfirmationDialog
         open={retryConfirmation !== null}
         onOpenChange={(open) => {
