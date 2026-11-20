@@ -160,15 +160,22 @@ export function MessageComposer({
   const [text, setText] = useState('');
   const [draftLoaded, setDraftLoaded] = useState(false);
   useEffect(() => {
-    try { if (draftKey) setText(localStorage.getItem(draftKey) ?? ''); }
-    catch { /* Storage unavailable. */ } finally { setDraftLoaded(true); }
+    try {
+      if (draftKey) setText(localStorage.getItem(draftKey) ?? '');
+    } catch {
+      /* Storage unavailable. */
+    } finally {
+      setDraftLoaded(true);
+    }
   }, [draftKey]);
   useEffect(() => {
     if (!draftLoaded || !draftKey) return;
     try {
       if (text) localStorage.setItem(draftKey, text);
       else localStorage.removeItem(draftKey);
-    } catch { /* Storage can be unavailable in private browsing. */ }
+    } catch {
+      /* Storage can be unavailable in private browsing. */
+    }
   }, [text, draftKey, draftLoaded]);
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
@@ -271,7 +278,7 @@ export function MessageComposer({
     setSending(true);
     try {
       if (await onSend(trimmed, replyTo?.id)) {
-        setText(current => current === text ? '' : current);
+        setText((current) => (current === text ? '' : current));
         requestAnimationFrame(adjustHeight);
       }
     } finally {
@@ -1009,17 +1016,26 @@ export function MessageComposer({
             </GatedButton>
           </div>
 
-          <EmojiMenu label={t('insertEmoji')} disabled={inputsDisabled} onPick={(emoji) => {
-            const editor = textareaRef.current;
-            if (!editor) return;
-            const start = editor.selectionStart;
-            setText(text.slice(0, start) + emoji + text.slice(editor.selectionEnd));
-            requestAnimationFrame(() => {
-              editor.focus();
-              editor.setSelectionRange(start + emoji.length, start + emoji.length);
-              adjustHeight();
-            });
-          }} />
+          <EmojiMenu
+            label={t('insertEmoji')}
+            disabled={inputsDisabled}
+            onPick={(emoji) => {
+              const editor = textareaRef.current;
+              if (!editor) return;
+              const start = editor.selectionStart;
+              setText(
+                text.slice(0, start) + emoji + text.slice(editor.selectionEnd)
+              );
+              requestAnimationFrame(() => {
+                editor.focus();
+                editor.setSelectionRange(
+                  start + emoji.length,
+                  start + emoji.length
+                );
+                adjustHeight();
+              });
+            }}
+          />
           <textarea
             ref={textareaRef}
             aria-label={t('message')}

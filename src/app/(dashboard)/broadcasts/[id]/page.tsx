@@ -100,7 +100,11 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
         >
           {icon}
         </div>
-        <span className={`text-xl font-bold tabular-nums ${color.split(" ").at(-1)}`}>{pct}%</span>
+        <span
+          className={`text-xl font-bold tabular-nums ${color.split(' ').at(-1)}`}
+        >
+          {pct}%
+        </span>
       </div>
       <p className="text-foreground mt-3 text-2xl font-bold">
         {value.toLocaleString()}
@@ -126,7 +130,12 @@ function StatCard({ label, hint, value, total, icon, color }: StatCardProps) {
           label
         )}
       </p>
-      <div className="bg-muted mt-4 h-2 overflow-hidden rounded-full"><div className={`h-full rounded-full bg-current ${color.split(" ").at(-1)}`} style={{width: `${Math.min(100,pct)}%`}} /></div>
+      <div className="bg-muted mt-4 h-2 overflow-hidden rounded-full">
+        <div
+          className={`h-full rounded-full bg-current ${color.split(' ').at(-1)}`}
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -627,7 +636,6 @@ export default function BroadcastDetailPage() {
             <h1 className="text-foreground text-2xl font-bold break-words">
               {broadcast.name}
             </h1>
-
           </div>
         </div>
 
@@ -857,93 +865,115 @@ export default function BroadcastDetailPage() {
         </div>
       )}
 
-<section className="space-y-4">
-<h2 className="text-xl font-semibold">{t('stats.campaign')}</h2>
-<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">{t('stats.overview')}</h3><span className="text-muted-foreground text-xs">{t('stats.audienceBasis', {count:broadcast.total_recipients})}</span></div>
-<div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label={t('stats.totalRecipients')}
-          value={broadcast.total_recipients}
-          total={broadcast.total_recipients}
-          icon={<Users className="h-4 w-4" />}
-          color="bg-muted text-muted-foreground"
-        />
-        <StatCard
-          label={t('stats.sent')}
-          value={broadcast.sent_count}
-          total={broadcast.total_recipients}
-          icon={<Send className="h-4 w-4" />}
-          color="bg-primary/10 text-primary"
-        />
-        <StatCard
-          label={t('stats.failed')}
-          value={broadcast.failed_count}
-          total={broadcast.total_recipients}
-          icon={<AlertCircle className="h-4 w-4" />}
-          color="bg-red-500/10 text-red-400"
-        />
-</div>
-<div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold">{t('stats.performance')}</h3><span className="text-muted-foreground text-xs">{t('stats.sentBasis', {count:broadcast.sent_count})}</span></div>
-<div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label={t('stats.delivered')}
-          value={broadcast.delivered_count}
-          total={broadcast.sent_count}
-          icon={<CheckCheck className="h-4 w-4" />}
-          color="bg-green-500/10 text-green-400"
-        />
-        <StatCard
-          label={t('stats.read')}
-          value={broadcast.read_count}
-          total={broadcast.sent_count}
-          icon={<Eye className="h-4 w-4" />}
-          color="bg-blue-500/10 text-blue-400"
-        />
-        <StatCard
-          label={t('stats.replied')}
-          hint={t('stats.repliedHint')}
-          value={broadcast.replied_count}
-          total={broadcast.sent_count}
-          icon={<MessageCircle className="h-4 w-4" />}
-          color="bg-indigo-500/10 text-indigo-400"
-        />
-</div>
-  <div className="border-border bg-card rounded-xl border p-4">
-    <p className="text-muted-foreground text-sm">{t('stats.clickRate')}</p>
-    <p className="text-xl font-semibold">{broadcast.link_click_count == null ? t('stats.untracked') : `${broadcast.sent_count ? (100 * broadcast.link_click_count / broadcast.sent_count).toFixed(1) : 0}%`}</p>
-    {broadcast.link_click_count != null && <p className="text-muted-foreground text-xs">{t('stats.clickBasis', {count:broadcast.link_click_count, sent:broadcast.sent_count})}</p>}
-  </div>
-</section>
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('stats.campaign')}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold">{t('stats.overview')}</h3>
+          <span className="text-muted-foreground text-xs">
+            {t('stats.audienceBasis', { count: broadcast.total_recipients })}
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard
+            label={t('stats.totalRecipients')}
+            value={broadcast.total_recipients}
+            total={broadcast.total_recipients}
+            icon={<Users className="h-4 w-4" />}
+            color="bg-muted text-muted-foreground"
+          />
+          <StatCard
+            label={t('stats.sent')}
+            value={broadcast.sent_count}
+            total={broadcast.total_recipients}
+            icon={<Send className="h-4 w-4" />}
+            color="bg-primary/10 text-primary"
+          />
+          <StatCard
+            label={t('stats.failed')}
+            value={broadcast.failed_count}
+            total={broadcast.total_recipients}
+            icon={<AlertCircle className="h-4 w-4" />}
+            color="bg-red-500/10 text-red-400"
+          />
+        </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold">{t('stats.performance')}</h3>
+          <span className="text-muted-foreground text-xs">
+            {t('stats.sentBasis', { count: broadcast.sent_count })}
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard
+            label={t('stats.delivered')}
+            value={broadcast.delivered_count}
+            total={broadcast.sent_count}
+            icon={<CheckCheck className="h-4 w-4" />}
+            color="bg-green-500/10 text-green-400"
+          />
+          <StatCard
+            label={t('stats.read')}
+            value={broadcast.read_count}
+            total={broadcast.sent_count}
+            icon={<Eye className="h-4 w-4" />}
+            color="bg-blue-500/10 text-blue-400"
+          />
+          <StatCard
+            label={t('stats.replied')}
+            hint={t('stats.repliedHint')}
+            value={broadcast.replied_count}
+            total={broadcast.sent_count}
+            icon={<MessageCircle className="h-4 w-4" />}
+            color="bg-indigo-500/10 text-indigo-400"
+          />
+        </div>
+        <div className="border-border bg-card rounded-xl border p-4">
+          <p className="text-muted-foreground text-sm">
+            {t('stats.clickRate')}
+          </p>
+          <p className="text-xl font-semibold">
+            {broadcast.link_click_count == null
+              ? t('stats.untracked')
+              : `${broadcast.sent_count ? ((100 * broadcast.link_click_count) / broadcast.sent_count).toFixed(1) : 0}%`}
+          </p>
+          {broadcast.link_click_count != null && (
+            <p className="text-muted-foreground text-xs">
+              {t('stats.clickBasis', {
+                count: broadcast.link_click_count,
+                sent: broadcast.sent_count,
+              })}
+            </p>
+          )}
+        </div>
+      </section>
       {/* Recipients Table */}
-                  <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <BroadcastDuration broadcast={broadcast} />
-              <span>{t('template', { name: broadcast.template_name })}</span>
-              <span>-</span>
-              <span className="flex flex-wrap items-center gap-1.5">
-                {t('target')}:
-                {targetTags.length > 0 ? (
-                  <TagChips tags={targetTags} />
-                ) : (
-                  <span>{targetLabel}</span>
-                )}
-                {excludedTags.length > 0 && (
-                  <>
-                    <span>{t('targetExcluding')}</span>
-                    <TagChips tags={excludedTags} danger />
-                  </>
-                )}
-                <span>
-                  ·{' '}
-                  {t('targetRecipients', { count: broadcast.total_recipients })}
-                </span>
-              </span>
-              <span>-</span>
-              <span>
-                {t('createdAt', {
-                  date: new Date(broadcast.created_at).toLocaleDateString(),
-                })}
-              </span>
-            </div>
+      <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <BroadcastDuration broadcast={broadcast} />
+        <span>{t('template', { name: broadcast.template_name })}</span>
+        <span>-</span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          {t('target')}:
+          {targetTags.length > 0 ? (
+            <TagChips tags={targetTags} />
+          ) : (
+            <span>{targetLabel}</span>
+          )}
+          {excludedTags.length > 0 && (
+            <>
+              <span>{t('targetExcluding')}</span>
+              <TagChips tags={excludedTags} danger />
+            </>
+          )}
+          <span>
+            · {t('targetRecipients', { count: broadcast.total_recipients })}
+          </span>
+        </span>
+        <span>-</span>
+        <span>
+          {t('createdAt', {
+            date: new Date(broadcast.created_at).toLocaleDateString(),
+          })}
+        </span>
+      </div>
       <SendConfirmationDialog
         open={retryConfirmation !== null}
         onOpenChange={(open) => {

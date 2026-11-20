@@ -79,16 +79,28 @@ export default function BroadcastsPage() {
   }
   const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
-    createClient().from('tags').select('id,name').then(({ data }) => setTags(data ?? []));
+    createClient()
+      .from('tags')
+      .select('id,name')
+      .then(({ data }) => setTags(data ?? []));
   }, []);
   const visibleBroadcasts = useMemo(
     () =>
       broadcasts.filter((broadcast) => {
-        const filter = broadcast.audience_filter as {tagIds?: string[]; excludeTagIds?: string[]} | null;
-        const names = tags.filter(tag => filter?.tagIds?.includes(tag.id) || filter?.excludeTagIds?.includes(tag.id)).map(tag => tag.name);
-        return `${broadcast.name} ${broadcast.template_name} ${broadcast.template_language} ${names.join(" ")}`
+        const filter = broadcast.audience_filter as {
+          tagIds?: string[];
+          excludeTagIds?: string[];
+        } | null;
+        const names = tags
+          .filter(
+            (tag) =>
+              filter?.tagIds?.includes(tag.id) ||
+              filter?.excludeTagIds?.includes(tag.id)
+          )
+          .map((tag) => tag.name);
+        return `${broadcast.name} ${broadcast.template_name} ${broadcast.template_language} ${names.join(' ')}`
           .toLowerCase()
-          .includes(search.trim().toLowerCase())
+          .includes(search.trim().toLowerCase());
       }),
     [broadcasts, search, tags]
   );
