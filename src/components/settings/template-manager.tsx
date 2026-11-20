@@ -1193,7 +1193,7 @@ export function TemplateManager() {
             </div>
           </fieldset>
           <aside aria-label={t('bodyPreview')} className="md:sticky md:top-0">
-            <BroadcastMessagePreview template={buildSubmitPayload()} bodyText={renderTemplateBody(form.body_text, form.body_samples)} headerText={form.header_sample || undefined} />
+            <BroadcastMessagePreview template={buildSubmitPayload()} bodyText={renderTemplateBody(form.body_text, form.body_samples) ?? ''} headerText={form.header_sample || undefined} />
           </aside>
           </div>
 
