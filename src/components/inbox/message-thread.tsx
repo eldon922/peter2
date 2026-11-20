@@ -1337,6 +1337,8 @@ export function MessageThread({
         </div>
       ) : (
         <MessageComposer
+          key={`${user?.id}:${conversation.id}`}
+          draftKey={user ? `inbox:draft:${user.id}:${conversation.id}` : undefined}
           conversationId={conversation.id}
           sessionExpired={sessionInfo.expired}
           onSend={handleSend}

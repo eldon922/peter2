@@ -118,6 +118,7 @@ interface MediaDraft {
 }
 
 interface MessageComposerProps {
+  draftKey?: string;
   conversationId: string;
   sessionExpired: boolean;
   onSend: (text: string, replyToId?: string) => Promise<void>;
@@ -143,6 +144,7 @@ function formatDuration(seconds: number): string {
 const OPUS_ENCODER_PATH = '/opus/encoderWorker.min.js';
 
 export function MessageComposer({
+  draftKey,
   conversationId,
   sessionExpired,
   onSend,
@@ -155,6 +157,18 @@ export function MessageComposer({
   const t = useTranslations('Inbox.composer');
 
   const [text, setText] = useState('');
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  useEffect(() => {
+    try { if (draftKey) setText(localStorage.getItem(draftKey) ?? ''); }
+    catch { /* Storage unavailable. */ } finally { setDraftLoaded(true); }
+  }, [draftKey]);
+  useEffect(() => {
+    if (!draftLoaded || !draftKey) return;
+    try {
+      if (text) localStorage.setItem(draftKey, text);
+      else localStorage.removeItem(draftKey);
+    } catch { /* Storage can be unavailable in private browsing. */ }
+  }, [text, draftKey, draftLoaded]);
   const [sending, setSending] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [formatPosition, setFormatPosition] = useState({ left: 8, top: 8 });
