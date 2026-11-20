@@ -307,25 +307,13 @@ export function ImportModal({
 
       // Collapse repeats of the same number now, so everything downstream —
       // preview, counts, insert — works from one list.
-      // A repeated number still contributes its tags (and any blank fields).
       const { unique, dropped } = dedupeByPhone(
-        rows,
-        (kept, repeat) => {
-          const known = new Set(kept.tagNames.map((n) => n.toLowerCase()));
-          for (const name of repeat.tagNames) {
-            if (!known.has(name.toLowerCase())) kept.tagNames.push(name);
-          }
-          kept.name ??= repeat.name;
-          kept.email ??= repeat.email;
-          kept.company ??= repeat.company;
-          if (repeat.customValues)
-            kept.customValues = {
-              ...repeat.customValues,
-              ...kept.customValues,
-            };
-        },
+        rows.slice().reverse(),
+        undefined,
         (phone) => toMetaPhone(phone, code)
       );
+      unique.reverse();
+      dropped.reverse();
       setParsedRows(unique);
       setInFileDropped(
         dropped.map(({ row, reason }) => ({
