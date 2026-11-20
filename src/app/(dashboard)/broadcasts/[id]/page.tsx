@@ -958,14 +958,14 @@ export default function BroadcastDetailPage() {
         }}
       />
       <div
-        className="border-border bg-card rounded-xl border"
+        className="border-border bg-card @container rounded-xl border"
         aria-busy={
           loadingRecipients ||
           filtering ||
           recipientSearch !== deferredRecipientSearch
         }
       >
-        <div className="border-border flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="border-border flex flex-col gap-3 border-b p-4 @min-[50rem]:flex-row @min-[50rem]:items-center">
           <h2 className="text-foreground text-sm font-semibold">
             {statusFilter !== 'all' || deferredRecipientSearch.trim()
               ? t('recipientsHeader', {
@@ -974,8 +974,8 @@ export default function BroadcastDetailPage() {
                 })
               : t('recipientsHeaderAll', { total: broadcast.total_recipients })}
           </h2>
-          <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:flex-1 sm:flex-wrap sm:justify-end">
-            <div className="relative col-span-2 min-w-0 sm:w-100">
+          <div className="grid min-w-0 grid-cols-2 items-center gap-2 @min-[50rem]:flex @min-[50rem]:flex-1">
+            <div className="relative col-span-2 min-w-0 @min-[50rem]:max-w-100 @min-[50rem]:flex-1">
               <SearchInput
                 value={recipientSearch}
                 onClear={() => setRecipientSearch('')}
@@ -996,7 +996,7 @@ export default function BroadcastDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-auto min-h-10 px-3 py-2 whitespace-normal"
+                    className="h-10 px-3 whitespace-nowrap"
                   />
                 }
               >
@@ -1038,7 +1038,7 @@ export default function BroadcastDetailPage() {
               size="sm"
               onClick={handleExport}
               disabled={exporting || broadcast.total_recipients === 0}
-              className="h-auto min-h-10 px-3 py-2 whitespace-normal"
+              className="h-10 px-3 whitespace-nowrap"
             >
               {exporting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
