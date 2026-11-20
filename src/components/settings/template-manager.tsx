@@ -1,6 +1,7 @@
 'use client';
 import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { FormattedTextarea } from '@/components/ui/formatted-textarea';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
@@ -1164,12 +1165,12 @@ export function TemplateManager() {
                       )}
                       {btn.type === 'PHONE_NUMBER' && (
                         <div className="space-y-2">
-                          <Input
+                          <PhoneInput
                             type="tel"
                             placeholder={t('phonePlaceholder')}
                             value={btn.phone_number}
-                            onChange={(e) =>
-                              updateButton(i, { phone_number: e.target.value })
+                            onValueChange={(phone_number) =>
+                              updateButton(i, { phone_number })
                             }
                             className="bg-muted border-border text-foreground placeholder:text-muted-foreground h-8 text-xs"
                           />
