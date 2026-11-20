@@ -303,6 +303,7 @@ export function Step2SelectAudience({
                 </p>
               ) : (
                 <TagMultiSelect
+                  variant="include"
                   className="[&_button]:scroll-mb-48"
                   tags={tags}
                   value={audience.tagIds ?? []}

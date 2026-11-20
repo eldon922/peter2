@@ -96,8 +96,7 @@ export function TagPickerList({
 interface TagMultiSelectProps extends TagPickerListProps {
   onClear?: () => void;
   placeholder?: string;
-  /** `danger` tints the selected chips red (used for exclusion lists). */
-  variant?: 'default' | 'danger';
+  variant?: 'default' | 'include' | 'danger';
   disabled?: boolean;
   className?: string;
 }
@@ -134,7 +133,9 @@ export function TagMultiSelect({
             'inline-flex max-w-full min-w-0 items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2 text-xs font-medium',
             variant === 'danger'
               ? 'border-red-500/30 bg-red-500/10 text-red-800 dark:text-red-300'
-              : 'border-primary/30 bg-primary/10 text-primary'
+              : variant === 'include'
+                ? 'border-green-500/30 bg-green-500/10 text-green-300 in-data-[mode=light]:text-green-800'
+                : 'border-primary/30 bg-primary/10 text-primary'
           )}
         >
           <span

@@ -1026,14 +1026,14 @@ export default function BroadcastDetailPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           {t('target')}:
           {targetTags.length > 0 ? (
-            <TagChips tags={targetTags} />
+            <TagChips tags={targetTags} tone="include" />
           ) : (
             <span>{targetLabel}</span>
           )}
           {excludedTags.length > 0 && (
             <>
               <span>{t('targetExcluding')}</span>
-              <TagChips tags={excludedTags} danger />
+              <TagChips tags={excludedTags} tone="exclude" />
             </>
           )}
         </div>

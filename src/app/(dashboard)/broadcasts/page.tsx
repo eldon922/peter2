@@ -377,10 +377,10 @@ export default function BroadcastsPage() {
                       {(targetTags.length > 0 || excludedTags.length > 0) && (
                         <div className="mt-1.5 flex flex-wrap gap-1.5 whitespace-normal">
                           {targetTags.length > 0 && (
-                            <TagChips tags={targetTags} />
+                            <TagChips tags={targetTags} tone="include" />
                           )}
                           {excludedTags.length > 0 && (
-                            <TagChips tags={excludedTags} danger />
+                            <TagChips tags={excludedTags} tone="exclude" />
                           )}
                         </div>
                       )}

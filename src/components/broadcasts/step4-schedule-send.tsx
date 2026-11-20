@@ -186,7 +186,7 @@ export function Step4ScheduleSend({
   const audienceBlock = (
     <div className="space-y-1.5">
       <p className="text-foreground">{audienceLabel}</p>
-      {includeTags.length > 0 && <TagChips tags={includeTags} />}
+      {includeTags.length > 0 && <TagChips tags={includeTags} tone="include" />}
       {audience.tagIds?.includes(UNTAGGED) && (
         <p>{t('selectAudience.untagged')}</p>
       )}
@@ -196,7 +196,7 @@ export function Step4ScheduleSend({
           <p className="text-muted-foreground text-xs">
             {t('scheduleSend.excluding')}
           </p>
-          <TagChips tags={excludeTags} danger />
+          <TagChips tags={excludeTags} tone="exclude" />
           {audience.excludeTagIds?.includes(UNTAGGED) && (
             <p>{t('selectAudience.untagged')}</p>
           )}
