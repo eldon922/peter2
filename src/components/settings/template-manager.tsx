@@ -1,5 +1,6 @@
 'use client';
-import { FormattedText } from '@/components/inbox/formatted-text';
+import { BroadcastMessagePreview } from '@/components/broadcasts/message-preview';
+import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
 import { FormattedTextarea } from '@/components/ui/formatted-textarea';
 import { PhoneCountryWarning } from '@/components/phone-country-warning';
 
@@ -723,7 +724,7 @@ export function TemplateManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="bg-popover border-border max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="bg-popover border-border max-h-[90dvh] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-popover-foreground">
               {viewOnly
@@ -752,6 +753,7 @@ export function TemplateManager() {
             </div>
           )}
 
+          <div className="grid items-start gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <fieldset
             disabled={viewOnly || submitting}
             className="min-w-0 space-y-4 py-2"
@@ -1002,19 +1004,6 @@ export function TemplateManager() {
                 maxLength={TEMPLATE_LIMITS.bodyMaxLength}
                 className="bg-muted border-border text-foreground placeholder:text-muted-foreground resize-none"
               />
-              {form.body_text && (
-                <section
-                  aria-label={t('bodyPreview')}
-                  className="bg-muted/30 space-y-2 rounded-lg border p-3"
-                >
-                  <p className="text-muted-foreground text-xs font-medium">
-                    {t('bodyPreview')}
-                  </p>
-                  <div className="text-sm break-words whitespace-pre-wrap">
-                    <FormattedText text={form.body_text} />
-                  </div>
-                </section>
-              )}
               <p className="text-muted-foreground text-xs leading-relaxed">
                 {t('namedVariableHint')}
               </p>
@@ -1203,6 +1192,10 @@ export function TemplateManager() {
               )}
             </div>
           </fieldset>
+          <aside aria-label={t('bodyPreview')} className="md:sticky md:top-0">
+            <BroadcastMessagePreview template={buildSubmitPayload()} bodyText={renderTemplateBody(form.body_text, form.body_samples)} headerText={form.header_sample || undefined} />
+          </aside>
+          </div>
 
           {submitting && (
             <p role="status" className="text-muted-foreground text-sm">

@@ -6,7 +6,7 @@ import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
 import type { MessageTemplate } from '@/types';
 
 interface Props {
-  template: MessageTemplate;
+  template: Pick<MessageTemplate, 'header_type' | 'header_content' | 'header_media_url' | 'footer_text' | 'buttons'>;
   /** Body with variables already substituted. */
   bodyText: string;
   headerText?: string;
