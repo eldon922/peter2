@@ -1,7 +1,7 @@
 /** What happened to each row of a contacts import, for the result report. */
 
 export type SkipReason =
-  | 'file_duplicate' // same number appeared earlier in the file
+  | 'file_duplicate' // same number appeared later in the file
   | 'no_phone' // no usable number in the row
   | 'nothing_new' // already saved, and the row adds nothing
   | 'already_exists'; // the database rejected it as a duplicate

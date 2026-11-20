@@ -553,7 +553,7 @@
         "customFieldFailed": "Custom fields not saved ({count})"
       },
       "reason": {
-        "file_duplicate": "Same number appears earlier in the file",
+        "file_duplicate": "A later row in the file has the same number",
         "no_phone": "No valid phone number",
         "nothing_new": "Already saved — nothing new in this row",
         "already_exists": "Already saved — this number exists in your contacts"

@@ -553,7 +553,7 @@
         "customFieldFailed": "저장되지 않은 사용자 지정 필드 ({count})"
       },
       "reason": {
-        "file_duplicate": "같은 번호가 파일 앞부분에 이미 있음",
+        "file_duplicate": "파일의 뒤쪽 행에 같은 번호가 있음",
         "no_phone": "유효한 전화번호 없음",
         "nothing_new": "이미 저장됨 — 이 행에 새로운 내용 없음",
         "already_exists": "이미 저장됨 — 이 번호는 연락처에 있음"
