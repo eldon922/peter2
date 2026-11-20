@@ -122,7 +122,7 @@ interface MessageComposerProps {
   draftKey?: string;
   conversationId: string;
   sessionExpired: boolean;
-  onSend: (text: string, replyToId?: string) => Promise<void>;
+  onSend: (text: string, replyToId?: string) => Promise<boolean>;
   onSendMedia: (payload: SendMediaPayload) => void;
   onSendInteractive: (
     payload: InteractiveMessagePayload,
@@ -269,14 +269,15 @@ export function MessageComposer({
     if (!trimmed || sending || sessionExpired) return;
 
     setSending(true);
-    setText('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     try {
-      await onSend(trimmed, replyTo?.id);
+      if (await onSend(trimmed, replyTo?.id)) {
+        setText(current => current === text ? '' : current);
+        requestAnimationFrame(adjustHeight);
+      }
     } finally {
       setSending(false);
     }
-  }, [text, sending, sessionExpired, onSend, replyTo?.id]);
+  }, [text, sending, sessionExpired, onSend, replyTo?.id, adjustHeight]);
 
   const applyFormat = useCallback(
     (marker: string) => {
