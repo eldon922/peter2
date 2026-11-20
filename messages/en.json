@@ -558,7 +558,8 @@
         "already_exists": "Already saved — this number exists in your contacts",
         "excel_numeric_phone": "Excel phone cell is too long or is not a whole number"
       },
-      "progressCounts": "{done} of {total} done · {remaining} remaining",
+      "checkedContacts": "{done} of {total} contacts checked",
+      "progressCounts": "{done} of {total} contacts processed · {remaining} remaining",
       "reportTitle": "Detailed report",
       "detailRenamed": "Name: {from} → {to}",
       "detailNamed": "Name set to {to}",

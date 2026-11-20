@@ -437,8 +437,9 @@ export function ImportModal({
       !countryCode
     )
       return;
+    const totalContacts = importRows.length;
     setImporting(true);
-    setProgress({ stage: 'checking', done: 0, total: parsedRows.length });
+    setProgress({ stage: 'checking', done: 0, total: totalContacts });
 
     // Declared outside the try block on purpose: a large import is
     // dozens to hundreds of sequential requests, and if one fails
@@ -480,21 +481,26 @@ export function ImportModal({
       //    caps a response at 1000 rows, so on a larger account it
       //    silently reported existing contacts as new. The cost is now
       //    proportional to the file, not to the account.
-      const importedKeys = [
-        ...new Set(
-          unique
-            .flatMap((row) => phoneLookupKeys(row.phone, countryCode))
-            .filter(Boolean)
-        ),
-      ];
+      // A contact is checked once all alternate spellings of its number have been looked up.
+      const contactsByKey = new Map<string, { remaining: number }[]>();
+      let checked = 0;
+      for (const row of unique) {
+        const keys = phoneLookupKeys(row.phone, countryCode).filter(Boolean);
+        const contact = { remaining: keys.length };
+        if (!keys.length) checked++;
+        for (const key of keys) {
+          const contacts = contactsByKey.get(key);
+          if (contacts) contacts.push(contact);
+          else contactsByKey.set(key, [contact]);
+        }
+      }
       const existingByPhone = new Map<
         string,
         { id: string; name: string | null }
       >();
       // Short URLs and a patient retry: a long filter that works once can
       // still get dropped on the next request.
-      const lookupChunks = chunkIds(importedKeys, 1500);
-      let checked = 0;
+      const lookupChunks = chunkIds([...contactsByKey.keys()], 1500);
       for (let i = 0; i < lookupChunks.length; i++) {
         const slice = lookupChunks[i];
         const { data: existingRows, error } = await withRetry(
@@ -526,11 +532,16 @@ export function ImportModal({
               existingByPhone.set(key, { id: r.id, name: r.name });
           }
         }
-        checked += slice.length;
+        for (const key of slice) {
+          for (const contact of contactsByKey.get(key) ?? []) {
+            contact.remaining--;
+            if (contact.remaining === 0) checked++;
+          }
+        }
         setProgress({
           stage: 'checking',
           done: checked,
-          total: importedKeys.length,
+          total: totalContacts,
         });
       }
 
@@ -603,9 +614,8 @@ export function ImportModal({
       // indicator — otherwise a multi-thousand-row import just shows a
       // spinner for however long it takes, indistinguishable from
       // being stuck.
-      const totalWork = toInsert.length + toMerge.length;
-      let doneWork = 0;
-      setProgress({ stage: 'adding', done: 0, total: totalWork });
+      let doneWork = duplicateRows.length;
+      setProgress({ stage: 'adding', done: doneWork, total: totalContacts });
 
       // 3) Batch insert the genuinely-new rows in chunks. The DB
       //    unique index is the backstop: a 23505 (race, or a format
@@ -696,9 +706,9 @@ export function ImportModal({
         }
 
         doneWork += chunk.length;
-        setProgress({ stage: 'adding', done: doneWork, total: totalWork });
+        setProgress({ stage: 'adding', done: doneWork, total: totalContacts });
       }
-      setProgress({ stage: 'updating', done: doneWork, total: totalWork });
+      setProgress({ stage: 'updating', done: doneWork, total: totalContacts });
 
       // 3b) Apply the merge rows. Tags go through the same assignment
       //     path as new contacts — it upserts with ignoreDuplicates, so a
@@ -739,7 +749,11 @@ export function ImportModal({
           }
         }
         doneWork += batch.length;
-        setProgress({ stage: 'updating', done: doneWork, total: totalWork });
+        setProgress({
+          stage: 'updating',
+          done: doneWork,
+          total: totalContacts,
+        });
       }
 
       for (const m of toMerge) {
@@ -748,7 +762,7 @@ export function ImportModal({
       // Merge rows that only needed tags (no rename) never went through
       // the rename loop above, so progress hasn't counted them yet.
       doneWork += toMerge.length - renames.length;
-      setProgress({ stage: 'updating', done: doneWork, total: totalWork });
+      setProgress({ stage: 'updating', done: doneWork, total: totalContacts });
 
       // 4) Wire tags onto the contacts we just created or merged. A failure
       //    here must not mask a successful contact import; the contacts
@@ -1298,11 +1312,16 @@ export function ImportModal({
                     />
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    {t('progressCounts', {
-                      done: progress.done,
-                      total: progress.total,
-                      remaining: Math.max(0, progress.total - progress.done),
-                    })}
+                    {t(
+                      progress.stage === 'checking'
+                        ? 'checkedContacts'
+                        : 'progressCounts',
+                      {
+                        done: progress.done,
+                        total: progress.total,
+                        remaining: Math.max(0, progress.total - progress.done),
+                      }
+                    )}
                   </p>
                 </div>
               )}

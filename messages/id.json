@@ -558,7 +558,8 @@
         "already_exists": "Sudah tersimpan — nomor ini ada di kontak Anda",
         "excel_numeric_phone": "Nomor Excel terlalu panjang atau bukan bilangan bulat"
       },
-      "progressCounts": "{done} dari {total} selesai · {remaining} tersisa",
+      "checkedContacts": "{done} dari {total} kontak diperiksa",
+      "progressCounts": "{done} dari {total} kontak diproses · {remaining} tersisa",
       "reportTitle": "Laporan rinci",
       "detailRenamed": "Nama: {from} → {to}",
       "detailNamed": "Nama diatur menjadi {to}",

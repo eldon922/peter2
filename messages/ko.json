@@ -558,7 +558,8 @@
         "already_exists": "이미 저장됨 — 이 번호는 연락처에 있음",
         "excel_numeric_phone": "Excel 전화번호가 너무 길거나 정수가 아님"
       },
-      "progressCounts": "{total}개 중 {done}개 완료 · {remaining}개 남음",
+      "checkedContacts": "연락처 {total}개 중 {done}개 확인",
+      "progressCounts": "연락처 {total}개 중 {done}개 처리 · {remaining}개 남음",
       "reportTitle": "상세 보고서",
       "detailRenamed": "이름: {from} → {to}",
       "detailNamed": "이름을 {to}(으)로 설정",
