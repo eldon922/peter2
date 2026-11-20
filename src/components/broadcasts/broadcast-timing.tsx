@@ -17,7 +17,8 @@ function useClock(active: boolean) {
 
 export function BroadcastDuration({ broadcast }: { broadcast: Broadcast }) {
   const t = useTranslations('Broadcasts.timing');
-  const now = useClock(broadcast.status === 'sending');
+  const sending = broadcast.status === 'sending';
+  const now = useClock(sending);
   if (!broadcast.started_at) return null;
   const elapsed =
     (broadcast.completed_at ? Date.parse(broadcast.completed_at) : now) -
@@ -28,10 +29,11 @@ export function BroadcastDuration({ broadcast }: { broadcast: Broadcast }) {
       className="text-muted-foreground block text-xs font-normal tabular-nums"
       suppressHydrationWarning
     >
-      {t('duration')}:{' '}
-      {parts.days
-        ? t('days', { days: parts.days, time: parts.time })
-        : parts.time}
+      {t(sending ? 'sendingDuration' : 'sentDuration', {
+        time: parts.days
+          ? t('days', { days: parts.days, time: parts.time })
+          : parts.time,
+      })}
     </span>
   );
 }

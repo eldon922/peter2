@@ -737,7 +737,7 @@
       },
       "errorLoad": "Gagal memuat blast",
       "retry": "Coba lagi",
-      "searchPlaceholder": "Cari broadcast, template, atau tag…"
+      "searchPlaceholder": "Cari broadcast, template, atau tag kontak…"
     },
     "status": {
       "draft": "Draf",
@@ -797,17 +797,14 @@
         "replied": "Dibalas / direaksi",
         "failed": "Gagal",
         "repliedHint": "Penerima unik yang membalas atau bereaksi. Setiap penerima dihitung sekali. Balasan tanpa kutipan pesan dihitung untuk blast yang terakhir dikirim.",
-        "campaign": "Performa kampanye",
         "overview": "Ringkasan penerima",
         "performance": "Performa pesan",
         "audienceBasis": "Berdasarkan {count, number} penerima",
         "sentBasis": "Berdasarkan {count, number} pesan terkirim",
         "clickRate": "Rasio klik tautan tombol",
-        "untracked": "Tidak dilacak",
-        "clickBasis": "{count, number} penerima unik mengeklik / {sent, number} terkirim",
-        "base": "Audiens dasar",
-        "ofAudience": "dari total penerima",
-        "ofSent": "dari pesan terkirim"
+        "base": "dalam audiens",
+        "ofAudience": "dari {count, number} penerima",
+        "ofSent": "dari {count, number} pesan terkirim"
       },
       "toastFailedDelete": "Gagal menghapus: {error}",
       "toastDeleted": "Blast dihapus",
@@ -868,7 +865,7 @@
       "scheduleTitle": "Jadwalkan blast",
       "scheduleDesc": "Pilih kapan blast dikirim.",
       "toastScheduled": "Blast dijadwalkan pada {time}",
-      "searchRecipients": "Cari nama, telepon, atau tag…"
+      "searchRecipients": "Cari nama, telepon, atau tag kontak…"
     },
     "new": {
       "title": "Blast Baru",
@@ -1064,10 +1061,11 @@
       }
     },
     "timing": {
-      "duration": "Durasi",
       "days": "{days} hari {time}",
       "startsIn": "Dimulai dalam {time}",
-      "startingSoon": "Waktu terjadwal tercapai — menunggu dimulai"
+      "startingSoon": "Waktu terjadwal tercapai — menunggu dimulai",
+      "sendingDuration": "Durasi pengiriman berjalan: {time}",
+      "sentDuration": "Durasi pengiriman: {time}"
     }
   },
   "Automations": {

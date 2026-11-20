@@ -538,7 +538,7 @@ export interface BroadcastRecipient {
   template_header_text?: string | null;
   template_button_params?: Record<number, string> | null;
   created_at: string;
-  contact?: Contact;
+  contact?: Contact & { contact_tags?: Pick<ContactTag, 'tag_id'>[] };
 }
 
 // ============================================================

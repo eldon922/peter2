@@ -737,7 +737,7 @@
       },
       "errorLoad": "Failed to load broadcasts",
       "retry": "Retry",
-      "searchPlaceholder": "Search by broadcast, template or tag…"
+      "searchPlaceholder": "Search by broadcast, template, or contact tag…"
     },
     "status": {
       "draft": "Draft",
@@ -797,17 +797,14 @@
         "replied": "Replied / reacted",
         "failed": "Failed",
         "repliedHint": "Unique recipients who replied or reacted. Each recipient counts once. Replies without a quoted message belong to the most recently sent broadcast.",
-        "campaign": "Campaign performance",
         "overview": "Recipients overview",
         "performance": "Message performance",
         "audienceBasis": "Based on {count, number} total recipients",
         "sentBasis": "Based on {count, number} sent messages",
         "clickRate": "Button link click rate",
-        "untracked": "Untracked",
-        "clickBasis": "{count, number} unique recipients clicked / {sent, number} sent",
-        "base": "Base audience",
-        "ofAudience": "of total recipients",
-        "ofSent": "of sent messages"
+        "base": "in the audience",
+        "ofAudience": "{count, plural, one {of # recipient} other {of # recipients}}",
+        "ofSent": "{count, plural, one {of # sent message} other {of # sent messages}}"
       },
       "toastFailedDelete": "Failed to delete: {error}",
       "toastDeleted": "Broadcast deleted",
@@ -868,7 +865,7 @@
       "scheduleTitle": "Schedule broadcast",
       "scheduleDesc": "Pick when to send it.",
       "toastScheduled": "Broadcast scheduled for {time}",
-      "searchRecipients": "Search by name, phone or tag…"
+      "searchRecipients": "Search by name, phone, or contact tag…"
     },
     "new": {
       "title": "New Broadcast",
@@ -1064,10 +1061,11 @@
       }
     },
     "timing": {
-      "duration": "Duration",
       "days": "{days} days {time}",
       "startsIn": "Starts in {time}",
-      "startingSoon": "Scheduled time reached — waiting to start"
+      "startingSoon": "Scheduled time reached — waiting to start",
+      "sendingDuration": "Sending duration: {time}",
+      "sentDuration": "Sent duration: {time}"
     }
   },
   "Automations": {

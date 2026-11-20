@@ -737,7 +737,7 @@
       },
       "errorLoad": "브로드캐스트를 불러오지 못했습니다",
       "retry": "다시 시도",
-      "searchPlaceholder": "방송, 템플릿 또는 태그 검색…"
+      "searchPlaceholder": "방송, 템플릿 또는 연락처 태그 검색…"
     },
     "status": {
       "draft": "초안",
@@ -797,17 +797,14 @@
         "replied": "답장 / 반응",
         "failed": "실패",
         "repliedHint": "답장하거나 반응한 고유 수신자 수입니다. 각 수신자는 한 번만 집계됩니다. 인용 메시지가 없는 답장은 가장 최근에 보낸 브로드캐스트에 집계됩니다.",
-        "campaign": "캠페인 성과",
         "overview": "수신자 개요",
         "performance": "메시지 성과",
         "audienceBasis": "전체 수신자 {count, number}명 기준",
         "sentBasis": "발송 메시지 {count, number}건 기준",
         "clickRate": "버튼 링크 클릭률",
-        "untracked": "추적되지 않음",
-        "clickBasis": "클릭한 수신자 {count, number}명 / 발송 {sent, number}건",
-        "base": "전체 대상",
-        "ofAudience": "전체 수신자 기준",
-        "ofSent": "발송 메시지 기준"
+        "base": "명 · 전체 대상",
+        "ofAudience": "명 / 전체 수신자 {count, number}명",
+        "ofSent": "건 / 발송 {count, number}건"
       },
       "toastFailedDelete": "삭제하지 못했습니다: {error}",
       "toastDeleted": "브로드캐스트가 삭제되었습니다",
@@ -868,7 +865,7 @@
       "scheduleTitle": "브로드캐스트 예약",
       "scheduleDesc": "전송할 시간을 선택하세요.",
       "toastScheduled": "브로드캐스트가 {time}에 예약되었습니다",
-      "searchRecipients": "이름, 전화번호 또는 태그 검색…"
+      "searchRecipients": "이름, 전화번호 또는 연락처 태그 검색…"
     },
     "new": {
       "title": "새 브로드캐스트",
@@ -1064,10 +1061,11 @@
       }
     },
     "timing": {
-      "duration": "소요 시간",
       "days": "{days}일 {time}",
       "startsIn": "{time} 후 시작",
-      "startingSoon": "예약 시간이 되어 시작을 기다리고 있습니다"
+      "startingSoon": "예약 시간이 되어 시작을 기다리고 있습니다",
+      "sendingDuration": "발송 진행 시간: {time}",
+      "sentDuration": "발송 소요 시간: {time}"
     }
   },
   "Automations": {

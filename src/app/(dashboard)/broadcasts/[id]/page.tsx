@@ -5,6 +5,7 @@ import {
   useDeferredValue,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -46,6 +47,7 @@ import {
   Eye,
   AlertCircle,
   MessageCircle,
+  Link,
   Filter,
   Download,
   ChevronDown,
@@ -62,7 +64,7 @@ import {
   recipientStatusConfig,
   statusTextClass,
 } from '@/lib/broadcast-status';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { TagChips } from '@/components/broadcasts/tag-chips';
 import { UnsentBanner } from '@/components/broadcasts/unsent-banner';
 import { contactDisplayName } from '@/lib/contacts/display-name';
@@ -78,6 +80,8 @@ import { SearchInput } from '@/components/ui/search-input';
 import { ListPagination, useListPage } from '@/components/ui/list-pagination';
 import { broadcastRunProgress } from '@/lib/broadcasts/run-progress';
 import { BroadcastDuration } from '@/components/broadcasts/broadcast-timing';
+import { fetchAllRows } from '@/lib/supabase/batching';
+import { cn } from '@/lib/utils';
 
 interface StatCardProps {
   basis: string;
@@ -90,6 +94,25 @@ interface StatCardProps {
 }
 
 function StatCard({
+  secondary,
+  className,
+  ...metric
+}: StatCardProps & { secondary?: StatCardProps; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'border-border bg-card grid rounded-xl border',
+        secondary && 'divide-border grid-cols-2 divide-x',
+        className
+      )}
+    >
+      <StatMetric {...metric} />
+      {secondary && <StatMetric {...secondary} />}
+    </div>
+  );
+}
+
+function StatMetric({
   label,
   hint,
   value,
@@ -98,52 +121,59 @@ function StatCard({
   color,
   basis,
 }: StatCardProps) {
-  const pct = total ? Math.round((value / total) * 1000) / 10 : 0;
+  const ratio = total ? value / total : 0;
+  const format = useFormatter();
   const hintId = useId();
   const [hintOpen, setHintOpen] = useState(false);
   return (
-    <div className="border-border bg-card rounded-xl border p-4">
-      <div className="flex items-center justify-between">
-        <div
-          className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}
-        >
-          {icon}
+    <div className="flex min-w-0 flex-col gap-3 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
+          <span
+            aria-hidden
+            className={`grid size-8 shrink-0 place-items-center rounded-lg ${color}`}
+          >
+            {icon}
+          </span>
+          {hint ? (
+            <TooltipProvider>
+              <Tooltip open={hintOpen} onOpenChange={setHintOpen}>
+                <TooltipTrigger
+                  closeOnClick={false}
+                  onClick={() => setHintOpen(true)}
+                  aria-describedby={hintOpen ? hintId : undefined}
+                  className="focus-visible:ring-ring rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2"
+                >
+                  {label}
+                </TooltipTrigger>
+                <TooltipContent id={hintId} role="tooltip">
+                  {hint}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            label
+          )}
         </div>
         <span
           className={`text-xl font-bold tabular-nums ${color.split(' ').at(-1)}`}
         >
-          {pct}%
+          {format.number(ratio, { style: 'percent', maximumFractionDigits: 1 })}
         </span>
       </div>
-      <p className="text-foreground mt-3 text-2xl font-bold">
-        {value.toLocaleString()}
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-foreground text-2xl font-bold tabular-nums">
+          {format.number(value)}
+        </span>
+        <span className="text-muted-foreground text-xs">{basis}</span>
       </p>
-      <p className="text-muted-foreground text-xs">
-        {hint ? (
-          <TooltipProvider>
-            <Tooltip open={hintOpen} onOpenChange={setHintOpen}>
-              <TooltipTrigger
-                closeOnClick={false}
-                onClick={() => setHintOpen(true)}
-                aria-describedby={hintOpen ? hintId : undefined}
-                className="focus-visible:ring-ring rounded-sm text-left underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2"
-              >
-                {label}
-              </TooltipTrigger>
-              <TooltipContent id={hintId} role="tooltip">
-                {hint}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : (
-          label
-        )}
-      </p>
-      <p className="text-muted-foreground mt-1 text-xs">{basis}</p>
-      <div className="bg-muted mt-4 h-2 overflow-hidden rounded-full">
+      <div
+        aria-hidden
+        className="bg-muted mt-auto h-2 overflow-hidden rounded-full"
+      >
         <div
           className={`h-full rounded-full bg-current ${color.split(' ').at(-1)}`}
-          style={{ width: `${Math.min(100, pct)}%` }}
+          style={{ width: `${Math.min(100, 100 * ratio)}%` }}
         />
       </div>
     </div>
@@ -202,6 +232,7 @@ export default function BroadcastDetailPage() {
   const router = useRouter();
   const t = useTranslations('Broadcasts.detail');
   const tStatus = useTranslations('Broadcasts.status');
+  const locale = useLocale();
   // Shared with the wizard's personalize step — same upload/URL
   // strings, same recommendation, so a retry prompt doesn't teach the
   // user a second vocabulary for the same choice.
@@ -231,6 +262,10 @@ export default function BroadcastDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const tagsById = useMemo(
+    () => new Map(tags.map((tag) => [tag.id, tag])),
+    [tags]
+  );
   /** Broadcast id while a bulk retry is in flight, or a recipient id for a row retry. */
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryConfirmation, setRetryConfirmation] = useState<{
@@ -326,12 +361,11 @@ export default function BroadcastDetailPage() {
     };
   }, [broadcastId]);
 
-  // Tag names for the "Target" line under the title.
   useEffect(() => {
-    createClient()
-      .from('tags')
-      .select('*')
-      .then(({ data }) => setTags((data ?? []) as Tag[]));
+    const db = createClient();
+    void fetchAllRows<Tag>((from, to) =>
+      db.from('tags').select('*').order('id').range(from, to)
+    ).then(({ rows }) => setTags(rows));
   }, []);
 
   // Poll for as long as this page is open, not just while the fan-out is
@@ -492,21 +526,11 @@ export default function BroadcastDetailPage() {
     }
   }
 
-  // The tags the broadcast was aimed at, and which of them each recipient
-  // carries — i.e. why they're on the list. Empty unless it targeted tags.
-  const targetTagIds =
-    (broadcast?.audience_filter as { tagIds?: string[] } | undefined)?.tagIds ??
-    [];
-  const showTagsColumn = targetTagIds.length > 0;
   function recipientTags(recipient: BroadcastRecipient): Tag[] {
-    const carried = (
-      recipient.contact as { contact_tags?: { tag_id: string }[] } | undefined
-    )?.contact_tags;
-    return tags.filter(
-      (tag) =>
-        targetTagIds.includes(tag.id) &&
-        carried?.some((ct) => ct.tag_id === tag.id)
-    );
+    return (recipient.contact?.contact_tags ?? []).flatMap(({ tag_id }) => {
+      const tag = tagsById.get(tag_id);
+      return tag ? [tag] : [];
+    });
   }
 
   async function handleExport() {
@@ -517,12 +541,12 @@ export default function BroadcastDetailPage() {
       const allRecipients = await fetchBroadcastRecipients(
         createClient(),
         broadcastId,
-        showTagsColumn
+        true
       );
       const header = [
         t('table.contact'),
         t('table.phone'),
-        ...(showTagsColumn ? [t('table.tags')] : []),
+        t('table.tags'),
         t('table.phoneAttempted'),
         t('table.status'),
         t('table.attempts'),
@@ -534,13 +558,9 @@ export default function BroadcastDetailPage() {
       const rows = allRecipients.map((r) => [
         r.contact?.name ?? '',
         r.contact?.phone ?? '',
-        ...(showTagsColumn
-          ? [
-              recipientTags(r)
-                .map((tag) => tag.name)
-                .join('; '),
-            ]
-          : []),
+        recipientTags(r)
+          .map((tag) => tag.name)
+          .join('; '),
         r.phone_attempted ?? '',
         r.status,
         String(r.attempt_count ?? 1),
@@ -619,6 +639,12 @@ export default function BroadcastDetailPage() {
         ? t('targetCsv')
         : t('targetAll');
   const statusChipClass = `items-center rounded-full border px-2 py-0.5 text-xs font-medium ${status.classes}`;
+  const ofAudience = t('stats.ofAudience', {
+    count: broadcast.total_recipients,
+  });
+  const ofSent = t('stats.ofSent', { count: broadcast.sent_count });
+  // The database leaves this null unless the broadcast used a tracked button.
+  const clicks = broadcast.link_click_count;
 
   const {
     total: progressTotal,
@@ -654,10 +680,22 @@ export default function BroadcastDetailPage() {
             it". `w-full` below md guarantees that row is its own line
             (with the chip at its left end) instead of wrapping
             unpredictably; from md up it shrinks to sit beside the title. */}
-        <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-          <span className={`inline-flex shrink-0 ${statusChipClass}`}>
-            {tStatus(status.label)}
-          </span>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:justify-end">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex shrink-0 ${statusChipClass}`}>
+              {tStatus(status.label)}
+            </span>
+            <time
+              className="text-muted-foreground text-xs whitespace-nowrap"
+              dateTime={broadcast.created_at}
+            >
+              {t('createdAt', {
+                date: new Date(broadcast.created_at).toLocaleDateString(locale, {
+                  dateStyle: 'medium',
+                }),
+              })}
+            </time>
+          </div>
 
           <div className="flex items-center gap-2">
             {/* Stop — unsent recipients become failed, so Retry resumes them. */}
@@ -875,15 +913,17 @@ export default function BroadcastDetailPage() {
         </div>
       )}
 
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold">{t('stats.campaign')}</h2>
+      <section className="@container space-y-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-semibold">{t('stats.overview')}</h3>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <Users className="text-muted-foreground size-4" aria-hidden />
+            {t('stats.overview')}
+          </h2>
           <span className="text-muted-foreground text-xs">
             {t('stats.audienceBasis', { count: broadcast.total_recipients })}
           </span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 @min-[36rem]:grid-cols-3">
           <StatCard
             label={t('stats.totalRecipients')}
             basis={t('stats.base')}
@@ -894,7 +934,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.sent')}
-            basis={t('stats.ofAudience')}
+            basis={ofAudience}
             value={broadcast.sent_count}
             total={broadcast.total_recipients}
             icon={<Send className="h-4 w-4" />}
@@ -902,7 +942,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.failed')}
-            basis={t('stats.ofAudience')}
+            basis={ofAudience}
             value={broadcast.failed_count}
             total={broadcast.total_recipients}
             icon={<AlertCircle className="h-4 w-4" />}
@@ -910,15 +950,28 @@ export default function BroadcastDetailPage() {
           />
         </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-semibold">{t('stats.performance')}</h3>
+          <h2 className="flex items-center gap-2 font-semibold">
+            <MessageCircle
+              className="text-muted-foreground size-4"
+              aria-hidden
+            />
+            {t('stats.performance')}
+          </h2>
           <span className="text-muted-foreground text-xs">
             {t('stats.sentBasis', { count: broadcast.sent_count })}
           </span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div
+          className={cn(
+            'grid gap-3',
+            clicks == null
+              ? '@min-[36rem]:grid-cols-3'
+              : '@min-[31rem]:grid-cols-2 @min-[60rem]:grid-cols-4'
+          )}
+        >
           <StatCard
             label={t('stats.delivered')}
-            basis={t('stats.ofSent')}
+            basis={ofSent}
             value={broadcast.delivered_count}
             total={broadcast.sent_count}
             icon={<CheckCheck className="h-4 w-4" />}
@@ -926,7 +979,7 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.read')}
-            basis={t('stats.ofSent')}
+            basis={ofSent}
             value={broadcast.read_count}
             total={broadcast.sent_count}
             icon={<Eye className="h-4 w-4" />}
@@ -934,39 +987,43 @@ export default function BroadcastDetailPage() {
           />
           <StatCard
             label={t('stats.replied')}
-            basis={t('stats.ofSent')}
+            basis={ofSent}
             hint={t('stats.repliedHint')}
             value={broadcast.replied_count}
             total={broadcast.sent_count}
             icon={<MessageCircle className="h-4 w-4" />}
             color="bg-indigo-500/10 text-indigo-400"
+            className={clicks != null ? '@min-[31rem]:col-span-2' : undefined}
+            secondary={
+              clicks == null
+                ? undefined
+                : {
+                    label: t('stats.clickRate'),
+                    basis: ofSent,
+                    value: clicks,
+                    total: broadcast.sent_count,
+                    icon: <Link className="size-4" />,
+                    color: 'bg-violet-500/10 text-violet-400',
+                  }
+            }
           />
-        </div>
-        <div className="border-border bg-card rounded-xl border p-4">
-          <p className="text-muted-foreground text-sm">
-            {t('stats.clickRate')}
-          </p>
-          <p className="text-xl font-semibold">
-            {broadcast.link_click_count == null
-              ? t('stats.untracked')
-              : `${broadcast.sent_count ? ((100 * broadcast.link_click_count) / broadcast.sent_count).toFixed(1) : 0}%`}
-          </p>
-          {broadcast.link_click_count != null && (
-            <p className="text-muted-foreground text-xs">
-              {t('stats.clickBasis', {
-                count: broadcast.link_click_count,
-                sent: broadcast.sent_count,
-              })}
-            </p>
-          )}
         </div>
       </section>
       {/* Recipients Table */}
       <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <BroadcastDuration broadcast={broadcast} />
+        {broadcast.started_at && (
+          <>
+            <BroadcastDuration broadcast={broadcast} />
+            <span aria-hidden>·</span>
+          </>
+        )}
         <span>{t('template', { name: broadcast.template_name })}</span>
-        <span>-</span>
-        <span className="flex flex-wrap items-center gap-1.5">
+        <span aria-hidden>·</span>
+        <span>
+          {t('targetRecipients', { count: broadcast.total_recipients })}
+        </span>
+        <span aria-hidden>·</span>
+        <div className="flex flex-wrap items-center gap-1.5">
           {t('target')}:
           {targetTags.length > 0 ? (
             <TagChips tags={targetTags} />
@@ -979,16 +1036,7 @@ export default function BroadcastDetailPage() {
               <TagChips tags={excludedTags} danger />
             </>
           )}
-          <span>
-            · {t('targetRecipients', { count: broadcast.total_recipients })}
-          </span>
-        </span>
-        <span>-</span>
-        <span>
-          {t('createdAt', {
-            date: new Date(broadcast.created_at).toLocaleDateString(),
-          })}
-        </span>
+        </div>
       </div>
       <SendConfirmationDialog
         open={retryConfirmation !== null}
@@ -1024,8 +1072,8 @@ export default function BroadcastDetailPage() {
                 })
               : t('recipientsHeaderAll', { total: broadcast.total_recipients })}
           </h2>
-          <div className="grid min-w-0 grid-cols-2 items-center gap-2 @min-[50rem]:flex @min-[50rem]:flex-1">
-            <div className="relative col-span-2 min-w-0 @min-[50rem]:max-w-100 @min-[50rem]:flex-1">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 @min-[50rem]:flex-1 @min-[50rem]:flex-nowrap">
+            <div className="relative w-full min-w-0 @min-[50rem]:w-auto @min-[50rem]:max-w-100 @min-[50rem]:flex-1">
               <SearchInput
                 value={recipientSearch}
                 onClear={() => setRecipientSearch('')}
@@ -1126,11 +1174,9 @@ export default function BroadcastDetailPage() {
                   <TableHead className="text-muted-foreground hidden sm:table-cell">
                     {t('table.phone')}
                   </TableHead>
-                  {showTagsColumn && (
-                    <TableHead className="text-muted-foreground hidden md:table-cell">
-                      {t('table.tags')}
-                    </TableHead>
-                  )}
+                  <TableHead className="text-muted-foreground hidden md:table-cell">
+                    {t('table.tags')}
+                  </TableHead>
                   <TableHead className="text-muted-foreground">
                     {t('table.status')}
                   </TableHead>
@@ -1155,6 +1201,7 @@ export default function BroadcastDetailPage() {
               <TableBody>
                 {filteredRecipients.map((recipient) => {
                   const rStatus = getRecipientStatus(recipient.status);
+                  const contactTags = recipientTags(recipient);
                   // The contact was edited since this row was dialled,
                   // so what's displayed is NOT what was messaged. Shown
                   // on any status — a delivered row whose contact moved
@@ -1224,15 +1271,22 @@ export default function BroadcastDetailPage() {
                         <span className="text-muted-foreground mt-0.5 block text-xs font-normal whitespace-normal sm:hidden">
                           {phoneBlock}
                         </span>
+                        {contactTags.length > 0 && (
+                          <div className="mt-1 whitespace-normal md:hidden">
+                            <TagChips tags={contactTags} />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden sm:table-cell">
                         {phoneBlock}
                       </TableCell>
-                      {showTagsColumn && (
-                        <TableCell className="hidden whitespace-normal md:table-cell">
-                          <TagChips tags={recipientTags(recipient)} />
-                        </TableCell>
-                      )}
+                      <TableCell className="hidden max-w-64 whitespace-normal md:table-cell">
+                        {contactTags.length ? (
+                          <TagChips tags={contactTags} />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span
                           className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${rStatus.classes}`}

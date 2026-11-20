@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Broadcast } from '@/types';
+import type { Broadcast, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -24,6 +24,7 @@ import { formatScheduledAt } from '@/lib/broadcasts/schedule';
 import { useTranslations } from 'next-intl';
 import { SearchInput } from '@/components/ui/search-input';
 import { fetchAllRows } from '@/lib/supabase/batching';
+import { TagChips } from '@/components/broadcasts/tag-chips';
 import {
   BroadcastDuration,
   ScheduledCountdown,
@@ -77,33 +78,47 @@ export default function BroadcastsPage() {
     setOpeningId(id);
     startNavigation(() => router.push(`/broadcasts/${id}`));
   }
-  const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   useEffect(() => {
-    createClient()
-      .from('tags')
-      .select('id,name')
-      .then(({ data }) => setTags(data ?? []));
+    const db = createClient();
+    void fetchAllRows<Tag>((from, to) =>
+      db.from('tags').select('*').order('id').range(from, to)
+    ).then(({ rows }) => setTags(rows));
   }, []);
-  const visibleBroadcasts = useMemo(
-    () =>
-      broadcasts.filter((broadcast) => {
-        const filter = broadcast.audience_filter as {
-          tagIds?: string[];
-          excludeTagIds?: string[];
-        } | null;
-        const names = tags
-          .filter(
-            (tag) =>
-              filter?.tagIds?.includes(tag.id) ||
-              filter?.excludeTagIds?.includes(tag.id)
-          )
-          .map((tag) => tag.name);
-        return `${broadcast.name} ${broadcast.template_name} ${broadcast.template_language} ${names.join(' ')}`
+  const visibleBroadcasts = useMemo(() => {
+    const byId = new Map(tags.map((tag) => [tag.id, tag]));
+    const resolveTags = (ids: string[] = []) =>
+      ids.flatMap((id) => {
+        const tag = byId.get(id);
+        return tag ? [tag] : [];
+      });
+    const query = search.trim().toLowerCase();
+    return broadcasts
+      .map((broadcast) => {
+        const filter = broadcast.audience_filter as
+          | {
+              tagIds?: string[];
+              excludeTagIds?: string[];
+            }
+          | undefined;
+        return {
+          broadcast,
+          targetTags: resolveTags(filter?.tagIds),
+          excludedTags: resolveTags(filter?.excludeTagIds),
+        };
+      })
+      .filter(({ broadcast, targetTags, excludedTags }) =>
+        [
+          broadcast.name,
+          broadcast.template_name,
+          broadcast.template_language,
+          ...[...targetTags, ...excludedTags].map((tag) => tag.name),
+        ]
+          .join(' ')
           .toLowerCase()
-          .includes(search.trim().toLowerCase());
-      }),
-    [broadcasts, search, tags]
-  );
+          .includes(query)
+      );
+  }, [broadcasts, search, tags]);
 
   // Used to kick off polling only while something is actively sending.
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -334,7 +349,8 @@ export default function BroadcastsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleBroadcasts.map((broadcast) => {
+              {visibleBroadcasts.map((row) => {
+                const { broadcast, targetTags, excludedTags } = row;
                 const status = getBroadcastStatus(broadcast.status);
                 return (
                   <TableRow
@@ -344,23 +360,33 @@ export default function BroadcastsPage() {
                     aria-busy={navigating && openingId === broadcast.id}
                   >
                     {/* Names are free text and routinely long enough to
-                        set the table's width by themselves, which pushed
-                        the whole row off a phone screen. Cap and ellipse
-                        them; the full name is the page you land on. */}
+                      set the table's width by themselves, which pushed
+                      the whole row off a phone screen. Cap and ellipse
+                      them; the full name is the page you land on. */}
                     {/* `w-full max-w-0` is the table-layout idiom for a
-                        cell that takes the leftover width *and* still
-                        truncates: without `max-w-0` the auto layout sizes
-                        the column to the longest name and `truncate`
-                        never engages. */}
+                      cell that takes the leftover width *and* still
+                      truncates: without `max-w-0` the auto layout sizes
+                      the column to the longest name and `truncate`
+                      never engages. */}
                     <TableCell className="text-foreground w-full max-w-0 min-w-48 truncate font-medium md:w-[40%]">
                       {broadcast.name}
                       {navigating && openingId === broadcast.id && (
                         <Loader2 className="ml-2 inline size-3 animate-spin" />
                       )}
                       <BroadcastDuration broadcast={broadcast} />
+                      {(targetTags.length > 0 || excludedTags.length > 0) && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5 whitespace-normal">
+                          {targetTags.length > 0 && (
+                            <TagChips tags={targetTags} />
+                          )}
+                          {excludedTags.length > 0 && (
+                            <TagChips tags={excludedTags} danger />
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     {/* `max-w-0` lets this column shrink and truncate
-                        instead of claiming its full text width. */}
+                      instead of claiming its full text width. */}
                     <TableCell className="text-muted-foreground hidden max-w-0 min-w-28 truncate md:table-cell">
                       {broadcast.template_name}
                     </TableCell>
