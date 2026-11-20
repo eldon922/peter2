@@ -142,7 +142,7 @@ export function BroadcastRecipientList({
 
   return (
     <>
-      <ul className="space-y-3 p-3 sm:hidden" role="list">
+      <ul className="space-y-3 p-3 @min-[50rem]:hidden" role="list">
         {entries.map(
           ({
             id,
@@ -202,7 +202,7 @@ export function BroadcastRecipientList({
           )
         )}
       </ul>
-      <div className="hidden overflow-x-auto sm:block">
+      <div className="hidden overflow-x-auto @min-[50rem]:block">
         <Table>
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
