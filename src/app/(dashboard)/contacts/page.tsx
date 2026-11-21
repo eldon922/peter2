@@ -715,10 +715,7 @@ export default function ContactsPage() {
               : t('subtitleZero')}
           </p>
         </div>
-        {/* Four buttons in a nowrap row ran off the side of a phone.
-            Wrapping them keeps every action reachable; `justify-end`
-            keeps the wrapped rows aligned with the primary action. */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end max-sm:[&_button]:h-auto max-sm:[&_button]:min-h-8 max-sm:[&_button]:w-full max-sm:[&_button]:py-1 max-sm:[&_button]:whitespace-normal max-sm:[&>:last-child]:col-span-2">
           <Button
             variant="outline"
             disabled={exporting}
