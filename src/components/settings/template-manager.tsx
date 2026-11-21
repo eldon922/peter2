@@ -96,6 +96,28 @@ const categoryDisplay: Record<
   },
 };
 
+function TemplateChips({ template }: { template: MessageTemplate }) {
+  const statusKey = template.status || 'DRAFT';
+  const status = templateStatusConfig[statusKey];
+  const category = categoryDisplay[template.category];
+  const CategoryIcon = category?.icon ?? FileText;
+
+  return (
+    <>
+      <Badge className={`border text-xs ${category?.classes ?? ''}`}>
+        <CategoryIcon data-icon="inline-start" aria-hidden />
+        {template.category}
+      </Badge>
+      <Badge className={`border text-xs ${status.classes}`}>
+        {statusKey === 'APPROVED' && (
+          <BadgeCheck data-icon="inline-start" aria-hidden />
+        )}
+        {status.label}
+      </Badge>
+    </>
+  );
+}
+
 interface TemplateFormData {
   name: string;
   category: MessageTemplate['category'];
@@ -158,10 +180,8 @@ export function TemplateManager() {
   // submit handler from POST /submit to PATCH /[id] and changes the
   // dialog title + CTA. Set to the template id to pre-fill from a row.
   const [editingId, setEditingId] = useState<string | null>(null);
-  const editingRemote = Boolean(
-    editingId &&
-    templates.find((item) => item.id === editingId)?.meta_template_id
-  );
+  const editingTemplate = templates.find((item) => item.id === editingId);
+  const editingRemote = Boolean(editingTemplate?.meta_template_id);
   // Deleted-on-Meta templates open read-only: there is nothing to edit.
   const [viewOnly, setViewOnly] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -602,9 +622,6 @@ export function TemplateManager() {
         <div className="grid gap-3 xl:grid-cols-2">
           {templates.map((template) => {
             const statusKey = template.status || 'DRAFT';
-            const status = templateStatusConfig[statusKey];
-            const category = categoryDisplay[template.category];
-            const CategoryIcon = category?.icon ?? FileText;
             return (
               <Card key={template.id}>
                 <CardContent className="@container space-y-2 pt-4">
@@ -690,18 +707,7 @@ export function TemplateManager() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      className={`border text-xs ${category?.classes ?? ''}`}
-                    >
-                      <CategoryIcon data-icon="inline-start" aria-hidden />
-                      {template.category}
-                    </Badge>
-                    <Badge className={`border text-xs ${status.classes}`}>
-                      {statusKey === 'APPROVED' && (
-                        <BadgeCheck data-icon="inline-start" aria-hidden />
-                      )}
-                      {status.label}
-                    </Badge>
+                    <TemplateChips template={template} />
                     {template.language && (
                       <span className="text-muted-foreground text-xs uppercase">
                         {template.language}
@@ -763,6 +769,12 @@ export function TemplateManager() {
                   : t('dialogNewDesc')}
             </DialogDescription>
           </DialogHeader>
+
+          {viewOnly && editingTemplate && (
+            <div className="flex flex-wrap items-center gap-2">
+              <TemplateChips template={editingTemplate} />
+            </div>
+          )}
 
           {form.category === 'Authentication' && (
             <div className="flex items-start gap-2 rounded border border-amber-700/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
