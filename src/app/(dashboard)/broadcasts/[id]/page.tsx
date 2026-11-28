@@ -935,7 +935,10 @@ export default function BroadcastDetailPage() {
             {t('stats.overview')}
           </h2>
           <span className="text-muted-foreground text-xs">
-            {t('stats.audienceBasis', { count: broadcast.total_recipients })}
+            {t.rich('stats.audienceBasis', {
+              count: broadcast.total_recipients,
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </span>
         </div>
         <div className="grid gap-3 @min-[36rem]:grid-cols-3">
@@ -973,7 +976,10 @@ export default function BroadcastDetailPage() {
             {t('stats.performance')}
           </h2>
           <span className="text-muted-foreground text-xs">
-            {t('stats.sentBasis', { count: broadcast.sent_count })}
+            {t.rich('stats.sentBasis', {
+              count: broadcast.sent_count,
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </span>
         </div>
         <div
