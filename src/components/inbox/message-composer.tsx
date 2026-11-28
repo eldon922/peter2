@@ -115,7 +115,6 @@ interface MediaDraft {
   /** Storage path — used to GC the object if the draft is discarded. */
   path: string;
   filename: string;
-  caption: string;
 }
 
 interface MessageComposerProps {
@@ -123,7 +122,7 @@ interface MessageComposerProps {
   conversationId: string;
   sessionExpired: boolean;
   onSend: (text: string, replyToId?: string) => Promise<boolean>;
-  onSendMedia: (payload: SendMediaPayload) => void;
+  onSendMedia: (payload: SendMediaPayload) => Promise<boolean>;
   onSendInteractive: (
     payload: InteractiveMessagePayload,
     replyToId?: string
@@ -212,13 +211,8 @@ export function MessageComposer({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
-  // Mirror of `draft` for the unmount cleanup, which can't read render
-  // state. Kept in sync below so navigating away with a staged-but-unsent
-  // attachment GCs the orphaned object.
   const draftRef = useRef<MediaDraft | null>(null);
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
+  const mountedRef = useRef(false);
 
   // Best-effort GC of a staged object the user never sent. Fire-and-forget.
   const removeStaged = useCallback((path: string | undefined) => {
@@ -242,6 +236,19 @@ export function MessageComposer({
   const readOnly = !canSend;
   // Media (like free-form text) is only allowed inside the 24h window.
   const inputsDisabled = readOnly || sessionExpired;
+  const attachmentDisabled = inputsDisabled || busy || sending;
+  const voiceNote = draft?.kind === 'audio';
+  const captioning = Boolean(draft) && !voiceNote;
+  const trimmedText = text.trim();
+  const captionTooLong = captioning && trimmedText.length > MEDIA_CAPTION_MAX;
+  const sendDisabled =
+    attachmentDisabled ||
+    recording ||
+    captionTooLong ||
+    (!draft && !trimmedText);
+  const editorPlaceholder = inputsDisabled
+    ? t(readOnly ? 'readOnlyPlaceholder' : 'sessionExpiredPlaceholder')
+    : t(captioning ? 'addCaption' : 'typeMessagePlaceholder');
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -254,7 +261,9 @@ export function MessageComposer({
   // navigation doesn't leak the mic, and GC a staged-but-unsent
   // attachment so it doesn't orphan in the bucket.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       clearTimer();
       cancelledRef.current = true;
       // stop() releases the mic stream + audio context inside opus-recorder.
@@ -271,20 +280,35 @@ export function MessageComposer({
     el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
   }, []);
 
-  const handleSend = useCallback(async () => {
-    const trimmed = text.trim();
-    if (!trimmed || sending || sessionExpired) return;
+  async function handleSend() {
+    if (sendDisabled) return;
 
     setSending(true);
     try {
-      if (await onSend(trimmed, replyTo?.id)) {
+      let sent;
+      if (draft) {
+        // The send handler owns the upload after this point.
+        draftRef.current = null;
+        setDraft(null);
+        sent = await onSendMedia({
+          kind: draft.kind,
+          mediaUrl: draft.mediaUrl,
+          path: draft.path,
+          caption: captioning ? trimmedText || undefined : undefined,
+          filename: draft.kind === 'document' ? draft.filename : undefined,
+          replyToId: replyTo?.id,
+        });
+      } else {
+        sent = await onSend(trimmedText, replyTo?.id);
+      }
+      if (sent && !voiceNote) {
         setText((current) => (current === text ? '' : current));
         requestAnimationFrame(adjustHeight);
       }
     } finally {
       setSending(false);
     }
-  }, [text, sending, sessionExpired, onSend, replyTo?.id, adjustHeight]);
+  }
 
   const applyFormat = useCallback(
     (marker: string) => {
@@ -303,23 +327,17 @@ export function MessageComposer({
     [text, inputsDisabled, adjustHeight]
   );
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        ['b', 'i'].includes(e.key.toLowerCase())
-      ) {
-        e.preventDefault();
-        applyFormat(e.key.toLowerCase() === 'b' ? '*' : '_');
-        return;
-      }
-      if (e.key === 'Enter' && !e.shiftKey && enterSends) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend, enterSends, applyFormat]
-  );
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((e.ctrlKey || e.metaKey) && ['b', 'i'].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      applyFormat(e.key.toLowerCase() === 'b' ? '*' : '_');
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && enterSends) {
+      e.preventDefault();
+      void handleSend();
+    }
+  }
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -478,15 +496,20 @@ export function MessageComposer({
           CHAT_MEDIA_BUCKET,
           file
         );
+        if (!mountedRef.current) {
+          removeStaged(path);
+          return;
+        }
         // Replacing an existing draft? GC the previous object first.
         removeStaged(draftRef.current?.path);
-        setDraft({
+        const attachment = {
           kind,
           mediaUrl: publicUrl,
           path,
           filename: file.name,
-          caption: '',
-        });
+        };
+        draftRef.current = attachment;
+        setDraft(attachment);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Upload failed.');
       } finally {
@@ -523,31 +546,13 @@ export function MessageComposer({
         toast.error('Recording is too long (over 16 MB).');
         return;
       }
-      setBusy(true);
-      try {
-        const { publicUrl, path } = await uploadAccountMedia(
-          CHAT_MEDIA_BUCKET,
-          file
-        );
-        removeStaged(draftRef.current?.path);
-        setDraft({
-          kind: 'audio',
-          mediaUrl: publicUrl,
-          path,
-          filename: file.name,
-          caption: '',
-        });
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Upload failed.');
-      } finally {
-        setBusy(false);
-      }
+      await stageUpload('audio', file);
     },
-    [removeStaged]
+    [stageUpload]
   );
 
   const startRecording = useCallback(async () => {
-    if (inputsDisabled || busy || recording) return;
+    if (attachmentDisabled || recording) return;
     if (
       !navigator.mediaDevices?.getUserMedia ||
       typeof AudioContext === 'undefined'
@@ -584,7 +589,7 @@ export function MessageComposer({
       recorderRef.current = null;
       toast.error('Microphone access denied or unavailable.');
     }
-  }, [inputsDisabled, busy, recording, finalizeRecording]);
+  }, [attachmentDisabled, recording, finalizeRecording]);
 
   const stopRecording = useCallback(() => {
     clearTimer();
@@ -607,35 +612,12 @@ export function MessageComposer({
     }
   }, [recording, recordSeconds, stopRecording]);
 
-  // ---- Draft send / discard -----------------------------------------
-
-  const sendDraft = useCallback(() => {
-    if (!draft || busy) return;
-    onSendMedia({
-      kind: draft.kind,
-      mediaUrl: draft.mediaUrl,
-      path: draft.path,
-      // Audio takes no caption (Meta rejects it). Everything else: the
-      // trimmed caption, or undefined when blank.
-      caption:
-        draft.kind === 'audio' ? undefined : draft.caption.trim() || undefined,
-      filename: draft.kind === 'document' ? draft.filename : undefined,
-      replyToId: replyTo?.id,
-    });
-    // The object is now owned by the sent message — clear without GC.
-    setDraft(null);
-    onClearReply?.();
-  }, [draft, busy, onSendMedia, replyTo?.id, onClearReply]);
-
   // Discard GCs the staged object — it was uploaded but never sent.
-  const discardDraft = useCallback(() => {
-    removeStaged(draft?.path);
+  function discardDraft() {
+    removeStaged(draftRef.current?.path);
+    draftRef.current = null;
     setDraft(null);
-  }, [draft?.path, removeStaged]);
-
-  const setCaption = useCallback((caption: string) => {
-    setDraft((d) => (d ? { ...d, caption } : d));
-  }, []);
+  }
 
   // ---- Render --------------------------------------------------------
 
@@ -667,7 +649,7 @@ export function MessageComposer({
         </div>
       )}
 
-      {hasSelection && !inputsDisabled && !draft && !recording && (
+      {hasSelection && !inputsDisabled && !voiceNote && !recording && (
         <div
           ref={formattingRef}
           style={formatPosition}
@@ -717,7 +699,7 @@ export function MessageComposer({
         </div>
       )}
       {!readOnly &&
-        !draft &&
+        !voiceNote &&
         !recording &&
         /[*_~`]|^(?:> |[-*] |\d+\. )/m.test(text) && (
           <div
@@ -764,17 +746,7 @@ export function MessageComposer({
         }}
       />
 
-      {draft ? (
-        <MediaDraftPreview
-          draft={draft}
-          busy={busy}
-          readOnly={readOnly}
-          onCaptionChange={setCaption}
-          onDiscard={discardDraft}
-          onSend={sendDraft}
-          t={t}
-        />
-      ) : recording ? (
+      {recording ? (
         // Recording bar — replaces the composer while the mic is live.
         <div className="border-border bg-muted flex items-center gap-3 rounded-xl border px-4 py-2.5">
           <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
@@ -852,28 +824,28 @@ export function MessageComposer({
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem
                 onClick={() => imageInputRef.current?.click()}
-                disabled={inputsDisabled || busy}
+                disabled={attachmentDisabled}
               >
                 <ImageIcon className="mr-2 h-4 w-4" />
                 {t('photo')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => videoInputRef.current?.click()}
-                disabled={inputsDisabled || busy}
+                disabled={attachmentDisabled}
               >
                 <Video className="mr-2 h-4 w-4" />
                 {t('video')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => documentInputRef.current?.click()}
-                disabled={inputsDisabled || busy}
+                disabled={attachmentDisabled}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 {t('document')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => void startRecording()}
-                disabled={inputsDisabled || busy}
+                disabled={attachmentDisabled}
               >
                 <Mic className="mr-2 h-4 w-4" />
                 {t('voiceNote')}
@@ -906,7 +878,7 @@ export function MessageComposer({
             {/* Attach menu — photo / video / document / voice. */}
             <DropdownMenu>
               <DropdownMenuTrigger
-                disabled={inputsDisabled || busy}
+                disabled={attachmentDisabled}
                 aria-label={t('attachMedia')}
                 title={
                   readOnly
@@ -1017,9 +989,18 @@ export function MessageComposer({
           </div>
 
           <div className="relative min-w-0 flex-1">
+            {draft && (
+              <MediaDraftPreview
+                draft={draft}
+                onDiscard={discardDraft}
+                removeLabel={t('removeAttachment')}
+              />
+            )}
             <textarea
               ref={textareaRef}
-              aria-label={t('message')}
+              aria-label={t(captioning ? 'addCaption' : 'message')}
+              aria-invalid={captionTooLong || undefined}
+              maxLength={captioning ? MEDIA_CAPTION_MAX : undefined}
               value={text}
               onChange={handleChange}
               onSelect={(event) => {
@@ -1068,14 +1049,9 @@ export function MessageComposer({
                 if (event.key === 'Escape') setHasSelection(false);
                 handleKeyDown(event);
               }}
-              placeholder={
-                readOnly
-                  ? t('readOnlyPlaceholder')
-                  : sessionExpired
-                    ? t('sessionExpiredPlaceholder')
-                    : t('typeMessagePlaceholder')
-              }
-              disabled={sessionExpired || readOnly}
+              placeholder={editorPlaceholder}
+              disabled={inputsDisabled || voiceNote}
+              hidden={voiceNote}
               rows={1}
               // Textarea keeps its own inline title — the GatedButton
               // wrapping pattern doesn't apply to non-button inputs.
@@ -1087,10 +1063,11 @@ export function MessageComposer({
                 // below that on its own — so on a narrow phone the row
                 // would overflow instead of the box getting smaller.
                 'border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus-visible:ring-ring block min-h-11 w-full resize-none rounded-lg border py-2.5 pr-11 pl-3 text-sm transition-colors outline-none focus-visible:ring-2',
-                (sessionExpired || readOnly) && 'cursor-not-allowed opacity-50'
+                captioning && 'mt-2',
+                inputsDisabled && 'cursor-not-allowed opacity-50'
               )}
             />
-            <div className="absolute right-1.5 bottom-1.5">
+            <div className="absolute right-1.5 bottom-1.5" hidden={voiceNote}>
               <EmojiMenu
                 label={t('insertEmoji')}
                 disabled={inputsDisabled}
@@ -1120,7 +1097,7 @@ export function MessageComposer({
             size="sm"
             canAct={!readOnly}
             gateReason="send messages"
-            disabled={!text.trim() || sessionExpired || sending}
+            disabled={sendDisabled}
             onClick={handleSend}
             aria-label={t('send')}
             title={t('send')}
@@ -1129,6 +1106,12 @@ export function MessageComposer({
             <Send className="h-4 w-4" />
           </GatedButton>
         </div>
+      )}
+
+      {!recording && captionTooLong && (
+        <p className="text-destructive mt-2 text-xs" role="status">
+          {t('captionTooLong', { max: MEDIA_CAPTION_MAX })}
+        </p>
       )}
 
       {!readOnly && (
@@ -1184,28 +1167,14 @@ export function MessageComposer({
   );
 }
 
-/**
- * Staged-attachment preview with caption + send/discard. Declared at
- * module scope (not nested in MessageComposer) so React keeps it mounted
- * across the parent's re-renders — a nested component would remount the
- * caption input on every keystroke and drop focus.
- */
 function MediaDraftPreview({
   draft,
-  busy,
-  readOnly,
-  onCaptionChange,
   onDiscard,
-  onSend,
-  t,
+  removeLabel,
 }: {
   draft: MediaDraft;
-  busy: boolean;
-  readOnly: boolean;
-  onCaptionChange: (caption: string) => void;
   onDiscard: () => void;
-  onSend: () => void;
-  t: ReturnType<typeof useTranslations>;
+  removeLabel: string;
 }) {
   return (
     <div className="border-border bg-muted/40 rounded-xl border p-3">
@@ -1223,7 +1192,7 @@ function MediaDraftPreview({
             <video
               src={draft.mediaUrl}
               controls
-              className="max-h-40 rounded-lg"
+              className="max-h-40 max-w-full rounded-lg"
             />
           )}
           {draft.kind === 'audio' && (
@@ -1239,44 +1208,11 @@ function MediaDraftPreview({
         <button
           type="button"
           onClick={onDiscard}
-          aria-label={t('removeAttachment')}
+          aria-label={removeLabel}
           className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1"
         >
           <X className="h-4 w-4" />
         </button>
-      </div>
-
-      <div className="mt-2 flex items-end gap-2">
-        {draft.kind !== 'audio' && (
-          <input
-            value={draft.caption}
-            maxLength={MEDIA_CAPTION_MAX}
-            onChange={(e) => onCaptionChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            aria-label={t('addCaption')}
-            placeholder={t('addCaption')}
-            className="border-border bg-muted text-foreground placeholder-muted-foreground focus:border-primary/50 flex-1 rounded-xl border px-4 py-2.5 text-sm transition-colors outline-none"
-          />
-        )}
-        <GatedButton
-          size="sm"
-          canAct={!readOnly}
-          gateReason="send messages"
-          disabled={busy}
-          aria-label={t('send')}
-          onClick={onSend}
-          className={cn(
-            'bg-primary hover:bg-primary/90 h-10 w-10 shrink-0 p-0 disabled:opacity-40',
-            draft.kind === 'audio' && 'ml-auto'
-          )}
-        >
-          <Send className="h-4 w-4" />
-        </GatedButton>
       </div>
     </div>
   );

@@ -574,7 +574,7 @@ export function MessageThread({
 
   const handleSendMedia = useCallback(
     async (payload: SendMediaPayload) => {
-      if (!conversation) return;
+      if (!conversation) return false;
 
       // Documents show their filename in our own bubble (and to the
       // recipient as the Meta caption when no caption was typed); other
@@ -626,10 +626,11 @@ export function MessageThread({
           void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(
             () => {}
           );
-          return;
+          return false;
         }
 
         onUpdateMessage(tempId, { status: 'sent' });
+        return true;
       } catch (err) {
         console.error('Failed to send media:', err);
         const reason = err instanceof Error ? err.message : 'network error';
@@ -638,6 +639,7 @@ export function MessageThread({
         void deleteAccountMedia(CHAT_MEDIA_BUCKET, payload.path).catch(
           () => {}
         );
+        return false;
       }
     },
     [conversation, onNewMessage, onUpdateMessage]

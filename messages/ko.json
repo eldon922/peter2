@@ -219,6 +219,7 @@
       "sendTemplate": "템플릿 보내기",
       "draftWithAI": "AI로 답장 초안 작성",
       "addCaption": "캡션 추가…",
+      "captionTooLong": "캡션은 최대 {max, number}자까지 입력할 수 있습니다.",
       "removeAttachment": "첨부 파일 제거",
       "moreActions": "더보기",
       "interactiveMessage": "인터랙티브 메시지",

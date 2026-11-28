@@ -219,6 +219,7 @@
       "sendTemplate": "Kirim template",
       "draftWithAI": "Susun balasan dengan AI",
       "addCaption": "Tambahkan keterangan…",
+      "captionTooLong": "Keterangan dapat berisi hingga {max, number} karakter.",
       "removeAttachment": "Hapus lampiran",
       "moreActions": "Lainnya",
       "interactiveMessage": "Pesan interaktif",

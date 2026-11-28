@@ -219,6 +219,7 @@
       "sendTemplate": "Send template",
       "draftWithAI": "Draft a reply with AI",
       "addCaption": "Add a caption…",
+      "captionTooLong": "Captions can be up to {max, number} characters.",
       "removeAttachment": "Remove attachment",
       "moreActions": "More",
       "interactiveMessage": "Interactive message",
