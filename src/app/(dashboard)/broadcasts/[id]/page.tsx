@@ -937,7 +937,9 @@ export default function BroadcastDetailPage() {
           <span className="text-muted-foreground text-xs">
             {t.rich('stats.audienceBasis', {
               count: broadcast.total_recipients,
-              strong: (chunks) => <strong>{chunks}</strong>,
+              strong: (chunks) => (
+                <strong className="text-foreground font-bold">{chunks}</strong>
+              ),
             })}
           </span>
         </div>
@@ -978,7 +980,9 @@ export default function BroadcastDetailPage() {
           <span className="text-muted-foreground text-xs">
             {t.rich('stats.sentBasis', {
               count: broadcast.sent_count,
-              strong: (chunks) => <strong>{chunks}</strong>,
+              strong: (chunks) => (
+                <strong className="text-foreground font-bold">{chunks}</strong>
+              ),
             })}
           </span>
         </div>
