@@ -89,7 +89,7 @@ function ContactTagFilter({
         render={
           <Button
             variant="outline"
-            className="border-border text-muted-foreground hover:bg-muted shrink-0"
+            className="border-border text-muted-foreground hover:bg-muted shrink-0 max-sm:h-auto max-sm:min-h-8 max-sm:w-full max-sm:py-1 max-sm:whitespace-normal"
           />
         }
       >
@@ -797,7 +797,7 @@ export default function ContactsPage() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <ContactTagFilter
               label={t('filterByTags')}
               tags={[untaggedOption, ...allTags]}
