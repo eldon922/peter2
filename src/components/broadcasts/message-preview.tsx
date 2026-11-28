@@ -1,9 +1,25 @@
-import { CheckCheck, FileIcon, ImageIcon } from 'lucide-react';
+import {
+  CheckCheck,
+  Copy,
+  ExternalLink,
+  FileIcon,
+  ImageIcon,
+  Phone,
+  Reply,
+  type LucideIcon,
+} from 'lucide-react';
 import { format } from 'date-fns';
 
 import { FormattedText } from '@/components/inbox/formatted-text';
 import { renderTemplateBody } from '@/lib/whatsapp/broadcast-message';
-import type { MessageTemplate } from '@/types';
+import type { MessageTemplate, TemplateButton } from '@/types';
+
+const buttonIcons: Record<TemplateButton['type'], LucideIcon> = {
+  QUICK_REPLY: Reply,
+  URL: ExternalLink,
+  PHONE_NUMBER: Phone,
+  COPY_CODE: Copy,
+};
 
 interface Props {
   template: Pick<
@@ -81,14 +97,18 @@ export function BroadcastMessagePreview({
         </div>
         {template.buttons && template.buttons.length > 0 && (
           <div className="mt-1 flex flex-col gap-1">
-            {template.buttons.map((b, i) => (
-              <div
-                key={i}
-                className="rounded-lg bg-[#D9FDD3] px-3 py-1.5 text-center text-sm font-medium text-[#00608A] shadow-sm dark:bg-[#005C4B] dark:text-[#53BDEB]"
-              >
-                {b.text}
-              </div>
-            ))}
+            {template.buttons.map((button, i) => {
+              const Icon = buttonIcons[button.type];
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-[#D9FDD3] px-3 py-1.5 text-center text-sm font-medium text-[#00608A] shadow-sm dark:bg-[#005C4B] dark:text-[#53BDEB]"
+                >
+                  {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
+                  <span className="min-w-0 wrap-anywhere">{button.text}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
