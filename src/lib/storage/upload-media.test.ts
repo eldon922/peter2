@@ -31,4 +31,9 @@ describe("buildMediaPath", () => {
     const path = buildMediaPath(ACCOUNT, "README", 1700000000000);
     expect(path).toBe(`account-${ACCOUNT}/1700000000000-README.bin`);
   });
+
+  it("uses a safe storage path for files with non-ASCII extensions", () => {
+    const path = buildMediaPath(ACCOUNT, "backup.資料", 1700000000000);
+    expect(path).toBe(`account-${ACCOUNT}/1700000000000-backup.bin`);
+  });
 });

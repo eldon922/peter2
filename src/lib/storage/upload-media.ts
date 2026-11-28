@@ -32,17 +32,14 @@ export function buildMediaPath(
   fileName: string,
   now: number = Date.now(),
 ): string {
-  // Only treat the trailing segment as an extension when there's a real
-  // one — a bare name like "README" has no extension and falls back to
-  // "bin" rather than becoming "readme".
-  const hasExt = /\.[^.]+$/.test(fileName);
-  const ext = hasExt ? fileName.split(".").pop()!.toLowerCase() : "bin";
+  const extension = fileName.match(/\.([^.]+)$/)?.[1] ?? "";
+  const safeExtension = extension.toLowerCase().replace(/[^a-z0-9_-]/g, "");
   const safeBase =
     fileName
       .replace(/\.[^.]+$/, "")
       .replace(/[^a-zA-Z0-9_-]+/g, "_")
       .slice(0, 40) || "file";
-  return `account-${accountId}/${now}-${safeBase}.${ext}`;
+  return `account-${accountId}/${now}-${safeBase}.${safeExtension || "bin"}`;
 }
 
 export interface UploadAccountMediaResult {

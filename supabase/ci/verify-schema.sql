@@ -33,6 +33,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'chat-media') THEN
     RAISE EXCEPTION 'the chat-media bucket row was not created (migration 023)';
   END IF;
+  IF EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'chat-media' AND allowed_mime_types IS NOT NULL) THEN
+    RAISE EXCEPTION 'the chat-media bucket still limits file types (migration 075)';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'flow-media') THEN
     RAISE EXCEPTION 'the flow-media bucket row was not created (migration 016)';
   END IF;
